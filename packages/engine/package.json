@@ -1,0 +1,17 @@
+{
+  "name": "@strata/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Strata's I/O side: git, GitHub, context sources, the LLM, and the analysis pipeline that drives @strata/core.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@strata/core": "workspace:*"
+  }
+}

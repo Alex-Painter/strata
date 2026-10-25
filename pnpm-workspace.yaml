@@ -1,0 +1,12 @@
+packages:
+  - packages/*
+  - apps/*
+
+# pnpm 10 blocks dependency install scripts unless they are listed here.
+onlyBuiltDependencies:
+  - esbuild
+# better-sqlite3 ships prebuilt binaries for Linux, macOS and Windows (x64 and
+# arm64) and loads those first, so compiling it with node-gyp only adds a
+# Python and C++ toolchain requirement.
+ignoredBuiltDependencies:
+  - better-sqlite3

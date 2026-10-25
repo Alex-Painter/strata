@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-static/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+# Local runtime data: SQLite database, git clone cache, LLM response cache.
+.data/
+.strata/
+*.sqlite
+*.sqlite-*
+# CLI output written into the repo root by default.
+strata-report*.html
+strata-report*.json
+.DS_Store
