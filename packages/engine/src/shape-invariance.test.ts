@@ -1,18 +1,143 @@
-import { describe, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  type ChangeReport,
+  canonicalReport,
+  parseChangeInput,
+  stableStringify,
+} from "@strata/core";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createEngine } from "./engine.js";
+import { treeOf } from "./git/diff.js";
+import { gitOk } from "./git/run.js";
+import { type FeatureShape, featureShape, type ShapeRepo } from "./testing/feature-shapes.js";
 
 /**
- * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1), wired in from the
- * start as CLAUDE.md asks. Milestone 1 turns these into real tests.
- *
- * Fixture plan: a temp git repo where one small feature (a model field, an API
- * route, a UI component, a test, a lockfile bump and a doc) is built twice from
- * the same main: once as a single commit, once as a stack of four commits that
- * includes a mistake a later commit fixes, ending in the same tree. Both are
- * analysed with the same intent source and a deterministic fake LLM.
+ * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1): one feature built
+ * five ways (see testing/feature-shapes.ts) must give the same whole-stack
+ * view, while "How it arrived" shows each split as it is.
  */
+const SHAPES: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "fork"];
+
+interface Analysed {
+  shape: ShapeRepo;
+  report: ChangeReport;
+  gitDir: string;
+}
+
+const analysed = new Map<FeatureShape, Analysed>();
+let dataDir: string;
+
+beforeAll(async () => {
+  dataDir = await mkdtemp(join(tmpdir(), "strata-shapes-"));
+  for (const name of SHAPES) {
+    const shape = await featureShape(name);
+    const engine = createEngine({
+      dataDir: join(dataDir, name),
+      githubPort: shape.github,
+      gitRemote: () => shape.remote.dir,
+      now: () => new Date(Date.UTC(2026, 9, 2)),
+    });
+    const input = parseChangeInput(`acme/app#${shape.tip}`);
+    const report = await engine.analyzeChange(input);
+    const { gitDir } = await engine.resolveChange(input);
+    analysed.set(name, { shape, report, gitDir });
+  }
+}, 60_000);
+
+afterAll(async () => {
+  for (const { shape } of analysed.values()) await shape.remote.remove();
+  await rm(dataDir, { recursive: true, force: true });
+});
+
+const get = (name: FeatureShape) => analysed.get(name) as Analysed;
+
+async function patchId({ report, gitDir }: Analysed): Promise<string> {
+  const out = await gitOk(gitDir, ["patch-id", "--stable"], undefined, report.raw.diff);
+  return out.split(" ")[0] as string;
+}
+
 describe("shape invariance", () => {
-  it.todo("one PR and a four-PR stack of the same feature give identical canonical reports");
-  it.todo("hints differ between the two runs, proving they exist but do not leak into the output");
-  it.todo("reordering files in the diff does not change the report");
+  const same: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked"];
+
+  it("gives the same whole-stack diff however the feature was split", async () => {
+    const one = get("one-pr");
+    expect(one.report.change.files.map((file) => file.path)).toEqual([
+      "app/models/account.py",
+      "app/routers/forecasts.py",
+      "app/services/forecasts.py",
+      "docs/forecasts.md",
+      "tests/test_forecasts.py",
+      "uv.lock",
+    ]);
+    const ids = await Promise.all(same.map((name) => patchId(get(name))));
+    expect(new Set(ids).size).toBe(1);
+    for (const name of same) {
+      expect(get(name).report.change.files, name).toEqual(one.report.change.files);
+      expect(get(name).report.change.hunks, name).toEqual(one.report.change.hunks);
+    }
+  });
+
+  it("gives identical canonical reports", () => {
+    const expected = stableStringify(canonicalReport(get("one-pr").report));
+    for (const name of same) {
+      expect(stableStringify(canonicalReport(get(name).report)), name).toBe(expected);
+    }
+  });
+
+  it("ends each split at a different commit with the same tree", async () => {
+    const one = get("one-pr");
+    const stack = get("stack");
+    expect(one.report.change.revisions?.head).not.toBe(stack.report.change.revisions?.head);
+    expect(await treeOf(one.gitDir, one.report.change.revisions?.head as string)).toBe(
+      await treeOf(stack.gitDir, stack.report.change.revisions?.head as string),
+    );
+  });
+
+  it("keeps the split in the hints and parts, where it belongs", () => {
+    expect(get("one-pr").report.change.hints).toHaveLength(1);
+    expect(get("stack").report.change.hints).toHaveLength(4);
+    expect(get("stack").report.parts.map((part) => [part.pr, part.how])).toEqual([
+      [1, "direct"],
+      [2, "direct"],
+      [3, "direct"],
+      [4, "direct"],
+    ]);
+    // #2 moved onto main past main's own new commit, so it's replayed onto #1.
+    // #3 sits on #2's old head, which has the same code as the stack so far.
+    expect(get("restacked").report.parts.map((part) => [part.pr, part.how])).toEqual([
+      [1, "direct"],
+      [2, "replayed"],
+      [3, "direct"],
+      [4, "direct"],
+    ]);
+    // #4 fixes #2's service, so its part changes a file #2 added.
+    const fix = get("stack").report.parts[3];
+    expect(fix?.files.map((file) => [file.path, file.status])).toEqual([
+      ["app/services/forecasts.py", "modified"],
+      ["docs/forecasts.md", "modified"],
+    ]);
+  });
+
+  it("never lets main's own new commits into the whole-stack diff", () => {
+    for (const name of ["squash-merged", "restacked"] as const) {
+      const paths = get(name).report.change.files.map((file) => file.path);
+      expect(paths, name).not.toContain("README.md");
+    }
+  });
+
+  it("gives a fork two paths, and the Change for one of them", () => {
+    const fork = get("fork").report;
+    expect(fork.stack?.paths).toEqual([
+      [1, 2, 3, 4],
+      [1, 2, 5],
+    ]);
+    expect(fork.stack?.selectedPath).toEqual([1, 2, 3, 4]);
+    expect(stableStringify(canonicalReport(fork))).toBe(
+      stableStringify(canonicalReport(get("stack").report)),
+    );
+  });
+
   it.todo("PR descriptions never feed the intent ledger");
 });
