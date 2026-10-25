@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StackRepo } from "../testing/stack-repo.js";
 import { CREDENTIAL_ARGS, RepoCache, remoteEnv } from "./cache.js";
-import { git, gitOk } from "./run.js";
+import { git, gitEnv, gitOk } from "./run.js";
 
 let remote: StackRepo;
 let dataDir: string;
@@ -117,5 +117,21 @@ describe("git isolation", () => {
     expect(await exists(join(marks, "system"))).toBe(false);
     expect(config).not.toContain(home);
     expect(config).not.toContain("noprefix");
+  });
+
+  it("ignores your attributes and ignore files", async () => {
+    const home = join(dataDir, "home");
+    await mkdir(join(home, ".config/git"), { recursive: true });
+    await writeFile(join(home, ".config/git/attributes"), "*.txt -diff\n");
+    await writeFile(join(home, ".config/git/ignore"), "*.txt\n");
+    vi.stubEnv("HOME", home);
+    vi.stubEnv("XDG_CONFIG_HOME", join(home, ".config"));
+    await writeFile(join(remote.dir, "a.txt"), "a\n");
+
+    const attributes = await gitOk(remote.dir, ["check-attr", "diff", "a.txt"], gitEnv());
+    const ignored = await git(remote.dir, ["check-ignore", "a.txt"], gitEnv());
+
+    expect(attributes.trim()).toBe("a.txt: diff: unspecified");
+    expect(ignored.code).toBe(1);
   });
 });

@@ -1,10 +1,10 @@
 /**
  * Runs git with Strata's own settings, never the user's.
  *
- * System and global git config are ignored, so a user's aliases, diff
- * drivers, credential helpers or rename settings can't change what Strata
- * sees, and prompts are off so a missing credential fails instead of hanging.
- * Repo-local config in Strata's own cache still applies.
+ * System and global git config, attributes and ignore files are ignored, so
+ * a user's aliases, diff drivers, credential helpers or rename settings can't
+ * change what Strata sees, and prompts are off so a missing credential fails
+ * instead of hanging. Repo-local config in Strata's own cache still applies.
  */
 import { execFile } from "node:child_process";
 
@@ -36,6 +36,13 @@ export function gitEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv
     ...env,
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_ATTR_NOSYSTEM: "1",
+    // Attributes and ignore files outside config: ~/.config/git/attributes and ignore.
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "core.attributesFile",
+    GIT_CONFIG_VALUE_0: "/dev/null",
+    GIT_CONFIG_KEY_1: "core.excludesFile",
+    GIT_CONFIG_VALUE_1: "/dev/null",
     GIT_TERMINAL_PROMPT: "0",
     LC_ALL: "C",
   };
