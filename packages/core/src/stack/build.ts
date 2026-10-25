@@ -1,0 +1,544 @@
+/**
+ * Builds a stack from PR metadata plus a few git facts.
+ *
+ * This stays pure: it never runs git. When it needs a fact it doesn't have
+ * (is this commit inside that one? where do these two meet?), it finishes the
+ * pass with what it knows and returns the questions instead of a stack. The
+ * engine answers them with git and calls again, until the stack is done. Each
+ * round only adds facts, so the same index and facts always give the same
+ * stack, and tests can hand it a fixed table of facts.
+ *
+ * A PR's parent is the PR whose head branch is its base, or was its base
+ * before GitHub retargeted it (when a merged parent's branch is deleted, its
+ * children move to the parent's base). See model/stack.ts for the link states.
+ */
+import type { Evidence } from "../model/change.js";
+import { stableId } from "../model/ids.js";
+import type {
+  BuildStackResult,
+  FactRequest,
+  GitFacts,
+  LinkState,
+  PrIndex,
+  Stack,
+  StackEdge,
+  StackIssue,
+  StackNode,
+  StackPr,
+  StackSeed,
+} from "../model/stack.js";
+
+export class StackError extends Error {}
+
+export function emptyFacts(): GitFacts {
+  return { isAncestor: {}, mergeBase: {}, firstParent: {}, tip: {} };
+}
+
+/** The key for a two-commit fact. */
+export function factKey(a: string, b: string): string {
+  return `${a} ${b}`;
+}
+
+/** Facts from `more` win, so a later answer replaces an earlier one. */
+export function mergeFacts(facts: GitFacts, more: Partial<GitFacts>): GitFacts {
+  return {
+    isAncestor: { ...facts.isAncestor, ...more.isAncestor },
+    mergeBase: { ...facts.mergeBase, ...more.mergeBase },
+    firstParent: { ...facts.firstParent, ...more.firstParent },
+    tip: { ...facts.tip, ...more.tip },
+  };
+}
+
+export function buildStack(index: PrIndex, seed: StackSeed, facts: GitFacts): BuildStackResult {
+  const builder = new Builder(index, facts);
+  const stack = builder.build(seed);
+  const requests = builder.requests();
+  return requests.length > 0 ? { kind: "needs", requests } : { kind: "done", stack };
+}
+
+interface Candidate {
+  pr: StackPr;
+  /** 0 when the child targets the candidate's branch now; higher for older bases. */
+  refRank: number;
+  ref: string;
+}
+
+interface ParentChoice {
+  pr: StackPr;
+  ref: string;
+  /** Set when the choice came down to which candidate is newest. */
+  tiedWith: StackPr | null;
+}
+
+const STATE_RANK = { open: 2, merged: 1, closed: 0 } as const;
+
+class Builder {
+  private readonly byNumber = new Map<number, StackPr>();
+  /** Same-repo PRs by head branch. Only these can be parents. */
+  private readonly byHeadRef = new Map<string, StackPr[]>();
+  /** PRs by every branch they target or used to target. */
+  private readonly byCandidateRef = new Map<string, StackPr[]>();
+  private readonly parentCache = new Map<number, ParentChoice | null>();
+  /** Children whose link to their parent was cut to break a cycle. */
+  private readonly cut = new Set<number>();
+  private readonly missing = new Map<string, FactRequest>();
+  private readonly issues: StackIssue[] = [];
+  private readonly issueKeys = new Set<string>();
+
+  constructor(
+    private readonly index: PrIndex,
+    private readonly facts: GitFacts,
+  ) {
+    for (const pr of index.prs) this.byNumber.set(pr.number, pr);
+    for (const pr of this.byNumber.values()) {
+      if (!pr.crossRepository) push(this.byHeadRef, pr.headRef, pr);
+      for (const ref of candidateRefs(pr)) push(this.byCandidateRef, ref, pr);
+    }
+  }
+
+  requests(): FactRequest[] {
+    return [...this.missing.values()];
+  }
+
+  build(seed: StackSeed): Stack {
+    const seedPr = this.resolveSeed(seed);
+    const root = this.findRoot(seedPr);
+
+    const trunkName = root.baseChanges[0]?.from ?? root.baseRef;
+    const isDefault = trunkName === this.index.defaultBranch;
+    if (!isDefault) {
+      this.issue(
+        "non-default-trunk",
+        [root.number],
+        `#${root.number} started on ${trunkName}, not ${this.index.defaultBranch}.`,
+        [prEvidence(root.number, `#${root.number}'s first base was ${trunkName}`)],
+      );
+    }
+
+    const base = this.rootAnchor(root);
+    if (base === null) {
+      this.issue(
+        "missing-commit",
+        [root.number],
+        `Couldn't tell where #${root.number} left ${trunkName}.`,
+        [prEvidence(root.number, `#${root.number}`)],
+      );
+    }
+
+    const nodes: StackNode[] = [];
+    const edges: StackEdge[] = [];
+    const anchors = new Map<number, string | null>();
+    const visit = (pr: StackPr, parent: StackPr | null, depth: number, seen: Set<number>) => {
+      seen.add(pr.number);
+      let anchor: string | null;
+      if (parent) {
+        const choice = this.parentOf(pr) as ParentChoice;
+        if (choice.tiedWith) {
+          const other = choice.tiedWith;
+          this.issue(
+            "ambiguous-parent",
+            [pr.number],
+            `#${pr.number} could sit on #${parent.number} or #${other.number}. ` +
+              `Strata picked #${parent.number}, the newer one.`,
+            [
+              prEvidence(pr.number, `#${pr.number} targets ${choice.ref}`),
+              prEvidence(parent.number, `#${parent.number}'s head is ${parent.headRef}`),
+              prEvidence(other.number, `#${other.number}'s head is ${other.headRef}`),
+            ],
+          );
+        }
+        const edge = this.link(parent, pr, choice.ref, anchors.get(parent.number) ?? null);
+        edges.push(edge.edge);
+        anchor = edge.anchor;
+      } else {
+        anchor = base;
+      }
+      anchors.set(pr.number, anchor);
+      const children = this.childrenOf(pr).filter((child) => !seen.has(child.number));
+      nodes.push({
+        pr,
+        parent: parent?.number ?? null,
+        children: children.map((child) => child.number),
+        depth,
+        anchor,
+      });
+      for (const child of children) visit(child, pr, depth + 1, seen);
+    };
+    visit(root, null, 0, new Set());
+
+    const paths = rootToTipPaths(nodes);
+    const selectedPath = this.selectPath(nodes, paths, seedPr, seed.leaf);
+
+    return {
+      id: stableId("stk", this.index.repo, String(root.number)),
+      repo: this.index.repo,
+      trunk: { name: trunkName, isDefault },
+      root: root.number,
+      base,
+      nodes,
+      edges,
+      paths,
+      selectedPath,
+      seed: seedPr.number,
+      issues: this.issues,
+    };
+  }
+
+  private resolveSeed(seed: StackSeed): StackPr {
+    if ("pr" in seed) {
+      const pr = this.byNumber.get(seed.pr);
+      if (!pr) throw new StackError(`#${seed.pr} isn't in the PR index for ${this.index.repo}.`);
+      return pr;
+    }
+    const onBranch = this.index.prs.filter(
+      (pr) => pr.headRef === seed.branch && !pr.crossRepository,
+    );
+    const pick =
+      newest(
+        onBranch.filter((pr) => pr.state === "open"),
+        (pr) => pr.updatedAt,
+      ) ??
+      newest(
+        onBranch.filter((pr) => pr.state === "merged"),
+        (pr) => pr.mergedAt ?? "",
+      ) ??
+      newest(onBranch, (pr) => pr.closedAt ?? pr.updatedAt);
+    if (!pick) throw new StackError(`No PR in ${this.index.repo} has ${seed.branch} as its head.`);
+    return pick;
+  }
+
+  /** Follows parents down from the seed, cutting any cycle at its newest link. */
+  private findRoot(seed: StackPr): StackPr {
+    for (;;) {
+      const walked: StackPr[] = [];
+      const seen = new Set<number>();
+      let current: StackPr | null = seed;
+      while (current && !seen.has(current.number)) {
+        seen.add(current.number);
+        walked.push(current);
+        current = this.parentOf(current)?.pr ?? null;
+      }
+      if (!current) return walked[walked.length - 1] as StackPr;
+
+      // `current` was seen before: everything from it onwards is a cycle.
+      const cycle = walked.slice(walked.findIndex((pr) => pr.number === current?.number));
+      const newestChild = cycle.reduce((a, b) => (compareAge(b, a) > 0 ? b : a));
+      this.cut.add(newestChild.number);
+      const numbers = cycle.map((pr) => pr.number).sort((a, b) => a - b);
+      this.issue(
+        "cycle",
+        numbers,
+        `${numbers.map((n) => `#${n}`).join(", ")} target each other's branches. ` +
+          `Strata cut the link below #${newestChild.number}, the newest.`,
+        numbers.map((n) => prEvidence(n, `#${n}`)),
+      );
+    }
+  }
+
+  private parentOf(pr: StackPr): ParentChoice | null {
+    if (this.cut.has(pr.number)) return null;
+    if (this.parentCache.has(pr.number)) return this.parentCache.get(pr.number) ?? null;
+    const choice = this.chooseParent(pr);
+    this.parentCache.set(pr.number, choice);
+    return choice;
+  }
+
+  private chooseParent(child: StackPr): ParentChoice | null {
+    const candidates: Candidate[] = [];
+    candidateRefs(child).forEach((ref, refRank) => {
+      for (const pr of this.byHeadRef.get(ref) ?? []) {
+        if (pr.number !== child.number) candidates.push({ pr, refRank, ref });
+      }
+    });
+    if (candidates.length === 0) return null;
+    if (candidates.length === 1) {
+      const only = candidates[0] as Candidate;
+      return { pr: only.pr, ref: only.ref, tiedWith: null };
+    }
+
+    const scored = candidates.map((c) => ({
+      c,
+      key: [
+        -c.refRank,
+        this.holdsHead(c.pr, child) ? 1 : 0,
+        overlaps(c.pr, child) ? 1 : 0,
+        STATE_RANK[c.pr.state],
+      ],
+    }));
+    scored.sort((a, b) => compareKeys(b.key, a.key) || compareAge(b.c.pr, a.c.pr));
+    const [best, next] = scored as [(typeof scored)[number], (typeof scored)[number]];
+    // Only recency separated them: say so rather than guess silently.
+    const tied = compareKeys(best.key, next.key) === 0;
+    return { pr: best.c.pr, ref: best.c.ref, tiedWith: tied ? next.c.pr : null };
+  }
+
+  /** Whether the child holds the candidate's head, now or before a force-push. */
+  private holdsHead(parent: StackPr, child: StackPr): boolean {
+    if (this.isAncestor(parent.headOid, child.headOid) === true) return true;
+    return parent.forcePushes.some((push) => this.isAncestor(push.before, child.headOid) === true);
+  }
+
+  private childrenOf(pr: StackPr): StackPr[] {
+    const children = new Map<number, StackPr>();
+    for (const candidate of this.byCandidateRef.get(pr.headRef) ?? []) {
+      if (candidate.number === pr.number) continue;
+      if (this.parentOf(candidate)?.pr.number === pr.number)
+        children.set(candidate.number, candidate);
+    }
+    return [...children.values()].sort((a, b) => a.number - b.number);
+  }
+
+  private rootAnchor(root: StackPr): string | null {
+    const from =
+      root.state === "merged" && root.mergeCommitOid
+        ? this.firstParent(root.mergeCommitOid)
+        : this.tip(root.baseRef);
+    return from ? (this.mergeBase(from, root.headOid) ?? null) : null;
+  }
+
+  private link(
+    parent: StackPr,
+    child: StackPr,
+    ref: string,
+    parentAnchor: string | null,
+  ): { edge: StackEdge; anchor: string | null } {
+    const via = child.baseRef === ref ? "base-ref" : "retarget";
+    const evidence: Evidence[] = [
+      prEvidence(
+        child.number,
+        via === "base-ref"
+          ? `#${child.number} targets ${ref}`
+          : `#${child.number} was retargeted from ${ref}`,
+      ),
+      prEvidence(parent.number, `#${parent.number}'s head branch is ${ref}`),
+    ];
+    let link: LinkState;
+    let anchor: string | null = null;
+
+    if (child.state === "merged" && child.baseRef === ref) {
+      link = "merged-into-parent";
+      const before = child.mergeCommitOid ? this.firstParent(child.mergeCommitOid) : null;
+      anchor = before ? (this.mergeBase(before, child.headOid) ?? null) : null;
+      if (child.mergeCommitOid) {
+        evidence.push(commitEvidence(child.mergeCommitOid, `#${child.number} merged into ${ref}`));
+      }
+      if (parent.mergedAt && child.mergedAt && child.mergedAt > parent.mergedAt) {
+        this.issue(
+          "base-already-merged",
+          [child.number, parent.number],
+          `#${child.number} was merged into ${ref} after #${parent.number} had merged, ` +
+            "so its changes never reached the trunk.",
+          evidence,
+        );
+      }
+    } else {
+      const inside = this.isAncestor(parent.headOid, child.headOid);
+      if (inside === true) {
+        link = "intact";
+        anchor = parent.headOid;
+        evidence.push(
+          commitEvidence(parent.headOid, `#${parent.number}'s head, inside #${child.number}`),
+        );
+      } else if (inside !== false) {
+        link = "unknown";
+      } else {
+        const stale = [...parent.forcePushes]
+          .reverse()
+          .find((push) => this.isAncestor(push.before, child.headOid) === true);
+        const met = stale ? null : this.mergeBase(parent.headOid, child.headOid);
+        if (stale) {
+          link = "stale";
+          anchor = stale.before;
+          evidence.push(
+            commitEvidence(stale.before, `#${parent.number}'s head before a force-push`),
+            commitEvidence(parent.headOid, `#${parent.number}'s head now`),
+          );
+        } else if (met === undefined || (met !== null && parentAnchor === null)) {
+          // Can't tell "behind" from "re-anchored" without both answers.
+          link = "unknown";
+        } else if (
+          met &&
+          met !== parentAnchor &&
+          this.isAncestor(parentAnchor as string, met) === true
+        ) {
+          link = "behind";
+          anchor = met;
+          evidence.push(
+            commitEvidence(met, `where #${child.number} left #${parent.number}`),
+            commitEvidence(parent.headOid, `#${parent.number}'s head now`),
+          );
+        } else {
+          link = "re-anchored";
+          const from =
+            child.state === "merged" && child.mergeCommitOid
+              ? this.firstParent(child.mergeCommitOid)
+              : this.tip(child.baseRef);
+          anchor = from ? (this.mergeBase(from, child.headOid) ?? null) : null;
+          if (anchor)
+            evidence.push(commitEvidence(anchor, `where #${child.number} left ${child.baseRef}`));
+        }
+      }
+      if (link === "behind" || link === "stale") {
+        this.issue(
+          "needs-restack",
+          [child.number],
+          link === "behind"
+            ? `#${parent.number} has commits that #${child.number} doesn't. #${child.number} needs a restack.`
+            : `#${child.number} sits on a head that #${parent.number} force-pushed away. #${child.number} needs a restack.`,
+          evidence,
+        );
+      }
+      if (child.state === "open" && child.baseRef === ref && parent.state === "merged") {
+        this.issue(
+          "base-already-merged",
+          [child.number, parent.number],
+          `#${child.number} still targets ${ref}, but #${parent.number} has merged, ` +
+            "so merging it won't reach the trunk.",
+          evidence,
+        );
+      }
+    }
+
+    if (link === "unknown" || anchor === null) {
+      this.issue(
+        "missing-commit",
+        [child.number],
+        `Couldn't tell where #${child.number}'s own changes start.`,
+        evidence,
+      );
+    }
+    return {
+      edge: { parent: parent.number, child: child.number, via, ref, link, evidence },
+      anchor,
+    };
+  }
+
+  private selectPath(
+    nodes: StackNode[],
+    paths: number[][],
+    seed: StackPr,
+    leaf: number | undefined,
+  ): number[] {
+    const byNumber = new Map(nodes.map((node) => [node.pr.number, node]));
+    const above = (n: number): StackNode[] => {
+      const node = byNumber.get(n) as StackNode;
+      return [node, ...node.children.flatMap(above)];
+    };
+    const reachable = above(seed.number);
+
+    let tip: StackNode;
+    if (leaf !== undefined) {
+      const chosen = reachable.find((node) => node.pr.number === leaf);
+      if (!chosen) throw new StackError(`#${leaf} isn't at or above #${seed.number} in its stack.`);
+      tip = chosen;
+    } else {
+      const tips = reachable.filter((node) => node.children.length === 0);
+      const live = tips.filter((node) => node.pr.state !== "closed");
+      tip = [...(live.length > 0 ? live : tips)].sort(
+        (a, b) => b.pr.updatedAt.localeCompare(a.pr.updatedAt) || b.pr.number - a.pr.number,
+      )[0] as StackNode;
+    }
+
+    if (tip.children.length === 0) {
+      return paths.find((path) => path[path.length - 1] === tip.pr.number) as number[];
+    }
+    const path: number[] = [];
+    for (let node: StackNode | undefined = tip; node; ) {
+      path.unshift(node.pr.number);
+      node = node.parent === null ? undefined : byNumber.get(node.parent);
+    }
+    return path;
+  }
+
+  private isAncestor(a: string, b: string): boolean | null | undefined {
+    if (a === b) return true;
+    return this.read(this.facts.isAncestor, factKey(a, b), { kind: "is-ancestor", a, b });
+  }
+
+  private mergeBase(a: string, b: string): string | null | undefined {
+    if (a === b) return a;
+    return this.read(this.facts.mergeBase, factKey(a, b), { kind: "merge-base", a, b });
+  }
+
+  private firstParent(oid: string): string | null | undefined {
+    return this.read(this.facts.firstParent, oid, { kind: "first-parent", oid });
+  }
+
+  private tip(ref: string): string | null | undefined {
+    return this.read(this.facts.tip, ref, { kind: "tip", ref });
+  }
+
+  /** Undefined means "asked for, not answered yet". */
+  private read<T>(table: Record<string, T>, key: string, request: FactRequest): T | undefined {
+    if (Object.hasOwn(table, key)) return table[key];
+    this.missing.set(`${request.kind}:${key}`, request);
+    return undefined;
+  }
+
+  private issue(kind: StackIssue["kind"], prs: number[], message: string, evidence: Evidence[]) {
+    const key = `${kind}:${prs.join(",")}`;
+    if (this.issueKeys.has(key)) return;
+    this.issueKeys.add(key);
+    this.issues.push({ kind, prs, message, evidence });
+  }
+}
+
+/** The branches a PR targets now and used to target, most recent first. */
+function candidateRefs(pr: StackPr): string[] {
+  const refs = [pr.baseRef, ...pr.baseChanges.map((change) => change.from).reverse()];
+  return [...new Set(refs)];
+}
+
+function overlaps(parent: StackPr, child: StackPr): boolean {
+  const parentEnd = parent.mergedAt ?? parent.closedAt;
+  const childEnd = child.mergedAt ?? child.closedAt;
+  return (
+    (parentEnd === null || child.createdAt <= parentEnd) &&
+    (childEnd === null || parent.createdAt <= childEnd)
+  );
+}
+
+/** Positive when `a` is newer than `b`. */
+function compareAge(a: StackPr, b: StackPr): number {
+  return a.createdAt.localeCompare(b.createdAt) || a.number - b.number;
+}
+
+function compareKeys(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function newest(prs: StackPr[], when: (pr: StackPr) => string): StackPr | undefined {
+  return [...prs].sort((a, b) => when(b).localeCompare(when(a)) || b.number - a.number)[0];
+}
+
+function rootToTipPaths(nodes: StackNode[]): number[][] {
+  const byNumber = new Map(nodes.map((node) => [node.pr.number, node]));
+  const root = nodes[0];
+  if (!root) return [];
+  const paths: number[][] = [];
+  const walk = (node: StackNode, path: number[]) => {
+    const next = [...path, node.pr.number];
+    if (node.children.length === 0) paths.push(next);
+    for (const child of node.children) walk(byNumber.get(child) as StackNode, next);
+  };
+  walk(root, []);
+  return paths;
+}
+
+function push<K, V>(map: Map<K, V[]>, key: K, value: V) {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+}
+
+function prEvidence(number: number, label: string): Evidence {
+  return { anchor: { source: { kind: "pr", number } }, label };
+}
+
+function commitEvidence(oid: string, label: string): Evidence {
+  return { anchor: { source: { kind: "commit", oid } }, label };
+}

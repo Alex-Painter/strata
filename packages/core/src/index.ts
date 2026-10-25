@@ -8,3 +8,4 @@
  * The browser imports `@strata/core/model` only.
  */
 export * from "./model/index.js";
+export * from "./stack/build.js";
