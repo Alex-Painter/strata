@@ -46,9 +46,10 @@ export function git(
   cwd: string,
   args: string[],
   env: NodeJS.ProcessEnv = gitEnv(),
+  input?: string,
 ): Promise<GitResult> {
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       "git",
       args,
       { cwd, env, maxBuffer: 256 * 1024 * 1024, encoding: "utf8" },
@@ -60,12 +61,21 @@ export function git(
         resolve({ stdout, stderr, code: error ? (error.code as number) : 0 });
       },
     );
+    // git may exit without reading stdin; its exit code says what happened.
+    child.stdin?.on("error", () => {});
+    if (input === undefined) child.stdin?.end();
+    else child.stdin?.end(input);
   });
 }
 
 /** Runs git and returns stdout, throwing a GitError on a non-zero exit. */
-export async function gitOk(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
-  const result = await git(cwd, args, env);
+export async function gitOk(
+  cwd: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+  input?: string,
+): Promise<string> {
+  const result = await git(cwd, args, env, input);
   if (result.code !== 0) throw new GitError(args, result);
   return result.stdout;
 }
