@@ -4,13 +4,14 @@ import { api, HttpError } from "./lib/api";
 import { readStaticReport } from "./lib/static-report";
 import { ChangesPage } from "./pages/ChangesPage";
 import { SignInPage } from "./pages/SignInPage";
+import { StacksPage } from "./pages/StacksPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 
 const staticReport = readStaticReport();
 
 export function App() {
   // A page written by the CLI renders its embedded report and never calls the API.
-  if (staticReport) return <WorkspacePage report={staticReport} mode="static" />;
+  if (staticReport) return <WorkspacePage mode="static" report={staticReport} />;
   return <ServerApp />;
 }
 
@@ -26,9 +27,8 @@ function ServerApp() {
   return (
     <Switch>
       <Route path="/" component={() => <ChangesPage me={me.data} />} />
-      <Route path="/changes/:id">
-        {() => <WorkspacePage report={null} mode="server" me={me.data} />}
-      </Route>
+      <Route path="/repos/:owner/:name">{() => <StacksPage me={me.data} />}</Route>
+      <Route path="/changes/:id">{() => <WorkspacePage mode="server" me={me.data} />}</Route>
       <Route>
         <p className="p-6 text-muted">Page not found.</p>
       </Route>
