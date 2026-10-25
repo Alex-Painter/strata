@@ -83,21 +83,20 @@ describe("engine.resolveChange for stacks", () => {
 });
 
 describe("engine.analyzeChange for stacks", () => {
-  it("reports the stack and says what isn't computed yet", async () => {
+  it("reports the stack and its diffs, and says what isn't computed yet", async () => {
     const steps: string[] = [];
     const report = await engine().analyzeChange(parseChangeInput("acme/app#3"), {
       onProgress: (step) => steps.push(step),
     });
 
-    expect(report.schemaVersion).toBe(2);
+    expect(report.schemaVersion).toBe(3);
     expect(report.stack?.selectedPath).toEqual([1, 2, 3]);
     expect(report.change.title).toBe("Add the forecast model");
-    expect(report.change.files).toEqual([]);
+    expect(report.change.files).toHaveLength(3);
+    expect(report.parts.map((part) => part.pr)).toEqual([1, 2, 3]);
     expect(report.verdict).toBeUndefined();
-    expect(report.notes).toEqual([
-      "Strata found the stack. Diffs, layers and summaries aren't computed yet.",
-    ]);
-    expect(steps).toEqual(["Finding the stack"]);
+    expect(report.notes).toEqual(["Layers and summaries aren't computed yet."]);
+    expect(steps).toEqual(["Finding the stack", "Building the diffs"]);
   });
 
   it("lets callers share one repo's caches at the same time", async () => {

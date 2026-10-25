@@ -10,10 +10,13 @@ import type { DataModelDiagram } from "./diagram.js";
 import type { Finding } from "./findings.js";
 import type { IntentLedger } from "./intent.js";
 import type { LayerId } from "./layers.js";
-import type { Stack } from "./stack.js";
+import type { PrPart, Stack } from "./stack.js";
 
-/** 2: the stack, and verdict, ledger and findings became optional. */
-export const REPORT_SCHEMA_VERSION = 2;
+/**
+ * 2: the stack, and verdict, ledger and findings became optional.
+ * 3: each PR's own diff, and the whole-stack diff as the Change's files.
+ */
+export const REPORT_SCHEMA_VERSION = 3;
 
 export type VerdictStatus =
   /** A gate failed or a blocker finding exists. */
@@ -54,6 +57,8 @@ export interface ChangeReport {
    * whole-stack view.
    */
   stack: Stack | null;
+  /** One per PR on the selected path, bottom first; empty without a stack. Also "How it arrived". */
+  parts: PrPart[];
   sources: ContextSource[];
   /** Absent until the steps that decide it exist. */
   verdict?: Verdict;

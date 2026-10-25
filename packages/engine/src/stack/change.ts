@@ -1,7 +1,7 @@
 /**
- * Turns a stack input into a Change: find the stack, pick the path, and
- * describe it. Diffs, layers and summaries come in later slices, so for now
- * the report carries the stack and says what it doesn't have yet.
+ * Turns a stack input into a Change: find the stack, pick the path, build
+ * each PR's diff and the whole-stack diff, and describe it. Layers and
+ * summaries come in later slices, so the report says it doesn't have them yet.
  */
 import {
   type ChangeHint,
@@ -17,6 +17,7 @@ import {
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
+import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
 
 export type StackInput = Extract<ChangeInput, { kind: "stack-of" | "stack" }>;
@@ -36,7 +37,7 @@ export async function resolveStackChange(
   input: StackInput,
   index: PrIndex,
   cache: RepoCache,
-): Promise<ResolvedChange> {
+): Promise<ResolvedChange & { stack: Stack }> {
   const seed: StackSeed =
     input.kind === "stack-of"
       ? input.seed
@@ -80,13 +81,18 @@ export async function resolveStackChange(
   };
 }
 
-export function stackReport(
+export async function stackReport(
   resolved: ResolvedChange & { stack: Stack },
   options: AnalyzeOptions,
   meta: { engineVersion: string; startedAt: Date },
-): ChangeReport {
-  const { stack } = resolved;
+): Promise<ChangeReport> {
+  const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir);
+  const stack: Stack = {
+    ...resolved.stack,
+    issues: [...resolved.stack.issues, ...diffs.issues],
+  };
   const path = stack.selectedPath;
+  const whole = diffs.whole;
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -98,25 +104,56 @@ export function stackReport(
       ),
       title: resolved.title,
       repo: resolved.repo,
-      revisions: resolved.revisions,
-      files: [],
-      hunks: [],
-      layers: [],
+      revisions: whole ? { base: whole.from, head: whole.to } : null,
+      files: whole?.model.files ?? [],
+      hunks: whole?.model.hunks ?? [],
+      layers: whole?.model.layers ?? [],
       hints: resolved.hints,
     },
     stack,
+    parts: diffs.parts,
     sources: options.sources ?? [],
     summary: [],
     layerSummaries: [],
     diagrams: [],
-    notes: ["Strata found the stack. Diffs, layers and summaries aren't computed yet."],
-    raw: { diff: "" },
+    notes: [...diffNotes(stack, diffs), "Layers and summaries aren't computed yet."],
+    raw: { diff: whole?.diff ?? "" },
     analysis: {
       engineVersion: meta.engineVersion,
       startedAt: meta.startedAt.toISOString(),
       durationMs: Date.now() - meta.startedAt.getTime(),
     },
   };
+}
+
+/** Says when the whole-stack diff doesn't cover the whole path. */
+function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
+  const path = stack.selectedPath;
+  if (!stack.base) {
+    return [
+      `Strata couldn't tell where the stack left ${stack.trunk.name}, so there are no diffs.`,
+    ];
+  }
+  if (!diffs.whole) {
+    return [
+      `Strata couldn't put #${path[0]} on ${stack.trunk.name}, so there's no whole-stack diff.`,
+    ];
+  }
+  if (diffs.placed.length < path.length) {
+    const left = path.filter((n) => !diffs.placed.includes(n));
+    return [
+      `The whole-stack diff covers ${describePath(diffs.placed)} only. ` +
+        `${describePrs(left)} ${left.length === 1 ? "isn't" : "aren't"} in it. The stack's issues say why.`,
+    ];
+  }
+  return [];
+}
+
+function describePrs(numbers: number[]): string {
+  const refs = numbers.map((n) => `#${n}`);
+  return refs.length <= 2
+    ? refs.join(" and ")
+    : `${refs.slice(0, -1).join(", ")} and ${refs.at(-1)}`;
 }
 
 function describePath(path: number[]): string {

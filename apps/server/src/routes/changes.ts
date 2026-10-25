@@ -6,7 +6,7 @@
  * have returns that Change, and a fork's other path is a separate Change.
  */
 
-import { byRecentActivity, StackError, summarizeStack } from "@strata/core";
+import { byRecentActivity, REPORT_SCHEMA_VERSION, StackError, summarizeStack } from "@strata/core";
 import {
   type ChangeDetail,
   ChangeInputError,
@@ -167,10 +167,11 @@ export function changeRoutes(deps: AppDeps) {
 
   function detail(row: ChangeRow): ChangeDetail {
     const run = latestRun(db, row.id);
+    // Reports from an older schema are left out; the next run replaces them.
     const report = db
       .select()
       .from(reports)
-      .where(eq(reports.changeId, row.id))
+      .where(and(eq(reports.changeId, row.id), eq(reports.schemaVersion, REPORT_SCHEMA_VERSION)))
       .orderBy(desc(reports.createdAt), desc(reports.id))
       .get();
     return {

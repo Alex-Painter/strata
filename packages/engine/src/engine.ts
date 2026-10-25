@@ -40,20 +40,24 @@ export const createEngine: CreateEngine = (config) => {
     },
     async resolveChange(input) {
       const stackInput = asStackInput(input);
-      const repo = `${stackInput.repo.owner}/${stackInput.repo.name}`;
-      return serialize(lockKey(config, repo), async () => {
-        const index = await loadIndex(config, repo);
-        return resolveStackChange(stackInput, index, await openCache(config, repo));
-      });
+      return serialize(lockKey(config, repoName(stackInput)), () =>
+        resolveStackInput(config, stackInput),
+      );
     },
     async analyzeChange(input, options = {}) {
       const startedAt = new Date();
-      options.onProgress?.("Finding the stack");
-      const resolved = await this.resolveChange(input, options.signal);
-      if (!resolved.stack) throw new NotImplementedError("Analysing a commit range");
-      return stackReport({ ...resolved, stack: resolved.stack }, options, {
-        engineVersion: ENGINE_VERSION,
-        startedAt,
+      const stackInput = asStackInput(input);
+      // The diffs write commits into the cache and read its branches, so they
+      // run under the same lock as the fetch.
+      return serialize(lockKey(config, repoName(stackInput)), async () => {
+        options.onProgress?.("Finding the stack");
+        const resolved = await resolveStackInput(config, stackInput);
+        options.signal?.throwIfAborted();
+        options.onProgress?.("Building the diffs");
+        return stackReport(resolved, options, {
+          engineVersion: ENGINE_VERSION,
+          startedAt,
+        });
       });
     },
     async readFile() {
@@ -104,6 +108,17 @@ function loadIndex(config: EngineConfig, repo: string): Promise<PrIndex> {
 }
 
 type GitHubStackInput = StackInput & { repo: Extract<RepoRef, { kind: "github" }> };
+
+function repoName(input: GitHubStackInput): string {
+  return `${input.repo.owner}/${input.repo.name}`;
+}
+
+/** Call with the repo's lock held. */
+async function resolveStackInput(config: EngineConfig, input: GitHubStackInput) {
+  const repo = repoName(input);
+  const index = await loadIndex(config, repo);
+  return resolveStackChange(input, index, await openCache(config, repo));
+}
 
 function asStackInput(input: ChangeInput): GitHubStackInput {
   if (input.kind === "range") throw new NotImplementedError("Resolving a commit range");

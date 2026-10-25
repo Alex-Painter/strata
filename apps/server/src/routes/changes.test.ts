@@ -114,7 +114,16 @@ describe("Changes", () => {
     const detail = (await (await app.request(`/api/changes/${change.id}`)).json()) as ChangeDetail;
     expect(detail.run?.status).toBe("done");
     expect(detail.report?.stack?.selectedPath).toEqual([1, 2, 3]);
-    expect(detail.report?.change.revisions).toEqual({ base: demo.m0, head: demo.heads[3] });
+    // The whole-stack diff ends at Strata's own commit for the tip.
+    expect(detail.report?.change.revisions).toEqual({
+      base: demo.m0,
+      head: detail.report?.parts[2]?.to,
+    });
+    expect(detail.report?.change.files.map((file) => file.path)).toEqual([
+      "b1-2.txt",
+      "b2-3.txt",
+      "b3-4.txt",
+    ]);
 
     // Another PR on the same path finds the same Change.
     const again = await post("/api/changes", { input: "https://github.com/acme/app/pull/3" });

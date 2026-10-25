@@ -10,7 +10,7 @@
  * bottom to a tip is one Change. The stack describes how the code arrived, so
  * like `ChangeHint` it must never decide layers, diagrams or findings.
  */
-import type { Evidence } from "./change.js";
+import type { Evidence, FileChange, Hunk } from "./change.js";
 
 export type PrState = "open" | "merged" | "closed";
 
@@ -132,7 +132,9 @@ export type StackIssueKind =
   | "non-default-trunk"
   | "base-already-merged"
   | "needs-restack"
-  | "missing-commit";
+  | "missing-commit"
+  /** A PR's changes don't apply on the stack below it, so the combined diffs stop there. */
+  | "replay-conflict";
 
 export interface StackIssue {
   kind: StackIssueKind;
@@ -170,6 +172,57 @@ export interface Stack {
   selectedPath: number[];
   seed: number;
   issues: StackIssue[];
+}
+
+/**
+ * One PR's own diff: what it adds to the stack below it.
+ *
+ * Strata builds a chain of commits of its own, one per PR on the path, from
+ * where the stack left the trunk. Each PR's diff starts where the one below it
+ * ends, so a PR's diff never repeats a parent's changes, even after the parent
+ * was squash-merged or moved on. The last commit's diff from the start is the
+ * whole-stack diff. These commits have a fixed author and date, so the same
+ * code always gives the same ids, and they exist only in Strata's cache.
+ */
+export interface PrPart {
+  pr: number;
+  /**
+   * - `direct`: the PR sits on the stack so far, so this is its diff from its
+   *   anchor to its head.
+   * - `replayed`: it doesn't, because its link is broken or a PR below it was
+   *   replayed, so its changes since its anchor were merged onto the stack so
+   *   far, as a restack would.
+   * - `apart`: it couldn't be put on the stack, because replaying it (or a PR
+   *   below it) conflicts. This is its diff from its anchor to its head, and
+   *   it's left out of the whole-stack diff.
+   * - `unknown`: git couldn't tell where its changes start, so there's no diff.
+   */
+  how: "direct" | "replayed" | "apart" | "unknown";
+  /** Where the diff starts and ends. Null for `unknown`. */
+  from: string | null;
+  to: string | null;
+  files: FileChange[];
+  hunks: Hunk[];
+  /** For open PRs: how GitHub's diff of the PR compares. Null when it can't be told. */
+  github: GitHubDiffCheck | null;
+}
+
+/**
+ * GitHub's diff of a PR starts where its head meets its base branch now.
+ * Strata's starts at the stack below it. The two match while the PR sits on
+ * its parent's head; after a squash-merged parent or a moved parent they
+ * don't, and the reason says why.
+ */
+export interface GitHubDiffCheck {
+  /** Where GitHub's diff starts: the merge base of the head and the base branch's tip. */
+  base: string;
+  same: boolean;
+  /** Paths only in GitHub's diff, and only in Strata's. */
+  onlyOnGitHub: string[];
+  onlyHere: string[];
+  /** Null when the diffs are the same. */
+  reason: string | null;
+  evidence: Evidence[];
 }
 
 export type BuildStackResult =
