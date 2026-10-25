@@ -3,7 +3,7 @@
  * The dev bypass uses DEV_GITHUB_TOKEN; signed-in users use the token they
  * granted at sign-in, stored encrypted.
  */
-import { createEngine, type Engine, type EngineConfig } from "@strata/engine";
+import { createEngine, createGitHubPort, type Engine, type EngineConfig } from "@strata/engine";
 import { eq } from "drizzle-orm";
 import { createTokenCipher, hashToken } from "./auth/crypto.js";
 import type { ServerConfig } from "./config.js";
@@ -37,10 +37,23 @@ export function engineFactory(
         ...(config.model ? { model: config.model } : {}),
         checkouts: config.checkouts,
         log: (message) => console.log(`[strata] ${message}`),
+        ...devGitHub(config, token),
         ...overrides,
       });
       engines.set(key, engine);
     }
     return engine;
+  };
+}
+
+function devGitHub(config: ServerConfig, token: string | undefined): Partial<EngineConfig> {
+  const dev = config.devGitHub;
+  if (!dev) return {};
+  const gitRemote = dev.gitRemote;
+  return {
+    ...(dev.graphqlUrl && token
+      ? { githubPort: createGitHubPort({ token, endpoint: dev.graphqlUrl }) }
+      : {}),
+    ...(gitRemote ? { gitRemote: (repo: string) => gitRemote.replaceAll("{repo}", repo) } : {}),
   };
 }

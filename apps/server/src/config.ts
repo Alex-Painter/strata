@@ -25,6 +25,10 @@ const Env = z.object({
   DEV_AUTH_BYPASS: z.string().optional(),
   DEV_GITHUB_LOGIN: z.string().optional(),
   DEV_GITHUB_TOKEN: z.string().optional(),
+  /** A GraphQL endpoint to read PRs from instead of GitHub's, such as the fixture GitHub. */
+  DEV_GITHUB_GRAPHQL_URL: z.url().optional(),
+  /** Where to fetch repos from instead of github.com; `{repo}` becomes `owner/name`. */
+  DEV_GIT_REMOTE: z.string().min(1).optional(),
   /** Local checkouts Strata may borrow objects from: `owner/name=path,owner/name=path`. */
   STRATA_CHECKOUTS: z.string().default(""),
 });
@@ -50,6 +54,8 @@ export interface ServerConfig {
   checkouts: Record<string, string>;
   /** Skips GitHub OAuth with a synthetic session. Never set in production. */
   devBypass: DevBypass | null;
+  /** Stand-ins for GitHub's API and git host, for driving the app offline. Never set in production. */
+  devGitHub: { graphqlUrl: string | null; gitRemote: string | null } | null;
   warnings: string[];
 }
 
@@ -80,6 +86,14 @@ export function loadConfig(
       : null;
   if (production && env.DEV_AUTH_BYPASS === "1") {
     warnings.push("DEV_AUTH_BYPASS is ignored in production.");
+  }
+  const wantsDevGitHub = Boolean(env.DEV_GITHUB_GRAPHQL_URL || env.DEV_GIT_REMOTE);
+  const devGitHub =
+    !production && wantsDevGitHub
+      ? { graphqlUrl: env.DEV_GITHUB_GRAPHQL_URL ?? null, gitRemote: env.DEV_GIT_REMOTE ?? null }
+      : null;
+  if (production && wantsDevGitHub) {
+    warnings.push("DEV_GITHUB_GRAPHQL_URL and DEV_GIT_REMOTE are ignored in production.");
   }
 
   let sessionSecret = env.SESSION_SECRET ?? "";
@@ -127,6 +141,7 @@ export function loadConfig(
     webDist: env.WEB_DIST ? path.resolve(env.WEB_DIST) : (defaults.webDist ?? null),
     checkouts,
     devBypass,
+    devGitHub,
     warnings,
   };
 }

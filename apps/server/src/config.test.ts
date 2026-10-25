@@ -41,6 +41,23 @@ describe("loadConfig", () => {
     expect(config.warnings).toContain("DEV_AUTH_BYPASS is ignored in production.");
   });
 
+  it("reads GitHub stand-ins locally and ignores them in production", () => {
+    const standIns = {
+      DEV_GITHUB_GRAPHQL_URL: "http://localhost:9000/graphql",
+      DEV_GIT_REMOTE: "/tmp/fixture/{repo}",
+    };
+    expect(loadConfig({ DEV_AUTH_BYPASS: "1", ...standIns }).devGitHub).toEqual({
+      graphqlUrl: "http://localhost:9000/graphql",
+      gitRemote: "/tmp/fixture/{repo}",
+    });
+    expect(loadConfig({ DEV_AUTH_BYPASS: "1" }).devGitHub).toBeNull();
+    const production = loadConfig({ ...PRODUCTION, ...standIns });
+    expect(production.devGitHub).toBeNull();
+    expect(production.warnings).toContain(
+      "DEV_GITHUB_GRAPHQL_URL and DEV_GIT_REMOTE are ignored in production.",
+    );
+  });
+
   it("runs locally with only the dev bypass", () => {
     const config = loadConfig({ DEV_AUTH_BYPASS: "1", DEV_GITHUB_LOGIN: "alex" });
     expect(config.devBypass).toEqual({ login: "alex", githubToken: null });
