@@ -1,0 +1,96 @@
+{
+  "repository": {
+    "defaultBranchRef": { "name": "main" },
+    "pullRequests": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOnYyOpK5MjAyNi0xMC0yMlQxMDowMDowMCswMTowMM4AAAAD"
+      },
+      "nodes": [
+        {
+          "number": 102,
+          "title": "Add the forecast service",
+          "url": "https://github.com/acme/app/pull/102",
+          "author": { "login": "dev-a" },
+          "state": "OPEN",
+          "isDraft": false,
+          "createdAt": "2026-10-20T09:00:00Z",
+          "updatedAt": "2026-10-23T16:12:41Z",
+          "mergedAt": null,
+          "closedAt": null,
+          "baseRefName": "main",
+          "headRefName": "forecast/service",
+          "headRefOid": "2222222222222222222222222222222222222222",
+          "isCrossRepository": false,
+          "mergeCommit": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "PENDING" } } }] },
+          "timelineItems": {
+            "pageInfo": { "hasNextPage": false, "endCursor": "MjM" },
+            "nodes": [
+              {
+                "__typename": "HeadRefForcePushedEvent",
+                "createdAt": "2026-10-21T11:00:00Z",
+                "beforeCommit": null,
+                "afterCommit": { "oid": "2222222222222222222222222222222222222220" }
+              },
+              {
+                "__typename": "BaseRefChangedEvent",
+                "createdAt": "2026-10-22T10:00:00Z",
+                "previousRefName": "forecast/model",
+                "currentRefName": "main"
+              },
+              {
+                "__typename": "HeadRefForcePushedEvent",
+                "createdAt": "2026-10-23T16:12:40Z",
+                "beforeCommit": { "oid": "2222222222222222222222222222222222222220" },
+                "afterCommit": { "oid": "2222222222222222222222222222222222222222" }
+              }
+            ]
+          }
+        },
+        null,
+        {
+          "number": 101,
+          "title": "Add the forecast model",
+          "url": "https://github.com/acme/app/pull/101",
+          "author": null,
+          "state": "MERGED",
+          "isDraft": false,
+          "createdAt": "2026-10-19T08:30:00Z",
+          "updatedAt": "2026-10-22T10:00:05Z",
+          "mergedAt": "2026-10-22T09:59:58Z",
+          "closedAt": "2026-10-22T09:59:58Z",
+          "baseRefName": "main",
+          "headRefName": "forecast/model",
+          "headRefOid": "1111111111111111111111111111111111111111",
+          "isCrossRepository": false,
+          "mergeCommit": { "oid": "5555555555555555555555555555555555555555" },
+          "reviewDecision": "APPROVED",
+          "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "SUCCESS" } } }] },
+          "timelineItems": { "pageInfo": { "hasNextPage": false, "endCursor": null }, "nodes": [] }
+        },
+        {
+          "number": 99,
+          "title": "Try a faster parser",
+          "url": "https://github.com/acme/app/pull/99",
+          "author": { "login": "contributor" },
+          "state": "CLOSED",
+          "isDraft": true,
+          "createdAt": "2026-10-10T12:00:00Z",
+          "updatedAt": "2026-10-12T12:00:00Z",
+          "mergedAt": null,
+          "closedAt": "2026-10-12T12:00:00Z",
+          "baseRefName": "main",
+          "headRefName": "main",
+          "headRefOid": "9999999999999999999999999999999999999999",
+          "isCrossRepository": true,
+          "mergeCommit": null,
+          "reviewDecision": "CHANGES_REQUESTED",
+          "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "ERROR" } } }] },
+          "timelineItems": { "pageInfo": { "hasNextPage": false, "endCursor": null }, "nodes": [] }
+        }
+      ]
+    }
+  }
+}
