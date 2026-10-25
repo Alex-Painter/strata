@@ -1,9 +1,10 @@
 /**
  * Parses what a reviewer types into a ChangeInput:
  *
- *   owner/repo#123                     one PR
- *   owner/repo#12,13,14                a stack, bottom first
+ *   owner/repo#123                     the stack around a PR
  *   https://github.com/owner/repo/pull/123
+ *   owner/repo:feature/x               the stack around a branch's PR
+ *   owner/repo#12,13,14                an explicit chain, bottom first
  *   owner/repo@main...feature          a commit range on GitHub
  *   main...feature                     a commit range in a local checkout
  */
@@ -14,6 +15,7 @@ const PR_URL = new RegExp(`^https://github\\.com/${REPO}/pull/(\\d+)(?:[/?#].*)?
 const PR_LIST = new RegExp(`^${REPO}#(\\d+(?:\\s*,\\s*\\d+)*)$`);
 const GITHUB_RANGE = new RegExp(`^${REPO}@([^\\s.][^\\s]*?)\\.\\.\\.?([^\\s.][^\\s]*)$`);
 const LOCAL_RANGE = /^([^\s.][^\s]*?)\.\.\.?([^\s.][^\s]*)$/;
+const BRANCH = new RegExp(`^${REPO}:([^\\s:]+)$`);
 
 export class ChangeInputError extends Error {}
 
@@ -25,7 +27,16 @@ export function parseChangeInput(
 
   const url = PR_URL.exec(text);
   if (url) {
-    return { kind: "pr", repo: github(url[1], url[2]), number: Number(url[3]) };
+    return { kind: "stack-of", repo: github(url[1], url[2]), seed: { pr: Number(url[3]) } };
+  }
+
+  const branch = BRANCH.exec(text);
+  if (branch) {
+    return {
+      kind: "stack-of",
+      repo: github(branch[1], branch[2]),
+      seed: { branch: branch[3] as string },
+    };
   }
 
   const list = PR_LIST.exec(text);
@@ -36,7 +47,7 @@ export function parseChangeInput(
       throw new ChangeInputError(`"${text}" lists the same PR more than once.`);
     }
     return numbers.length === 1
-      ? { kind: "pr", repo, number: numbers[0] as number }
+      ? { kind: "stack-of", repo, seed: { pr: numbers[0] as number } }
       : { kind: "stack", repo, numbers };
   }
 
@@ -61,8 +72,8 @@ export function parseChangeInput(
   }
 
   throw new ChangeInputError(
-    `Can't read "${text}". Use owner/repo#123, owner/repo#12,13,14, a PR URL, ` +
-      "owner/repo@base...head, or base...head inside a local checkout.",
+    `Can't read "${text}". Use owner/repo#123, a PR URL, owner/repo:branch, ` +
+      "owner/repo#12,13,14, owner/repo@base...head, or base...head inside a local checkout.",
   );
 }
 
@@ -73,8 +84,10 @@ export function describeRepo(repo: RepoRef): string {
 export function describeInput(input: ChangeInput): string {
   const repo = describeRepo(input.repo);
   switch (input.kind) {
-    case "pr":
-      return `${repo}#${input.number}`;
+    case "stack-of": {
+      const at = "pr" in input.seed ? `${repo}#${input.seed.pr}` : `${repo}:${input.seed.branch}`;
+      return input.seed.leaf === undefined ? at : `${at} up to #${input.seed.leaf}`;
+    }
     case "stack":
       return `${repo}#${input.numbers.join(",")}`;
     case "range":

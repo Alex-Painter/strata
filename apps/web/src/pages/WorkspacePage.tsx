@@ -26,7 +26,7 @@ export function WorkspacePage({
     <div className="flex h-full flex-col">
       <TopBar {...(me ? { me } : {})}>
         <span className="truncate font-medium">{report?.change.title ?? "Change"}</span>
-        {report && <span className="truncate text-muted">{report.verdict.headline}</span>}
+        {report?.verdict && <span className="truncate text-muted">{report.verdict.headline}</span>}
       </TopBar>
       <div className="flex min-h-0 flex-1">
         <Navigator report={report} />

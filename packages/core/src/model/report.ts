@@ -10,8 +10,10 @@ import type { DataModelDiagram } from "./diagram.js";
 import type { Finding } from "./findings.js";
 import type { IntentLedger } from "./intent.js";
 import type { LayerId } from "./layers.js";
+import type { Stack } from "./stack.js";
 
-export const REPORT_SCHEMA_VERSION = 1;
+/** 2: the stack, and verdict, ledger and findings became optional. */
+export const REPORT_SCHEMA_VERSION = 2;
 
 export type VerdictStatus =
   /** A gate failed or a blocker finding exists. */
@@ -46,12 +48,19 @@ export interface LayerSummary {
 export interface ChangeReport {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
   change: Change;
+  /**
+   * How the code arrived as PRs, for stack inputs. It depends on how the work
+   * was split, so it is shown as "How it arrived" and never feeds the
+   * whole-stack view.
+   */
+  stack: Stack | null;
   sources: ContextSource[];
-  verdict: Verdict;
+  /** Absent until the steps that decide it exist. */
+  verdict?: Verdict;
   summary: Claim[];
   layerSummaries: LayerSummary[];
-  ledger: IntentLedger;
-  findings: Finding[];
+  ledger?: IntentLedger;
+  findings?: Finding[];
   diagrams: DataModelDiagram[];
   /** Caveats about what this run could not do, shown under the verdict. */
   notes: string[];

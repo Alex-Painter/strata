@@ -4,6 +4,7 @@
  */
 import type { ContextKind, ContextSource } from "./context.js";
 import type { ChangeReport } from "./report.js";
+import type { LinkState, PrState, StackIssue, StackPr } from "./stack.js";
 
 export interface MeResponse {
   login: string;
@@ -21,7 +22,48 @@ export interface NewContextSource {
 export interface CreateChangeRequest {
   /** Anything `parseChangeInput` accepts, except local ranges. */
   input: string;
+  /** For a stack that forks: the tip PR whose path to review. */
+  leaf?: number;
   sources?: NewContextSource[];
+}
+
+/** One PR in a stack, as the stack list shows it. */
+export interface StackPrSummary {
+  number: number;
+  title: string;
+  url: string;
+  author: string | null;
+  state: PrState;
+  draft: boolean;
+  updatedAt: string;
+  /** Null for the bottom PR. */
+  parent: number | null;
+  /** How it sits on its parent; null for the bottom PR. */
+  link: LinkState | null;
+  review: StackPr["review"];
+  checks: StackPr["checks"];
+}
+
+export interface StackSummary {
+  id: string;
+  repo: string;
+  trunk: string;
+  root: number;
+  /** Depth first from the bottom, siblings by PR number. */
+  prs: StackPrSummary[];
+  /** Every bottom-to-tip path; each one is a Change. */
+  paths: number[][];
+  /** The path a Change gets when no tip is chosen. */
+  defaultPath: number[];
+  issues: StackIssue[];
+  /** The newest updatedAt among its PRs. */
+  updatedAt: string;
+}
+
+export interface StacksResponse {
+  repo: string;
+  /** Newest activity first. */
+  stacks: StackSummary[];
 }
 
 export type RunStatus = "queued" | "running" | "done" | "failed";

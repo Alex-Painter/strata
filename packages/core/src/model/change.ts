@@ -9,11 +9,16 @@
  */
 import type { Anchor } from "./anchors.js";
 import type { LayerId } from "./layers.js";
+import type { StackSeed } from "./stack.js";
 
 /** What the reviewer asked Strata to look at. */
 export type ChangeInput =
-  | { kind: "pr"; repo: RepoRef; number: number }
-  /** Bottom of the stack first. */
+  /**
+   * The stack around a PR or branch, from its bottom PR up to `seed.leaf` or
+   * the newest tip above the seed. A PR on its own is a stack of one.
+   */
+  | { kind: "stack-of"; repo: RepoRef; seed: StackSeed }
+  /** An explicit chain, bottom first. It must match the PRs' branch links. */
   | { kind: "stack"; repo: RepoRef; numbers: number[] }
   /** `base...head`: everything on head since it diverged from base. */
   | { kind: "range"; repo: RepoRef; base: string; head: string };
@@ -133,7 +138,8 @@ export interface Change {
   id: string;
   title: string;
   repo: RepoRef;
-  revisions: ChangeRevisions;
+  /** Null when git couldn't tell where a stack left its trunk; the stack's issues say why. */
+  revisions: ChangeRevisions | null;
   files: FileChange[];
   hunks: Hunk[];
   layers: LayerGroup[];
