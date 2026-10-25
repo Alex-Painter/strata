@@ -1,11 +1,19 @@
-import { linkedGroups } from "@strata/core";
+import { type ChangeInput, linkedGroups, type PrIndex, type RepoRef } from "@strata/core";
 import type { CreateEngine, EngineConfig } from "./api.js";
 import { NotImplementedError } from "./errors.js";
 import { RepoCache } from "./git/cache.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlm } from "./llm.js";
+import { serialize } from "./lock.js";
+import {
+  resolveStackChange,
+  type StackInput,
+  StackInputError,
+  stackReport,
+} from "./stack/change.js";
 import { discoverStacks } from "./stack/discover.js";
+import { ENGINE_VERSION } from "./version.js";
 
 /**
  * Wires the engine together. Stack discovery works; the other operations are
@@ -20,25 +28,33 @@ export const createEngine: CreateEngine = (config) => {
   );
 
   return {
-    async discoverStacks(repo, signal) {
-      splitRepo(repo);
-      const index = await loadPrIndex(repo, {
-        port: githubPort(config),
-        dataDir: config.dataDir,
-        ...(config.now ? { now: config.now } : {}),
-        ...(config.log ? { log: config.log } : {}),
+    discoverStacks(repo, signal) {
+      return serialize(lockKey(config, repo), async () => {
+        const index = await loadIndex(config, repo);
+        signal?.throwIfAborted();
+        const cache = await openCache(config, repo);
+        await cache.fetch({ pulls: linkedGroups(index).flat() });
+        signal?.throwIfAborted();
+        return discoverStacks(index, cache.gitDir);
       });
-      signal?.throwIfAborted();
-      const cache = await openCache(config, repo);
-      await cache.fetch({ pulls: linkedGroups(index).flat() });
-      signal?.throwIfAborted();
-      return discoverStacks(index, cache.gitDir);
     },
-    async resolveChange() {
-      throw new NotImplementedError("Resolving a PR, stack or commit range");
+    async resolveChange(input) {
+      const stackInput = asStackInput(input);
+      const repo = `${stackInput.repo.owner}/${stackInput.repo.name}`;
+      return serialize(lockKey(config, repo), async () => {
+        const index = await loadIndex(config, repo);
+        return resolveStackChange(stackInput, index, await openCache(config, repo));
+      });
     },
-    async analyzeChange() {
-      throw new NotImplementedError("Change analysis");
+    async analyzeChange(input, options = {}) {
+      const startedAt = new Date();
+      options.onProgress?.("Finding the stack");
+      const resolved = await this.resolveChange(input, options.signal);
+      if (!resolved.stack) throw new NotImplementedError("Analysing a commit range");
+      return stackReport({ ...resolved, stack: resolved.stack }, options, {
+        engineVersion: ENGINE_VERSION,
+        startedAt,
+      });
     },
     async readFile() {
       throw new NotImplementedError("Reading files at a revision");
@@ -70,4 +86,29 @@ function openCache(config: EngineConfig, repo: string): Promise<RepoCache> {
     ...(remoteUrl ? { remoteUrl } : {}),
     ...(config.log ? { log: config.log } : {}),
   });
+}
+
+/** Engines with the same data folder share its caches, so they share its locks. */
+function lockKey(config: EngineConfig, repo: string): string {
+  return `${config.dataDir}\0${repo}`;
+}
+
+function loadIndex(config: EngineConfig, repo: string): Promise<PrIndex> {
+  splitRepo(repo);
+  return loadPrIndex(repo, {
+    port: githubPort(config),
+    dataDir: config.dataDir,
+    ...(config.now ? { now: config.now } : {}),
+    ...(config.log ? { log: config.log } : {}),
+  });
+}
+
+type GitHubStackInput = StackInput & { repo: Extract<RepoRef, { kind: "github" }> };
+
+function asStackInput(input: ChangeInput): GitHubStackInput {
+  if (input.kind === "range") throw new NotImplementedError("Resolving a commit range");
+  if (input.repo.kind !== "github") {
+    throw new StackInputError("Stacks come from GitHub; give the repo as owner/repo.");
+  }
+  return input as GitHubStackInput;
 }

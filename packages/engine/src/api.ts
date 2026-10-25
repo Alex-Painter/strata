@@ -57,11 +57,14 @@ export interface ResolvedChange {
   repo: RepoRef;
   /** A local git directory holding both revisions. */
   gitDir: string;
-  revisions: ChangeRevisions;
+  /** Null when git couldn't tell where a stack left its trunk. */
+  revisions: ChangeRevisions | null;
   title: string;
   hints: ChangeHint[];
   /** One per PR; shown as context, never used to build the ledger. */
   prDescriptions: ContextSource[];
+  /** For stack inputs: the whole stack, with `selectedPath` as this Change. */
+  stack: Stack | null;
 }
 
 /** An anchor turned into text for the chat prompt. */

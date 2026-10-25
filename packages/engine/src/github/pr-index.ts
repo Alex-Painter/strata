@@ -8,6 +8,7 @@
  * newest-updated first and stops at the last fetch, so it is usually one
  * small query.
  */
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { PrIndex, StackPr } from "@strata/core";
@@ -140,7 +141,7 @@ async function readCache(path: string, repo: string): Promise<CachedIndex | null
 
 async function writeCache(path: string, index: CachedIndex): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const temp = `${path}.${process.pid}.tmp`;
+  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temp, `${JSON.stringify(index, null, 2)}\n`);
   await rename(temp, path);
 }

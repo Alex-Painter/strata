@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Strata's I/O side: git, GitHub, context sources, the LLM, and the analysis pipeline that drives @strata/core.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
