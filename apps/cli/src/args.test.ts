@@ -31,6 +31,14 @@ describe("parseCommand", () => {
     });
   });
 
+  it("takes the tip of a fork's path with --leaf", () => {
+    expect(parseCommand(["analyze", "acme/app#5", "--leaf", "6"])).toMatchObject({ leaf: 6 });
+    expect(() => parseCommand(["analyze", "acme/app#5", "--leaf", "six"])).toThrow(
+      '--leaf needs a PR number, got "six".',
+    );
+    expect(() => parseCommand(["stacks", "acme/app", "--leaf", "6"])).toThrow(UsageError);
+  });
+
   it("rejects unknown commands, flags and extra arguments", () => {
     expect(() => parseCommand(["review", "a/b#1"])).toThrow(UsageError);
     expect(() => parseCommand(["analyze", "a/b#1", "--nope"])).toThrow(UsageError);
