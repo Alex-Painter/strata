@@ -41,6 +41,9 @@ importers:
       '@strata/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@strata/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       arctic:
         specifier: ^3.7.0
         version: 3.7.0

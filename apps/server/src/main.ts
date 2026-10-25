@@ -6,6 +6,8 @@ import { createApp } from "./app.js";
 import { createGitHubOAuth } from "./auth/github.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
+import { engineFactory } from "./engines.js";
+import { RunQueue } from "./runs.js";
 
 // Both src/main.ts (tsx) and dist/main.js (bundle) sit one level below
 // apps/server, so these resolve the same way in dev and production.
@@ -27,7 +29,14 @@ const { db, close } = openDatabase(
   path.join(config.dataDir, "strata.sqlite"),
   fromHere("../drizzle"),
 );
-const app = createApp({ config, db, oauth: createGitHubOAuth(config) });
+const engineFor = engineFactory(config, db);
+const app = createApp({
+  config,
+  db,
+  oauth: createGitHubOAuth(config),
+  engineFor,
+  runs: new RunQueue(db, engineFor),
+});
 
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   const signIn = config.devBypass ? `dev bypass as ${config.devBypass.login}` : "GitHub";

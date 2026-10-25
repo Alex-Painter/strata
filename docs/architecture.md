@@ -27,7 +27,7 @@ apps/web          The workspace UI. Talks to the server, or reads a report embed
 apps/cli          Runs the engine locally and writes a self-contained review page.
 ```
 
-Dependencies only point downwards: `web → core`, `server → core (+ engine later)`, `cli → engine → core`.
+Dependencies only point downwards: `web → core`, `server → engine → core`, `cli → engine → core`.
 
 ### core
 
@@ -37,19 +37,25 @@ Dependencies only point downwards: `web → core`, `server → core (+ engine la
 - `layers.ts`: the semantic layers (data model, API, logic, UI, tests, config, docs, other), their order, and which ones need mandatory inspection.
 - `anchors.ts`: the anchor model (below).
 - `report.ts`: the `ChangeReport` with progressive disclosure (verdict, summary, evidence, raw). A `Claim` without evidence can't be shown.
+- `stack.ts`: a **stack** is a tree of ordinary PRs linked by branch (a PR targets, or used to target, the head branch of the PR below). Each bottom-to-tip path is one Change. `stack/build.ts` builds it purely from PR metadata plus git facts it asks the engine for.
 - `intent.ts`, `findings.ts`, `diagram.ts`, `context.ts`: the intent ledger, three-lens findings, the data-model diagram and context sources.
 - `chat.ts`, `api.ts`: request and response shapes shared by the server and the web app.
 
 ### engine
 
-`packages/engine/src/api.ts` is the contract the CLI and the server code against: `resolveChange`, `analyzeChange`, `readFile`, `resolveAnchors` and `chat`. In the scaffold every method throws `NotImplementedError`.
+`packages/engine/src/api.ts` is the contract the CLI and the server code against: `discoverStacks`, `resolveChange`, `analyzeChange`, `readFile`, `resolveAnchors` and `chat`. Stack discovery and stack Changes work (no diffs yet); the rest throw `NotImplementedError`.
+
+- `github/` reads the PR index (90 days of PRs with retarget and force-push events) over GraphQL and caches it in the data folder.
+- `git/` runs git without the user's config, attributes, ignore files or credential helpers, and keeps Strata's own bare clone of each repo, borrowing objects from a local checkout once (`STRATA_CHECKOUTS`, or the CLI's `--repo-path`).
+- `stack/` answers the stack builder's git questions and turns a stack path into a Change.
 
 ### server
 
 - `src/config.ts` validates the environment once at startup and reports every problem together.
 - `src/auth/` handles the GitHub OAuth flow, the allowlist, sessions (only a hash of the token is stored) and encryption of the GitHub token at rest.
-- `src/db/` holds the Drizzle schema (users and sessions so far) and runs migrations from `drizzle/` on startup.
-- `src/routes/api.ts` declares every milestone-1 route. Only `/api/me` works; the rest answer 501.
+- `src/db/` holds the Drizzle schema (users, sessions, Changes, runs and reports) and runs migrations from `drizzle/` on startup.
+- `src/routes/api.ts` declares every milestone-1 route. `/api/me`, `GET /api/repos/:owner/:name/stacks` and the Changes routes (`routes/changes.ts`) work; sources, files and threads answer 501.
+- `src/runs.ts` runs analyses one at a time in-process; `src/engines.ts` gives each user an engine with their own GitHub token.
 - `src/app.ts` adds security headers, CSRF origin checks, `/healthz`, and serves the web build with an SPA fallback.
 
 ### web

@@ -1,6 +1,8 @@
+import type { Engine } from "@strata/engine";
 import type { GitHubOAuth } from "./auth/github.js";
 import type { ServerConfig } from "./config.js";
 import type { Db } from "./db/client.js";
+import type { RunQueue } from "./runs.js";
 
 export interface SessionUser {
   id: string;
@@ -18,4 +20,7 @@ export interface AppDeps {
   db: Db;
   /** Null when GitHub OAuth isn't configured (dev bypass only). */
   oauth: GitHubOAuth | null;
+  /** The engine that reads GitHub as this user. */
+  engineFor: (userId: string) => Engine;
+  runs: RunQueue;
 }

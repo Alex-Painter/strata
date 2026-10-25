@@ -2,6 +2,7 @@
  * Server configuration from environment variables, validated once at startup
  * so a misconfigured deploy fails loudly instead of half-working.
  */
+import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
@@ -24,6 +25,8 @@ const Env = z.object({
   DEV_AUTH_BYPASS: z.string().optional(),
   DEV_GITHUB_LOGIN: z.string().optional(),
   DEV_GITHUB_TOKEN: z.string().optional(),
+  /** Local checkouts Strata may borrow objects from: `owner/name=path,owner/name=path`. */
+  STRATA_CHECKOUTS: z.string().default(""),
 });
 
 export interface DevBypass {
@@ -43,6 +46,8 @@ export interface ServerConfig {
   anthropicApiKey: string | null;
   model: string | null;
   webDist: string | null;
+  /** Local checkouts by `owner/name`, absolute paths. Only ever read. */
+  checkouts: Record<string, string>;
   /** Skips GitHub OAuth with a synthetic session. Never set in production. */
   devBypass: DevBypass | null;
   warnings: string[];
@@ -105,6 +110,8 @@ export function loadConfig(
     problems.push("ALLOWED_GITHUB_LOGINS must list at least one GitHub login.");
   }
 
+  const checkouts = parseCheckouts(env.STRATA_CHECKOUTS, problems);
+
   if (problems.length > 0) throw new ConfigError(problems);
 
   return {
@@ -118,7 +125,31 @@ export function loadConfig(
     anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
     model: env.STRATA_MODEL ?? null,
     webDist: env.WEB_DIST ? path.resolve(env.WEB_DIST) : (defaults.webDist ?? null),
+    checkouts,
     devBypass,
     warnings,
   };
+}
+
+function parseCheckouts(value: string, problems: string[]): Record<string, string> {
+  const checkouts: Record<string, string> = {};
+  for (const entry of value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    const match = /^([\w.-]+\/[\w.-]+)=(.+)$/.exec(entry);
+    if (!match) {
+      problems.push(`STRATA_CHECKOUTS: "${entry}" should look like owner/name=/path/to/checkout.`);
+      continue;
+    }
+    const [, repo, raw] = match as unknown as [string, string, string];
+    const expanded =
+      raw === "~" || raw.startsWith("~/") ? path.join(os.homedir(), raw.slice(1)) : raw;
+    if (!path.isAbsolute(expanded)) {
+      problems.push(`STRATA_CHECKOUTS: the path for ${repo} must be absolute or start with ~/.`);
+      continue;
+    }
+    checkouts[repo] = path.normalize(expanded);
+  }
+  return checkouts;
 }

@@ -8,6 +8,8 @@ import type { GitHubOAuth } from "./auth/github.js";
 import { SESSION_TTL_MS } from "./auth/session.js";
 import { loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
+import { engineFactory } from "./engines.js";
+import { RunQueue } from "./runs.js";
 
 const migrations = fileURLToPath(new URL("../drizzle", import.meta.url));
 const closers: Array<() => void> = [];
@@ -35,7 +37,9 @@ function setup(env: Record<string, string> = {}) {
   });
   const { db, close } = openDatabase(":memory:", migrations);
   closers.push(close);
-  return { app: createApp({ config, db, oauth: fakeOAuth }), config };
+  const engineFor = engineFactory(config, db);
+  const runs = new RunQueue(db, engineFor);
+  return { app: createApp({ config, db, oauth: fakeOAuth, engineFor, runs }), config };
 }
 
 function cookieValue(res: Response, name: string): string | undefined {
@@ -149,7 +153,7 @@ describe("/api", () => {
 
   it("declares milestone-1 routes as not implemented", async () => {
     const { app } = setup({ DEV_AUTH_BYPASS: "1" });
-    expect((await app.request("/api/changes")).status).toBe(501);
+    expect((await app.request("/api/threads/thr_1/messages")).status).toBe(501);
     expect((await app.request("/api/nope")).status).toBe(404);
   });
 });

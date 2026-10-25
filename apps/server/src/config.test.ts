@@ -1,3 +1,4 @@
+import os from "node:os";
 import { describe, expect, it } from "vitest";
 import { ConfigError, loadConfig } from "./config.js";
 
@@ -45,5 +46,25 @@ describe("loadConfig", () => {
     expect(config.devBypass).toEqual({ login: "alex", githubToken: null });
     expect(config.github).toBeNull();
     expect(config.sessionSecret.length).toBeGreaterThanOrEqual(32);
+  });
+
+  it("reads local checkouts, expanding ~", () => {
+    const config = loadConfig({
+      ...PRODUCTION,
+      STRATA_CHECKOUTS: "GlyphicAI/maverick-backend=~/workspace/maverick-backend, a/b=/srv/b/",
+    });
+    expect(config.checkouts).toEqual({
+      "GlyphicAI/maverick-backend": `${os.homedir()}/workspace/maverick-backend`,
+      "a/b": "/srv/b/",
+    });
+  });
+
+  it("rejects checkouts it can't read", () => {
+    expect(() => loadConfig({ ...PRODUCTION, STRATA_CHECKOUTS: "maverick=/x" })).toThrow(
+      /owner\/name=\/path/,
+    );
+    expect(() => loadConfig({ ...PRODUCTION, STRATA_CHECKOUTS: "a/b=relative/x" })).toThrow(
+      /must be absolute/,
+    );
   });
 });
