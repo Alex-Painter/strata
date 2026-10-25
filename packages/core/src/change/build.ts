@@ -3,10 +3,12 @@
  * becomes the domain model, and it stays a pure function of the diff: the same
  * text gives the same files, hunks and ids, however the work was split.
  *
- * Layers and mechanical checks plug in through `classify`. Without it, every
- * file and hunk is marked unclassified and no layer groups are made.
+ * Layers and mechanical checks plug in through a classifier (layers/classify.ts).
+ * Without one, every file and hunk is marked unclassified, nothing is
+ * mechanical, and no layer groups are made.
  */
-import { type ParsedFile, parseDiff } from "../diff/parse.js";
+import { parseDiff } from "../diff/parse.js";
+import type { Classifier } from "../layers/classify.js";
 import type { FileChange, Hunk, LayerAssignment, LayerGroup } from "../model/change.js";
 import { stableId } from "../model/ids.js";
 import { compareLayers, type LayerId } from "../model/layers.js";
@@ -28,7 +30,7 @@ export interface DiffModel {
 }
 
 export interface BuildDiffOptions {
-  classify?: (file: ParsedFile) => LayerAssignment;
+  classifier?: Classifier;
 }
 
 export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffModel {
@@ -36,8 +38,10 @@ export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffMod
   const files: FileChange[] = [];
   const hunks: Hunk[] = [];
 
+  const { classifier } = options;
   for (const file of parsed) {
-    const layer = options.classify?.(file) ?? UNCLASSIFIED;
+    const layer = classifier?.layer(file) ?? UNCLASSIFIED;
+    const fileMechanical = classifier?.mechanicalFile(file) ?? null;
     const seen = new Map<string, number>();
     const hunkIds: string[] = [];
     let additions = 0;
@@ -66,7 +70,8 @@ export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffMod
         section: parsedHunk.section,
         lines: parsedHunk.lines,
         layer,
-        mechanical: null,
+        // A mechanical file's hunks are mechanical for the same reason.
+        mechanical: fileMechanical ?? classifier?.mechanicalHunk(parsedHunk) ?? null,
       });
     }
 
@@ -81,12 +86,12 @@ export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffMod
       hunkIds,
       additions,
       deletions,
-      mechanical: null,
+      mechanical: fileMechanical,
       layer,
     });
   }
 
-  return { files, hunks, layers: options.classify ? groupByLayer(files, hunks) : [] };
+  return { files, hunks, layers: classifier ? groupByLayer(files, hunks) : [] };
 }
 
 function groupByLayer(files: FileChange[], hunks: Hunk[]): LayerGroup[] {

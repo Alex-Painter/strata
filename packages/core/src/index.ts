@@ -10,5 +10,6 @@
 export * from "./change/build.js";
 export * from "./change/canonical.js";
 export * from "./diff/parse.js";
+export * from "./layers/index.js";
 export * from "./model/index.js";
 export * from "./stack/index.js";

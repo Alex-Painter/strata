@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LayerAssignment } from "../model/change.js";
+import { createClassifier } from "../layers/classify.js";
 import { buildDiff, UNCLASSIFIED } from "./build.js";
 
 const DIFF = `diff --git a/src/models/user.py b/src/models/user.py
@@ -63,26 +63,21 @@ describe("buildDiff", () => {
   });
 
   it("groups files by layer, in layer order, when classified", () => {
-    const rule = (layer: LayerAssignment["layer"]): LayerAssignment => ({
-      layer,
-      by: "rule",
-      reason: "test",
-      confidence: "high",
-    });
-    const classified = buildDiff(DIFF, {
-      classify: (file) =>
-        file.path.includes("models")
-          ? rule("data-model")
-          : file.path.includes("api")
-            ? rule("api")
-            : rule("config"),
-    });
+    const classified = buildDiff(DIFF, { classifier: createClassifier() });
     expect(classified.layers.map((g) => [g.layer, g.files.map((f) => f.path)])).toEqual([
       ["data-model", ["src/models/user.py"]],
       ["api", ["src/api/users.py"]],
-      ["config", ["bin/run", "pnpm-lock.yaml"]],
+      ["config", ["pnpm-lock.yaml"]],
+      ["other", ["bin/run"]],
     ]);
-    expect(classified.layers[2]).toMatchObject({ meaningfulHunks: 1, mechanicalHunks: 0 });
+    // The lockfile is mechanical, file and hunk alike.
+    expect(classified.layers[2]).toMatchObject({ meaningfulHunks: 0, mechanicalHunks: 1 });
+    expect(classified.files[1]?.mechanical).toEqual({
+      kind: "lockfile",
+      reason: "Dependency lockfile",
+    });
+    expect(classified.hunks[0]?.mechanical?.kind).toBe("lockfile");
+    expect(classified.layers[0]).toMatchObject({ meaningfulHunks: 1, mechanicalHunks: 0 });
   });
 
   it("doesn't depend on the order of files in the diff", () => {

@@ -11,5 +11,11 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "picomatch": "^4.0.7"
+  },
+  "devDependencies": {
+    "@types/picomatch": "^4.0.3"
   }
 }

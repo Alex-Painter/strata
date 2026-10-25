@@ -98,6 +98,8 @@ export interface LayerAssignment {
 export type MechanicalKind =
   | "lockfile"
   | "generated"
+  /** Third-party code checked into the repo. */
+  | "vendored"
   | "snapshot"
   | "whitespace"
   | "rename"
