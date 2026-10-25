@@ -171,9 +171,15 @@ async function compareWithGitHub(
   const same =
     theirs.length === part.files.length &&
     theirs.every((file, i) => fileKey(file) === fileKey(part.files[i] as FileChange));
+  // Strata's own commits aren't on GitHub, so its side is shown by the PR's
+  // anchor: the same code for a direct part, and where the replay started otherwise.
+  const anchor = node.anchor as string;
   const evidence: Evidence[] = [
     commitEvidence(base, `where GitHub's diff of #${pr.number} starts`),
-    ...(part.from ? [commitEvidence(part.from, `where Strata's starts`)] : []),
+    commitEvidence(
+      anchor,
+      part.how === "direct" ? "where Strata's starts" : `where #${pr.number}'s changes start`,
+    ),
   ];
   return {
     base,

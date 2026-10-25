@@ -59,9 +59,16 @@ describe("each PR's diff", () => {
         "#1 landed on main as a new commit, and #2 hasn't been rebased since, " +
         "so GitHub's diff of #2 repeats #1's changes.",
     });
-    expect(two?.github?.evidence.map((e) => e.label)).toEqual([
-      "where GitHub's diff of #2 starts",
-      "where Strata's starts",
+    // Strata's own commits aren't on GitHub, so the evidence names real ones.
+    expect(two?.github?.evidence).toEqual([
+      {
+        anchor: { source: { kind: "commit", oid: demo.m0 } },
+        label: "where GitHub's diff of #2 starts",
+      },
+      {
+        anchor: { source: { kind: "commit", oid: demo.heads[1] } },
+        label: "where Strata's starts",
+      },
     ]);
     expect(three?.github).toMatchObject({ base: demo.heads[2], same: true, reason: null });
   });
