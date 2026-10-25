@@ -1,0 +1,378 @@
+[
+  {
+    "path": "added.txt",
+    "status": "added",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 0,
+        "oldLines": 0,
+        "newStart": 1,
+        "newLines": 1,
+        "section": "",
+        "lines": [
+          {
+            "kind": "add",
+            "content": "no newline",
+            "newLine": 1,
+            "noNewlineAtEof": true
+          }
+        ]
+      }
+    ],
+    "newMode": "100644"
+  },
+  {
+    "path": "café.txt",
+    "status": "added",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 0,
+        "oldLines": 0,
+        "newStart": 1,
+        "newLines": 1,
+        "section": "",
+        "lines": [
+          {
+            "kind": "add",
+            "content": "é",
+            "newLine": 1
+          }
+        ]
+      }
+    ],
+    "newMode": "100644"
+  },
+  {
+    "path": "docs/moved.md",
+    "status": "renamed",
+    "binary": false,
+    "hunks": [],
+    "similarity": 100,
+    "oldPath": "moved.md"
+  },
+  {
+    "path": "edit.txt",
+    "status": "modified",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 6,
+        "newStart": 1,
+        "newLines": 6,
+        "section": "",
+        "lines": [
+          {
+            "kind": "context",
+            "content": "one",
+            "oldLine": 1,
+            "newLine": 1
+          },
+          {
+            "kind": "context",
+            "content": "two",
+            "oldLine": 2,
+            "newLine": 2
+          },
+          {
+            "kind": "del",
+            "content": "three",
+            "oldLine": 3
+          },
+          {
+            "kind": "add",
+            "content": "THREE",
+            "newLine": 3
+          },
+          {
+            "kind": "context",
+            "content": "four",
+            "oldLine": 4,
+            "newLine": 4
+          },
+          {
+            "kind": "context",
+            "content": "five",
+            "oldLine": 5,
+            "newLine": 5
+          },
+          {
+            "kind": "context",
+            "content": "six",
+            "oldLine": 6,
+            "newLine": 6
+          }
+        ]
+      },
+      {
+        "oldStart": 8,
+        "oldLines": 3,
+        "newStart": 8,
+        "newLines": 4,
+        "section": "seven",
+        "lines": [
+          {
+            "kind": "context",
+            "content": "eight",
+            "oldLine": 8,
+            "newLine": 8
+          },
+          {
+            "kind": "context",
+            "content": "nine",
+            "oldLine": 9,
+            "newLine": 9
+          },
+          {
+            "kind": "context",
+            "content": "ten",
+            "oldLine": 10,
+            "newLine": 10
+          },
+          {
+            "kind": "add",
+            "content": "eleven",
+            "newLine": 11
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "path": "empty-new.txt",
+    "status": "renamed",
+    "binary": false,
+    "hunks": [],
+    "similarity": 100,
+    "oldPath": "empty-gone.txt"
+  },
+  {
+    "path": "gone.txt",
+    "status": "deleted",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 1,
+        "newStart": 0,
+        "newLines": 0,
+        "section": "",
+        "lines": [
+          {
+            "kind": "del",
+            "content": "line",
+            "oldLine": 1
+          }
+        ]
+      }
+    ],
+    "oldMode": "100644"
+  },
+  {
+    "path": "icon.bin",
+    "status": "added",
+    "binary": true,
+    "hunks": [],
+    "newMode": "100644"
+  },
+  {
+    "path": "link-to-edit",
+    "status": "added",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 0,
+        "oldLines": 0,
+        "newStart": 1,
+        "newLines": 1,
+        "section": "",
+        "lines": [
+          {
+            "kind": "add",
+            "content": "edit.txt",
+            "newLine": 1,
+            "noNewlineAtEof": true
+          }
+        ]
+      }
+    ],
+    "newMode": "120000"
+  },
+  {
+    "path": "logo.png",
+    "status": "modified",
+    "binary": true,
+    "hunks": []
+  },
+  {
+    "path": "mode-and-edit.sh",
+    "status": "modified",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 1,
+        "newStart": 1,
+        "newLines": 1,
+        "section": "",
+        "lines": [
+          {
+            "kind": "del",
+            "content": "x = 1",
+            "oldLine": 1
+          },
+          {
+            "kind": "add",
+            "content": "x = 2",
+            "newLine": 1
+          }
+        ]
+      }
+    ],
+    "oldMode": "100644",
+    "newMode": "100755"
+  },
+  {
+    "path": "my dir/file one.md",
+    "status": "modified",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 1,
+        "newStart": 1,
+        "newLines": 3,
+        "section": "",
+        "lines": [
+          {
+            "kind": "del",
+            "content": "keep",
+            "oldLine": 1
+          },
+          {
+            "kind": "add",
+            "content": "--- a/not-a-header",
+            "newLine": 1
+          },
+          {
+            "kind": "add",
+            "content": "+++ b/not-a-header",
+            "newLine": 2
+          },
+          {
+            "kind": "add",
+            "content": "diff --git a/x b/y",
+            "newLine": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "path": "new_name.py",
+    "status": "renamed",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 7,
+        "newStart": 1,
+        "newLines": 7,
+        "section": "",
+        "lines": [
+          {
+            "kind": "context",
+            "content": "alpha",
+            "oldLine": 1,
+            "newLine": 1
+          },
+          {
+            "kind": "context",
+            "content": "beta",
+            "oldLine": 2,
+            "newLine": 2
+          },
+          {
+            "kind": "context",
+            "content": "gamma",
+            "oldLine": 3,
+            "newLine": 3
+          },
+          {
+            "kind": "del",
+            "content": "delta",
+            "oldLine": 4
+          },
+          {
+            "kind": "add",
+            "content": "DELTA",
+            "newLine": 4
+          },
+          {
+            "kind": "context",
+            "content": "epsilon",
+            "oldLine": 5,
+            "newLine": 5
+          },
+          {
+            "kind": "context",
+            "content": "zeta",
+            "oldLine": 6,
+            "newLine": 6
+          },
+          {
+            "kind": "context",
+            "content": "eta",
+            "oldLine": 7,
+            "newLine": 7
+          }
+        ]
+      }
+    ],
+    "similarity": 86,
+    "oldPath": "old-name.py"
+  },
+  {
+    "path": "run.sh",
+    "status": "modified",
+    "binary": false,
+    "hunks": [],
+    "oldMode": "100644",
+    "newMode": "100755"
+  },
+  {
+    "path": "tail.txt",
+    "status": "modified",
+    "binary": false,
+    "hunks": [
+      {
+        "oldStart": 1,
+        "oldLines": 1,
+        "newStart": 1,
+        "newLines": 2,
+        "section": "",
+        "lines": [
+          {
+            "kind": "del",
+            "content": "end",
+            "oldLine": 1,
+            "noNewlineAtEof": true
+          },
+          {
+            "kind": "add",
+            "content": "end",
+            "newLine": 1
+          },
+          {
+            "kind": "add",
+            "content": "more",
+            "newLine": 2,
+            "noNewlineAtEof": true
+          }
+        ]
+      }
+    ]
+  }
+]

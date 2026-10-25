@@ -54,6 +54,9 @@ export interface FileChange {
   binary: boolean;
   /** Rename/copy similarity reported by git, 0-100. */
   similarity?: number;
+  /** File modes when the diff names them: `100644`, `100755`, `120000` (symlink). */
+  oldMode?: string;
+  newMode?: string;
   /** Ids of this file's hunks, in file order. */
   hunkIds: string[];
   additions: number;

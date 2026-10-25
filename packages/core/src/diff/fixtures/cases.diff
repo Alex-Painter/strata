@@ -1,0 +1,109 @@
+diff --git a/added.txt b/added.txt
+new file mode 100644
+index 0000000..20cbb4d
+--- /dev/null
++++ b/added.txt
+@@ -0,0 +1 @@
++no newline
+\ No newline at end of file
+diff --git "a/caf\303\251.txt" "b/caf\303\251.txt"
+new file mode 100644
+index 0000000..c600332
+--- /dev/null
++++ "b/caf\303\251.txt"
+@@ -0,0 +1 @@
++é
+diff --git a/moved.md b/docs/moved.md
+similarity index 100%
+rename from moved.md
+rename to docs/moved.md
+diff --git a/edit.txt b/edit.txt
+index c9e9e05..5d4832f 100644
+--- a/edit.txt
++++ b/edit.txt
+@@ -1,6 +1,6 @@
+ one
+ two
+-three
++THREE
+ four
+ five
+ six
+@@ -8,3 +8,4 @@ seven
+ eight
+ nine
+ ten
++eleven
+diff --git a/empty-gone.txt b/empty-new.txt
+similarity index 100%
+rename from empty-gone.txt
+rename to empty-new.txt
+diff --git a/gone.txt b/gone.txt
+deleted file mode 100644
+index a999a0c..0000000
+--- a/gone.txt
++++ /dev/null
+@@ -1 +0,0 @@
+-line
+diff --git a/icon.bin b/icon.bin
+new file mode 100644
+index 0000000..7108bdf
+Binary files /dev/null and b/icon.bin differ
+diff --git a/link-to-edit b/link-to-edit
+new file mode 120000
+index 0000000..6e2feb0
+--- /dev/null
++++ b/link-to-edit
+@@ -0,0 +1 @@
++edit.txt
+\ No newline at end of file
+diff --git a/logo.png b/logo.png
+index ac6c544..69ec7ce 100644
+Binary files a/logo.png and b/logo.png differ
+diff --git a/mode-and-edit.sh b/mode-and-edit.sh
+old mode 100644
+new mode 100755
+index 7d4290a..407de30
+--- a/mode-and-edit.sh
++++ b/mode-and-edit.sh
+@@ -1 +1 @@
+-x = 1
++x = 2
+diff --git a/my dir/file one.md b/my dir/file one.md
+index 2fa992c..f3d061c 100644
+--- a/my dir/file one.md	
++++ b/my dir/file one.md	
+@@ -1 +1,3 @@
+-keep
++--- a/not-a-header
+++++ b/not-a-header
++diff --git a/x b/y
+diff --git a/old-name.py b/new_name.py
+similarity index 86%
+rename from old-name.py
+rename to new_name.py
+index 1e395f2..afa37bf 100644
+--- a/old-name.py
++++ b/new_name.py
+@@ -1,7 +1,7 @@
+ alpha
+ beta
+ gamma
+-delta
++DELTA
+ epsilon
+ zeta
+ eta
+diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755
+diff --git a/tail.txt b/tail.txt
+index e32b0df..09d1eeb 100644
+--- a/tail.txt
++++ b/tail.txt
+@@ -1 +1,2 @@
+-end
+\ No newline at end of file
++end
++more
+\ No newline at end of file
