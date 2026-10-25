@@ -3,7 +3,6 @@ import { summarizeStack } from "@strata/core/stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "wouter";
-import { ChatPanel } from "../components/ChatPanel";
 import { Navigator } from "../components/Navigator";
 import { PaneArea, type RunView } from "../components/PaneArea";
 import { TopBar } from "../components/TopBar";
@@ -28,7 +27,7 @@ export function WorkspacePage(
 /** A CLI-written page: the embedded report, with the scope kept in memory. */
 function StaticWorkspace({ report }: { report: ChangeReport }) {
   const [scope, setScope] = useState<number | null>(null);
-  return <Workspace mode="static" report={report} run={null} scope={scope} onScope={setScope} />;
+  return <Workspace report={report} run={null} scope={scope} onScope={setScope} />;
 }
 
 function ServerWorkspace({ me }: { me: MeResponse }) {
@@ -75,7 +74,6 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
   const data: ChangeDetail | undefined = detail.data;
   return (
     <Workspace
-      mode="server"
       me={me}
       title={data?.change.title}
       report={data?.report ?? null}
@@ -95,7 +93,6 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
 }
 
 function Workspace({
-  mode,
   me,
   title,
   report,
@@ -106,7 +103,6 @@ function Workspace({
   pickingPath = null,
   pickError = null,
 }: {
-  mode: "server" | "static";
   me?: MeResponse;
   title?: string | undefined;
   report: ChangeReport | null;
@@ -134,7 +130,6 @@ function Workspace({
         pickingPath={pickingPath}
         pickError={pickError}
       />
-      <ChatPanel mode={mode} />
     </Shell>
   );
 }

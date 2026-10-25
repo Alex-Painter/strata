@@ -17,12 +17,62 @@ import { demoRepo, prNode, StackRepo } from "@strata/engine/testing";
 const remote = await StackRepo.create();
 const demo = await demoRepo(remote);
 
-// One more stack, with review and CI states: #10 is behind #9, and #11 is a draft on top.
-await remote.commit("b9", "main");
-const h10 = await remote.commit("b10", "b9");
-const h11 = await remote.commit("b11", "b10");
+// One more stack, with review and CI states and some code to read: #10 is
+// behind #9, and #11 is a draft on top.
+const lines = (...values: string[]) => `${values.join("\n")}\n`;
+await remote.write(
+  "b9",
+  {
+    "app/forecast_cache.py": lines(
+      "from datetime import timedelta",
+      "",
+      "TTL = timedelta(hours=1)",
+      "",
+      "",
+      "def cache_key(account_id: str) -> str:",
+      '    return f"forecast:{account_id}"',
+    ),
+  },
+  "main",
+);
+const h10 = await remote.write(
+  "b10",
+  {
+    "app/jobs/warm_cache.py": lines(
+      "from app.forecast_cache import cache_key",
+      "",
+      "",
+      "async def warm_all(accounts, cache, forecasts):",
+      "    for account in accounts:",
+      "        cache.set(cache_key(account.id), await forecasts.build(account))",
+    ),
+  },
+  "b9",
+);
+const h11 = await remote.write(
+  "b11",
+  {
+    "web/admin/CacheStats.tsx": lines(
+      "export function CacheStats({ hits, misses }: { hits: number; misses: number }) {",
+      "  const rate = hits + misses === 0 ? 0 : hits / (hits + misses);",
+      "  return <p>Forecast cache hit rate: {Math.round(rate * 100)}%</p>;",
+      "}",
+    ),
+  },
+  "b10",
+);
 // #9 moves on after #10 branched from it.
-const h9 = await remote.commit("b9");
+const h9 = await remote.write("b9", {
+  "app/forecast_cache.py": lines(
+    "from datetime import timedelta",
+    "",
+    "TTL = timedelta(hours=6)",
+    "",
+    "",
+    "def cache_key(account_id: str) -> str:",
+    '    return f"forecast:v2:{account_id}"',
+  ),
+});
 for (const [n, oid] of [
   [9, h9],
   [10, h10],

@@ -1,5 +1,5 @@
 /** Words and dates for PR metadata, shared by the stack map and the panes. */
-import type { LinkState, PrState, StackPr } from "@strata/core/model";
+import type { FileStatus, LinkState, PrState, StackPr } from "@strata/core/model";
 
 export function stateLabel(pr: { state: PrState; draft: boolean }): string {
   if (pr.state === "open") return pr.draft ? "Draft" : "Open";
@@ -83,4 +83,17 @@ export function countPrs(prs: { state: PrState }[]): string {
 export function describePath(path: number[]): string {
   const names = path.map((n) => `#${n}`);
   return names.length <= 3 ? names.join(" → ") : `${names[0]} → … → ${names[names.length - 1]}`;
+}
+
+export const FILE_STATUS: Record<FileStatus, string> = {
+  added: "Added",
+  modified: "Modified",
+  deleted: "Deleted",
+  renamed: "Renamed",
+  copied: "Copied",
+};
+
+/** `+40 −3`, with a real minus sign. */
+export function lineCount(additions: number, deletions: number): string {
+  return `+${additions} −${deletions}`;
 }

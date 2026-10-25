@@ -1,5 +1,7 @@
 import type {
   ChangeReport,
+  GitHubDiffCheck,
+  PrPart,
   RunInfo,
   Stack,
   StackIssue,
@@ -17,6 +19,7 @@ import {
   REVIEW_LABEL,
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
+import { Files } from "./Diff";
 import { EvidenceList } from "./EvidenceList";
 import { PathPicker } from "./PathPicker";
 import { StateBadge } from "./PrStatus";
@@ -29,9 +32,9 @@ export interface RunView {
 }
 
 /**
- * Where context is read: the whole stack, or one PR of it ("How it arrived").
- * Diffs, layers and summaries join these panes in later slices; text
- * selections in them become anchors for chat.
+ * Where context is read: the whole stack and its diff, or one PR of it ("How
+ * it arrived") with that PR's own diff. Layers and summaries join these panes
+ * in later slices.
  */
 export function PaneArea({
   report,
@@ -61,7 +64,12 @@ export function PaneArea({
           {run && <RunBanner run={run} hasReport={report !== null} />}
           {report && stack && summary ? (
             node ? (
-              <PrPane stack={stack} node={node} onScope={onScope} />
+              <PrPane
+                stack={stack}
+                node={node}
+                part={report.parts.find((part) => part.pr === node.pr.number)}
+                onScope={onScope}
+              />
             ) : (
               <StackPane
                 report={report}
@@ -102,6 +110,14 @@ function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean }) {
       </p>
     );
   }
+  if (info.status === "done" && !hasReport) {
+    return (
+      <div role="status" className="rounded-md border border-dashed border-line px-3 py-2">
+        <p>This Change was analysed by an older version of Strata. Run it again to see it.</p>
+        <RunAgain run={run} />
+      </div>
+    );
+  }
   if (info.status === "failed") {
     return (
       <div role="alert" className="rounded-md border border-closed/40 bg-del/40 px-3 py-2">
@@ -109,18 +125,24 @@ function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean }) {
           The last run failed{info.finishedAt ? ` ${ago(info.finishedAt)}` : ""}: {info.error}
         </p>
         {hasReport && <p className="text-muted">Showing the last report that worked.</p>}
-        <button
-          type="button"
-          onClick={run.onRunAgain}
-          disabled={run.rerunning}
-          className="mt-2 rounded-md border border-line bg-surface px-2 py-1 hover:bg-raised"
-        >
-          Run again
-        </button>
+        <RunAgain run={run} />
       </div>
     );
   }
   return null;
+}
+
+function RunAgain({ run }: { run: RunView }) {
+  return (
+    <button
+      type="button"
+      onClick={run.onRunAgain}
+      disabled={run.rerunning}
+      className="mt-2 rounded-md border border-line bg-surface px-2 py-1 hover:bg-raised"
+    >
+      Run again
+    </button>
+  );
 }
 
 function StackPane({
@@ -173,6 +195,7 @@ function StackPane({
           ))}
         </ul>
       )}
+      {report.change.revisions && <Files files={report.change.files} hunks={report.change.hunks} />}
     </>
   );
 }
@@ -180,10 +203,12 @@ function StackPane({
 function PrPane({
   stack,
   node,
+  part,
   onScope,
 }: {
   stack: Stack;
   node: StackNode;
+  part: PrPart | undefined;
   onScope: (pr: number | null) => void;
 }) {
   const { pr } = node;
@@ -297,7 +322,66 @@ function PrPane({
         )}
       </dl>
       <Issues repo={stack.repo} issues={issues} />
+      {part && <PartDiff stack={stack} node={node} part={part} />}
     </>
+  );
+}
+
+/** One PR's own diff, with how Strata built it and how it compares with GitHub's. */
+function PartDiff({ stack, node, part }: { stack: Stack; node: StackNode; part: PrPart }) {
+  const n = node.pr.number;
+  const conflicted = stack.issues.some(
+    (issue) => issue.kind === "replay-conflict" && issue.prs.includes(n),
+  );
+  const how =
+    part.how === "replayed"
+      ? "Strata put this PR's changes on the stack below it, as a restack would."
+      : part.how === "apart"
+        ? conflicted
+          ? "Its changes conflict with the stack below it, so this is its diff from where its changes start to its head. It isn't in the whole-stack diff."
+          : "A PR below it couldn't be put on the stack, so this is its diff from where its changes start to its head. It isn't in the whole-stack diff."
+        : part.how === "unknown"
+          ? "Git couldn't tell where its changes start, so there's no diff."
+          : null;
+  return (
+    <>
+      {part.github && !part.github.same && (
+        <GitHubDiffers repo={stack.repo} pr={n} check={part.github} />
+      )}
+      {how && <p className="text-muted">{how}</p>}
+      {part.how !== "unknown" && <Files files={part.files} hunks={part.hunks} />}
+    </>
+  );
+}
+
+function GitHubDiffers({ repo, pr, check }: { repo: string; pr: number; check: GitHubDiffCheck }) {
+  return (
+    <section
+      aria-label="GitHub's diff"
+      className="space-y-1 rounded-md border border-warn/40 bg-warn-bg px-3 py-2"
+    >
+      <p className="font-medium">GitHub's diff of #{pr} is different from this one.</p>
+      {check.reason && <p>{check.reason}</p>}
+      {check.onlyOnGitHub.length > 0 && (
+        <PathList label="Only on GitHub" paths={check.onlyOnGitHub} />
+      )}
+      {check.onlyHere.length > 0 && <PathList label="Only here" paths={check.onlyHere} />}
+      <EvidenceList repo={repo} evidence={check.evidence} />
+    </section>
+  );
+}
+
+function PathList({ label, paths }: { label: string; paths: string[] }) {
+  return (
+    <p>
+      <span className="text-muted">{label}: </span>
+      {paths.map((path, i) => (
+        <span key={path}>
+          {i > 0 && ", "}
+          <span className="font-mono">{path}</span>
+        </span>
+      ))}
+    </p>
   );
 }
 
