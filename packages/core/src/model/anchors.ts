@@ -30,7 +30,11 @@ export type SourceRef =
   /** A diagram, or one element (entity, field, relation) inside it. */
   | { kind: "diagram"; diagramId: string; elementId?: string }
   | { kind: "finding"; findingId: string }
-  | { kind: "ledger"; entryId: string };
+  | { kind: "ledger"; entryId: string }
+  /** A pull request in the Change's repo. */
+  | { kind: "pr"; number: number }
+  /** A commit, by full object id. */
+  | { kind: "commit"; oid: string };
 
 export type SourceKind = SourceRef["kind"];
 
@@ -77,6 +81,10 @@ export function sourceKey(ref: SourceRef): string {
       return `finding:${ref.findingId}`;
     case "ledger":
       return `ledger:${ref.entryId}`;
+    case "pr":
+      return `pr:${ref.number}`;
+    case "commit":
+      return `commit:${ref.oid}`;
   }
 }
 

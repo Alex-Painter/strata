@@ -66,5 +66,7 @@ describe("anchors", () => {
     expect(sourceKey({ kind: "diagram", diagramId: "d", elementId: "User" })).toBe(
       "diagram:d#User",
     );
+    expect(sourceKey({ kind: "pr", number: 9339 })).toBe("pr:9339");
+    expect(sourceKey({ kind: "commit", oid: "abc123" })).toBe("commit:abc123");
   });
 });
