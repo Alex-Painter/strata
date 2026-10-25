@@ -1,0 +1,74 @@
+/**
+ * The ChangeReport is everything one analysis run produced, laid out for
+ * progressive disclosure (SPEC.md): verdict, then summary, then evidence, then
+ * raw. It is the single payload behind the CLI's static page, the server's
+ * workspace view and the chat agent's context.
+ */
+import type { Change, Evidence } from "./change.js";
+import type { ContextSource } from "./context.js";
+import type { DataModelDiagram } from "./diagram.js";
+import type { Finding } from "./findings.js";
+import type { IntentLedger } from "./intent.js";
+import type { LayerId } from "./layers.js";
+
+export const REPORT_SCHEMA_VERSION = 1;
+
+export type VerdictStatus =
+  /** A gate failed or a blocker finding exists. */
+  | "blocked"
+  /** Findings or mandatory inspections need a human. */
+  | "needs-review"
+  /** Nothing outstanding that Strata can see. */
+  | "ready"
+  /** A step was skipped (no intent sources, no LLM, no extractor). */
+  | "incomplete";
+
+export interface Verdict {
+  status: VerdictStatus;
+  /** One line. */
+  headline: string;
+  /** Lead with the weakest cell, not a single number (SPEC.md). */
+  weakest?: { layer?: LayerId; reason: string; evidence: Evidence[] };
+}
+
+/** A sentence the product shows. No evidence means it is not shown. */
+export interface Claim {
+  text: string;
+  confidence: "high" | "medium" | "low";
+  evidence: Evidence[];
+}
+
+export interface LayerSummary {
+  layer: LayerId;
+  claims: Claim[];
+}
+
+export interface ChangeReport {
+  schemaVersion: typeof REPORT_SCHEMA_VERSION;
+  change: Change;
+  sources: ContextSource[];
+  verdict: Verdict;
+  summary: Claim[];
+  layerSummaries: LayerSummary[];
+  ledger: IntentLedger;
+  findings: Finding[];
+  diagrams: DataModelDiagram[];
+  /** Caveats about what this run could not do, shown under the verdict. */
+  notes: string[];
+  raw: {
+    /** The full net diff, for the last level of disclosure. */
+    diff: string;
+  };
+  /** Run metadata. Excluded from shape-invariance comparisons. */
+  analysis: {
+    engineVersion: string;
+    model?: string;
+    startedAt: string;
+    durationMs: number;
+  };
+}
+
+/** Drops claims that have no evidence, enforcing CLAUDE.md's evidence rule. */
+export function evidenced<T extends { evidence: readonly unknown[] }>(items: readonly T[]): T[] {
+  return items.filter((item) => item.evidence.length > 0);
+}
