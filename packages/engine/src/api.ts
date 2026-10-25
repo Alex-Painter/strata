@@ -13,7 +13,9 @@ import type {
   ContextSource,
   LayerRule,
   RepoRef,
+  Stack,
 } from "@strata/core";
+import type { GitHubPort } from "./github/port.js";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
@@ -22,6 +24,17 @@ export interface EngineConfig {
   dataDir: string;
   /** Token for the GitHub API and git over HTTPS. Not needed for local repos. */
   githubToken?: string;
+  /**
+   * Local checkouts by `owner/name`. Strata's own clone borrows their objects
+   * once and never writes to them. Paths stay here, out of the model.
+   */
+  checkouts?: Record<string, string>;
+  /** Replaces the GitHub API client; tests pass a fake. */
+  githubPort?: GitHubPort;
+  /** Where to clone `owner/name` from. Defaults to GitHub over HTTPS; tests use local repos. */
+  gitRemote?: (repo: string) => string;
+  /** The clock for the PR index window. Tests fix it. */
+  now?: () => Date;
   /** Without a key, LLM steps are skipped and the report says so. */
   anthropicApiKey?: string;
   /** Defaults to DEFAULT_MODEL. */
@@ -74,6 +87,8 @@ export interface ChatRequest {
 export type ChatChunk = { type: "text"; text: string } | { type: "status"; text: string };
 
 export interface Engine {
+  /** Every stack among the PRs updated in the last 90 days, bottom PR first. */
+  discoverStacks(repo: string, signal?: AbortSignal): Promise<Stack[]>;
   resolveChange(input: ChangeInput, signal?: AbortSignal): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */

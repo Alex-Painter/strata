@@ -37,4 +37,17 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["analyze", "a/b#1", "extra"])).toThrow(UsageError);
     expect(() => parseCommand(["analyze"])).toThrow(/needs an <input>/);
   });
+
+  it("parses stacks with a checkout and JSON output", () => {
+    expect(
+      parseCommand(["stacks", "acme/app", "--repo-path", "~/w/app", "--json", "s.json"]),
+    ).toEqual({ kind: "stacks", repo: "acme/app", repoPath: "~/w/app", json: "s.json" });
+    expect(parseCommand(["stacks", "acme/app"])).toEqual({ kind: "stacks", repo: "acme/app" });
+  });
+
+  it("rejects stacks without an owner/repo, or with analyze-only flags", () => {
+    expect(() => parseCommand(["stacks"])).toThrow(/needs an <owner\/repo>/);
+    expect(() => parseCommand(["stacks", "acme/app#12"])).toThrow(/owner\/repo/);
+    expect(() => parseCommand(["stacks", "acme/app", "--out", "x.html"])).toThrow(UsageError);
+  });
 });
