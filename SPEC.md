@@ -22,7 +22,8 @@ Review moves from code to **intent, system change and behaviour change**, backed
 - Layers are semantic, not PRs. Example order: PRD/design → data model → API → settings UI → feature UI → tests.
 - Each code hunk is assigned to a layer (path/AST rules first, agent judgement second). PR boundaries are a hint, never trusted.
 - Lower layers must qualify before upper layers matter.
-- The tool can generate and own the PR split for a Change (build on GitHub's native stacked PRs / `gh-stack`, don't rebuild stacking).
+- A stack is read as PRs whose branches feed into each other, however they were made (by hand, Graphite, Linear or GitHub's native stacked PRs). Strata finds it from the branch links and doesn't depend on any tool's own stack records.
+- Later, the tool can generate and own the PR split for a Change (build on existing stacking tools such as `gh-stack`, don't rebuild stacking).
 
 ## Traceability graph
 `requirement → interpretation → layer → hunk → evidence`, extended after merge with `commit → deploy → flag → errors/metrics`.
