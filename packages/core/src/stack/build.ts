@@ -56,6 +56,41 @@ export function buildStack(index: PrIndex, seed: StackSeed, facts: GitFacts): Bu
   return requests.length > 0 ? { kind: "needs", requests } : { kind: "done", stack };
 }
 
+/**
+ * Groups the PRs that branch links could join into one stack, from metadata
+ * alone: each PR with every same-repo PR whose head branch it targets or used
+ * to target. Groups of two or more come back, each sorted, smallest first.
+ * buildStack decides the real trees; this only tells the engine which PR
+ * heads to fetch before asking.
+ */
+export function linkedGroups(index: PrIndex): number[][] {
+  const parent = new Map<number, number>();
+  const find = (n: number): number => {
+    let root = n;
+    while (parent.get(root) !== root) root = parent.get(root) as number;
+    parent.set(n, root);
+    return root;
+  };
+  const byHeadRef = new Map<string, StackPr[]>();
+  for (const pr of index.prs) {
+    parent.set(pr.number, pr.number);
+    if (!pr.crossRepository) push(byHeadRef, pr.headRef, pr);
+  }
+  for (const pr of index.prs) {
+    for (const ref of candidateRefs(pr)) {
+      for (const other of byHeadRef.get(ref) ?? []) {
+        if (other.number !== pr.number) parent.set(find(pr.number), find(other.number));
+      }
+    }
+  }
+  const groups = new Map<number, number[]>();
+  for (const number of parent.keys()) push(groups, find(number), number);
+  return [...groups.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => group.sort((a, b) => a - b))
+    .sort((a, b) => (a[0] as number) - (b[0] as number));
+}
+
 interface Candidate {
   pr: StackPr;
   /** 0 when the child targets the candidate's branch now; higher for older bases. */

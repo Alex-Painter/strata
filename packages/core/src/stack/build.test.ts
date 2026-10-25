@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GitFacts, PrIndex, Stack, StackPr, StackSeed } from "../model/stack.js";
-import { buildStack, emptyFacts, factKey, mergeFacts, StackError } from "./build.js";
+import { buildStack, emptyFacts, factKey, linkedGroups, mergeFacts, StackError } from "./build.js";
 
 /**
  * Each case describes a tiny commit graph and the PRs on it, then checks the
@@ -386,5 +386,26 @@ describe("buildStack", () => {
     for (const item of [...stack.edges, ...stack.issues]) {
       expect(item.evidence.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("linkedGroups", () => {
+  it("groups PRs joined by current or former bases, and leaves lone PRs out", () => {
+    const groups = linkedGroups(
+      index(
+        pr(1),
+        pr(2, { baseRef: "main", baseChanges: [{ from: "b1", to: "main", at: at(30) }] }),
+        pr(3, { baseRef: "b2" }),
+        pr(4),
+        pr(6, { baseRef: "b5" }),
+        pr(5),
+        pr(7, { baseRef: "b8" }),
+        pr(8, { crossRepository: true }),
+      ),
+    );
+    expect(groups).toEqual([
+      [1, 2, 3],
+      [5, 6],
+    ]);
   });
 });
