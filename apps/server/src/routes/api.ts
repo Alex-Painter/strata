@@ -40,6 +40,8 @@ export function apiRoutes(deps: AppDeps) {
   app.get("/threads/:id/messages", notYet);
   app.post("/threads/:id/messages", notYet);
 
-  app.notFound((c) => c.json({ error: "Not found." }, 404));
+  // A mounted sub-app's notFound never fires, so without this route the
+  // parent's app-shell fallback would answer unknown API paths with HTML.
+  app.all("*", (c) => c.json({ error: "Not found." }, 404));
   return app;
 }

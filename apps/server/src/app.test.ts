@@ -174,4 +174,15 @@ describe("web app", () => {
 
     expect((await app.request("/api/unknown")).status).toBe(401);
   });
+
+  it("answers unknown API paths with JSON, not the app shell", async () => {
+    const dist = mkdtempSync(path.join(os.tmpdir(), "strata-web-"));
+    writeFileSync(path.join(dist, "index.html"), "<!doctype html><title>Strata</title>");
+    const { app } = setup({ WEB_DIST: dist, DEV_AUTH_BYPASS: "1" });
+
+    const res = await app.request("/api/nope");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(await res.json()).toEqual({ error: "Not found." });
+  });
 });
