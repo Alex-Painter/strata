@@ -3,12 +3,13 @@
  * GitHub would do to a stack (commit, squash-merge, rebase, force-push) and
  * returns the resulting commit, so tests can say where anchors should land.
  *
- * Every commit gets a fixed author and a ticking clock, and each one adds its
- * own file, so merges and rebases never conflict.
+ * Every commit gets a fixed author and a ticking clock. `commit` adds a new
+ * file each time, so merges and rebases never conflict; `write` commits exact
+ * contents, for tests about what the code is.
  */
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { gitEnv, gitOk } from "../git/run.js";
 
 const EPOCH = Date.UTC(2026, 9, 1) / 1000;
@@ -35,6 +36,31 @@ export class StackRepo {
     );
     await this.addFile(branch);
     await this.git(["commit", "--quiet", "-m", `Work on ${branch}`]);
+    return this.tip(branch);
+  }
+
+  /**
+   * Commits these contents on `branch`, first creating it at `from` when given.
+   * Null deletes a file.
+   */
+  async write(
+    branch: string,
+    files: Record<string, string | null>,
+    from?: string,
+  ): Promise<string> {
+    await this.git(
+      from ? ["checkout", "--quiet", "-b", branch, from] : ["checkout", "--quiet", branch],
+    );
+    for (const [path, content] of Object.entries(files)) {
+      if (content === null) {
+        await this.git(["rm", "--quiet", "--", path]);
+      } else {
+        await mkdir(dirname(join(this.dir, path)), { recursive: true });
+        await writeFile(join(this.dir, path), content);
+      }
+    }
+    await this.git(["add", "--all"]);
+    await this.git(["commit", "--quiet", "-m", `Write ${branch}`]);
     return this.tip(branch);
   }
 
