@@ -17,6 +17,7 @@ import { stableId } from "../model/ids.js";
 import type {
   BuildStackResult,
   FactRequest,
+  ForcePush,
   GitFacts,
   LinkState,
   PrIndex,
@@ -58,8 +59,9 @@ export function buildStack(index: PrIndex, seed: StackSeed, facts: GitFacts): Bu
 
 /**
  * Groups the PRs that branch links could join into one stack, from metadata
- * alone: each PR with every same-repo PR whose head branch it targets or used
- * to target. Groups of two or more come back, each sorted, smallest first.
+ * alone: each PR with every PR that could be its parent (see canBeParent) and
+ * whose head branch it targets or used to target. Groups of two or more come
+ * back, each sorted, smallest first.
  * buildStack decides the real trees; this only tells the engine which PR
  * heads to fetch before asking.
  */
@@ -74,7 +76,7 @@ export function linkedGroups(index: PrIndex): number[][] {
   const byHeadRef = new Map<string, StackPr[]>();
   for (const pr of index.prs) {
     parent.set(pr.number, pr.number);
-    if (!pr.crossRepository) push(byHeadRef, pr.headRef, pr);
+    if (canBeParent(pr, index)) push(byHeadRef, pr.headRef, pr);
   }
   for (const pr of index.prs) {
     for (const ref of candidateRefs(pr)) {
@@ -109,7 +111,7 @@ const STATE_RANK = { open: 2, merged: 1, closed: 0 } as const;
 
 class Builder {
   private readonly byNumber = new Map<number, StackPr>();
-  /** Same-repo PRs by head branch. Only these can be parents. */
+  /** PRs that can be parents, by head branch. */
   private readonly byHeadRef = new Map<string, StackPr[]>();
   /** PRs by every branch they target or used to target. */
   private readonly byCandidateRef = new Map<string, StackPr[]>();
@@ -117,6 +119,8 @@ class Builder {
   /** Children whose link to their parent was cut to break a cycle. */
   private readonly cut = new Set<number>();
   private readonly missing = new Map<string, FactRequest>();
+  /** Reads that found no answer yet; a computation that bumps it is pending. */
+  private unanswered = 0;
   private readonly issues: StackIssue[] = [];
   private readonly issueKeys = new Set<string>();
 
@@ -126,7 +130,7 @@ class Builder {
   ) {
     for (const pr of index.prs) this.byNumber.set(pr.number, pr);
     for (const pr of this.byNumber.values()) {
-      if (!pr.crossRepository) push(this.byHeadRef, pr.headRef, pr);
+      if (canBeParent(pr, index)) push(this.byHeadRef, pr.headRef, pr);
       for (const ref of candidateRefs(pr)) push(this.byCandidateRef, ref, pr);
     }
   }
@@ -139,14 +143,15 @@ class Builder {
     const seedPr = this.resolveSeed(seed);
     const root = this.findRoot(seedPr);
 
-    const trunkName = root.baseChanges[0]?.from ?? root.baseRef;
+    // The branch the bottom PR targets (or merged into), which is also where its anchor is found.
+    const trunkName = root.baseRef;
     const isDefault = trunkName === this.index.defaultBranch;
     if (!isDefault) {
       this.issue(
         "non-default-trunk",
         [root.number],
-        `#${root.number} started on ${trunkName}, not ${this.index.defaultBranch}.`,
-        [prEvidence(root.number, `#${root.number}'s first base was ${trunkName}`)],
+        `#${root.number} targets ${trunkName}, not ${this.index.defaultBranch}.`,
+        [prEvidence(root.number, `#${root.number} targets ${trunkName}`)],
       );
     }
 
@@ -162,10 +167,11 @@ class Builder {
 
     const nodes: StackNode[] = [];
     const edges: StackEdge[] = [];
-    const anchors = new Map<number, string | null>();
+    /** Undefined while git facts are pending. */
+    const anchors = new Map<number, string | null | undefined>();
     const visit = (pr: StackPr, parent: StackPr | null, depth: number, seen: Set<number>) => {
       seen.add(pr.number);
-      let anchor: string | null;
+      let anchor: string | null | undefined;
       if (parent) {
         const choice = this.parentOf(pr) as ParentChoice;
         if (choice.tiedWith) {
@@ -182,7 +188,7 @@ class Builder {
             ],
           );
         }
-        const edge = this.link(parent, pr, choice.ref, anchors.get(parent.number) ?? null);
+        const edge = this.link(parent, pr, choice.ref, anchors.get(parent.number));
         edges.push(edge.edge);
         anchor = edge.anchor;
       } else {
@@ -195,7 +201,7 @@ class Builder {
         parent: parent?.number ?? null,
         children: children.map((child) => child.number),
         depth,
-        anchor,
+        anchor: anchor ?? null,
       });
       for (const child of children) visit(child, pr, depth + 1, seen);
     };
@@ -209,7 +215,7 @@ class Builder {
       repo: this.index.repo,
       trunk: { name: trunkName, isDefault },
       root: root.number,
-      base,
+      base: base ?? null,
       nodes,
       edges,
       paths,
@@ -282,7 +288,12 @@ class Builder {
     const candidates: Candidate[] = [];
     candidateRefs(child).forEach((ref, refRank) => {
       for (const pr of this.byHeadRef.get(ref) ?? []) {
-        if (pr.number !== child.number) candidates.push({ pr, refRank, ref });
+        if (pr.number === child.number) continue;
+        // An old base counts when GitHub retargeted the child because the parent
+        // landed or closed, or when the child still holds the parent's work. A
+        // PR moved off a parent that is still open has left it.
+        if (refRank > 0 && pr.state === "open" && !this.holdsHead(pr, child)) continue;
+        candidates.push({ pr, refRank, ref });
       }
     });
     if (candidates.length === 0) return null;
@@ -323,20 +334,36 @@ class Builder {
     return [...children.values()].sort((a, b) => a.number - b.number);
   }
 
-  private rootAnchor(root: StackPr): string | null {
+  /** Where the stack left the trunk. Undefined while git facts are pending. */
+  private rootAnchor(root: StackPr): string | null | undefined {
+    return this.whileAsking(() => this.baseMeet(root));
+  }
+
+  /**
+   * Where a PR last met its current base: the base just before the PR merged,
+   * or the base's tip now. Null when the base branch is gone.
+   */
+  private baseMeet(pr: StackPr): string | null {
     const from =
-      root.state === "merged" && root.mergeCommitOid
-        ? this.firstParent(root.mergeCommitOid)
-        : this.tip(root.baseRef);
-    return from ? (this.mergeBase(from, root.headOid) ?? null) : null;
+      pr.state === "merged" && pr.mergeCommitOid
+        ? this.firstParent(pr.mergeCommitOid)
+        : this.tip(pr.baseRef);
+    return from ? (this.mergeBase(from, pr.headOid) ?? null) : null;
+  }
+
+  /** Runs `read` and returns undefined if it needed a fact that isn't answered yet. */
+  private whileAsking<T>(read: () => T): T | undefined {
+    const before = this.unanswered;
+    const value = read();
+    return this.unanswered > before ? undefined : value;
   }
 
   private link(
     parent: StackPr,
     child: StackPr,
     ref: string,
-    parentAnchor: string | null,
-  ): { edge: StackEdge; anchor: string | null } {
+    parentAnchor: string | null | undefined,
+  ): { edge: StackEdge; anchor: string | null | undefined } {
     const via = child.baseRef === ref ? "base-ref" : "retarget";
     const evidence: Evidence[] = [
       prEvidence(
@@ -347,13 +374,14 @@ class Builder {
       ),
       prEvidence(parent.number, `#${parent.number}'s head branch is ${ref}`),
     ];
-    let link: LinkState;
+    const before = this.unanswered;
+    let link: LinkState = "unknown";
     let anchor: string | null = null;
 
     if (child.state === "merged" && child.baseRef === ref) {
       link = "merged-into-parent";
-      const before = child.mergeCommitOid ? this.firstParent(child.mergeCommitOid) : null;
-      anchor = before ? (this.mergeBase(before, child.headOid) ?? null) : null;
+      const into = child.mergeCommitOid ? this.firstParent(child.mergeCommitOid) : null;
+      anchor = into ? (this.mergeBase(into, child.headOid) ?? null) : null;
       if (child.mergeCommitOid) {
         evidence.push(commitEvidence(child.mergeCommitOid, `#${child.number} merged into ${ref}`));
       }
@@ -367,50 +395,40 @@ class Builder {
         );
       }
     } else {
+      const onBase = this.baseMeet(child);
       const inside = this.isAncestor(parent.headOid, child.headOid);
-      if (inside === true) {
+      // After the parent landed, the child was rebased onto its base or updated from it.
+      const pastParent =
+        onBase && onBase !== parent.headOid ? this.holdsWork(parent, onBase) : false;
+      if (pastParent === true) {
+        link = "re-anchored";
+        anchor = onBase;
+        evidence.push(
+          commitEvidence(onBase as string, `where #${child.number} left ${child.baseRef}`),
+        );
+      } else if (inside === true) {
         link = "intact";
         anchor = parent.headOid;
         evidence.push(
           commitEvidence(parent.headOid, `#${parent.number}'s head, inside #${child.number}`),
         );
-      } else if (inside !== false) {
-        link = "unknown";
-      } else {
-        const stale = [...parent.forcePushes]
-          .reverse()
-          .find((push) => this.isAncestor(push.before, child.headOid) === true);
-        const met = stale ? null : this.mergeBase(parent.headOid, child.headOid);
-        if (stale) {
-          link = "stale";
-          anchor = stale.before;
+      } else if (inside === false && pastParent === false) {
+        const met = this.lastMeet(parent, child, parentAnchor);
+        if (met) {
+          link = met.push ? "stale" : "behind";
+          anchor = met.oid;
           evidence.push(
-            commitEvidence(stale.before, `#${parent.number}'s head before a force-push`),
+            met.push
+              ? commitEvidence(met.push.before, `#${parent.number}'s head before a force-push`)
+              : commitEvidence(met.oid, `where #${child.number} left #${parent.number}`),
             commitEvidence(parent.headOid, `#${parent.number}'s head now`),
           );
-        } else if (met === undefined || (met !== null && parentAnchor === null)) {
-          // Can't tell "behind" from "re-anchored" without both answers.
-          link = "unknown";
-        } else if (
-          met &&
-          met !== parentAnchor &&
-          this.isAncestor(parentAnchor as string, met) === true
-        ) {
-          link = "behind";
-          anchor = met;
-          evidence.push(
-            commitEvidence(met, `where #${child.number} left #${parent.number}`),
-            commitEvidence(parent.headOid, `#${parent.number}'s head now`),
-          );
-        } else {
+        } else if (met === null) {
           link = "re-anchored";
-          const from =
-            child.state === "merged" && child.mergeCommitOid
-              ? this.firstParent(child.mergeCommitOid)
-              : this.tip(child.baseRef);
-          anchor = from ? (this.mergeBase(from, child.headOid) ?? null) : null;
-          if (anchor)
-            evidence.push(commitEvidence(anchor, `where #${child.number} left ${child.baseRef}`));
+          anchor = onBase;
+          if (onBase) {
+            evidence.push(commitEvidence(onBase, `where #${child.number} left ${child.baseRef}`));
+          }
         }
       }
       if (link === "behind" || link === "stale") {
@@ -434,7 +452,8 @@ class Builder {
       }
     }
 
-    if (link === "unknown" || anchor === null) {
+    const pending = this.unanswered > before;
+    if (!pending && (link === "unknown" || anchor === null)) {
       this.issue(
         "missing-commit",
         [child.number],
@@ -444,8 +463,56 @@ class Builder {
     }
     return {
       edge: { parent: parent.number, child: child.number, via, ref, link, evidence },
-      anchor,
+      anchor: pending ? undefined : anchor,
     };
+  }
+
+  /** Whether `oid` holds the parent's work: its head, or the commit it landed as. */
+  private holdsWork(parent: StackPr, oid: string): boolean | undefined {
+    const head = this.isAncestor(parent.headOid, oid);
+    const landed = parent.mergeCommitOid ? this.isAncestor(parent.mergeCommitOid, oid) : false;
+    if (head === true || landed === true) return true;
+    return head === undefined || landed === undefined ? undefined : false;
+  }
+
+  /**
+   * The newest commit the child shares with the parent's own work (past where
+   * the parent starts), through the parent's head now or one it force-pushed
+   * away. Null when they share none; undefined when git can't tell yet.
+   */
+  private lastMeet(
+    parent: StackPr,
+    child: StackPr,
+    parentAnchor: string | null | undefined,
+  ): { oid: string; push: ForcePush | null } | null | undefined {
+    if (parentAnchor === undefined) {
+      this.unanswered++;
+      return undefined;
+    }
+    const heads: { oid: string; push: ForcePush | null }[] = [
+      { oid: parent.headOid, push: null },
+      ...[...parent.forcePushes].reverse().map((push) => ({ oid: push.before, push })),
+    ];
+    const meets: { oid: string; push: ForcePush | null }[] = [];
+    let unsure = false;
+    for (const head of heads) {
+      const met = this.mergeBase(head.oid, child.headOid);
+      if (met === undefined) unsure = true;
+      if (!met || meets.some((m) => m.oid === met)) continue;
+      if (parentAnchor === null) {
+        unsure = true;
+        continue;
+      }
+      const before = this.isAncestor(met, parentAnchor);
+      if (before === false) meets.push({ oid: met, push: head.push });
+      else if (before !== true) unsure = true;
+    }
+    if (unsure) return undefined;
+    const newest = meets.filter((a) =>
+      meets.every((b) => b === a || this.isAncestor(b.oid, a.oid) === true),
+    );
+    if (meets.length === 0) return null;
+    return newest.length === 1 ? newest[0] : undefined;
   }
 
   private selectPath(
@@ -507,6 +574,7 @@ class Builder {
   private read<T>(table: Record<string, T>, key: string, request: FactRequest): T | undefined {
     if (Object.hasOwn(table, key)) return table[key];
     this.missing.set(`${request.kind}:${key}`, request);
+    this.unanswered++;
     return undefined;
   }
 
@@ -516,6 +584,14 @@ class Builder {
     this.issueKeys.add(key);
     this.issues.push({ kind, prs, message, evidence });
   }
+}
+
+/**
+ * Same-repo PRs can be parents, except those from the default branch (a
+ * release PR from main is not the bottom of every stack on main).
+ */
+function canBeParent(pr: StackPr, index: PrIndex): boolean {
+  return !pr.crossRepository && pr.headRef !== index.defaultBranch;
 }
 
 /** The branches a PR targets now and used to target, most recent first. */

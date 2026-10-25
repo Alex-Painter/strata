@@ -203,19 +203,166 @@ describe("resolveStack", () => {
 
   it("looks up branch tips where the caller keeps them", async () => {
     const m0 = await repo.tip("main");
-    const h1 = await repo.commit("b1", "main");
     await git(repo.dir, ["update-ref", "refs/remotes/origin/main", m0]);
+    const m1 = await repo.commit("main");
+
+    const facts = await answerFacts(
+      repo.dir,
+      [{ kind: "tip", ref: "main" }],
+      (branch) => `refs/remotes/origin/${branch}`,
+    );
+    const local = await answerFacts(repo.dir, [{ kind: "tip", ref: "main" }]);
+
+    expect(facts.tip).toEqual({ main: m0 });
+    expect(local.tip).toEqual({ main: m1 });
+  });
+});
+
+/** The files a PR's own diff touches, from its anchor to its head. */
+async function ownFiles(stack: Stack, number: number): Promise<string[]> {
+  const node = stack.nodes.find((n) => n.pr.number === number);
+  if (!node?.anchor) return [];
+  const out = await git(repo.dir, ["diff", "--name-only", node.anchor, node.pr.headOid]);
+  return out.stdout.trim().split("\n").filter(Boolean);
+}
+const onlyFrom = (files: string[], branch: string) =>
+  files.length > 0 && files.every((file) => file.startsWith(`${branch}-`));
+
+describe("resolveStack after the parent lands or moves", () => {
+  it("re-anchors a child rebased onto main after its parent landed with a merge commit", async () => {
+    const h1 = await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
     await repo.commit("main");
+    const mc = await repo.mergeCommit("b1", "main");
+    const m2 = await repo.commit("main");
+    const h2r = await repo.rebase("b2", "main", h1);
+    await repo.holdPr(1, h1);
+    await repo.deleteBranch("b1");
+    const index = indexOf(
+      pr(1, h1, { state: "merged", mergedAt: at(30), mergeCommitOid: mc }),
+      pr(2, h2r, {
+        baseChanges: [{ from: "b1", to: "main", at: at(31) }],
+        forcePushes: [{ before: h2, after: h2r, at: at(32) }],
+      }),
+    );
 
-    const stack = await resolveStack(indexOf(pr(1, h1)), { pr: 1 }, repo.dir, {
-      refFor: (branch) => `refs/remotes/origin/${branch}`,
-    });
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
 
-    expect(stack.base).toBe(m0);
+    expect(links(stack)).toEqual([[2, "re-anchored"]]);
+    expect(anchors(stack)[1]).toEqual([2, m2]);
+    expect(onlyFrom(await ownFiles(stack, 2), "b2")).toBe(true);
+  });
+
+  it("re-anchors a child updated from main after its parent was squash-merged", async () => {
+    await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
+    const s1 = await repo.squashMerge("b1", "main");
+    const m2 = await repo.commit("main");
+    const h2u = await repo.mergeCommit("main", "b2");
+    const index = indexOf(
+      pr(1, await repo.tip("b1"), { state: "merged", mergedAt: at(30), mergeCommitOid: s1 }),
+      pr(2, h2u, { baseChanges: [{ from: "b1", to: "main", at: at(31) }] }),
+    );
+    await repo.deleteBranch("b1");
+
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
+
+    expect(links(stack)).toEqual([[2, "re-anchored"]]);
+    expect(anchors(stack)[1]).toEqual([2, m2]);
+    expect(onlyFrom(await ownFiles(stack, 2), "b2")).toBe(true);
+    expect(h2).not.toBe(h2u);
+  });
+
+  it("finds a child stale after its parent pushed again and then rebased onto main", async () => {
+    const m0 = await repo.tip("main");
+    const h1 = await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
+    const h1b = await repo.commit("b1");
+    await repo.commit("main");
+    const h1x = await repo.rebase("b1", "main", m0);
+    const index = indexOf(
+      pr(1, h1x, { forcePushes: [{ before: h1b, after: h1x, at: at(30) }] }),
+      pr(2, h2, { baseRef: "b1" }),
+    );
+
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
+
+    expect(links(stack)).toEqual([[2, "stale"]]);
+    expect(anchors(stack)[1]).toEqual([2, h1]);
+    expect(issueKinds(stack)).toEqual(["needs-restack"]);
+    expect(onlyFrom(await ownFiles(stack, 2), "b2")).toBe(true);
+  });
+
+  it("finds a child stale after its parent squashed its own commits in place", async () => {
+    const m0 = await repo.tip("main");
+    const h1 = await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
+    const h1b = await repo.commit("b1");
+    const h1s = await repo.squashBranch("b1", m0);
+    const index = indexOf(
+      pr(1, h1s, { forcePushes: [{ before: h1b, after: h1s, at: at(30) }] }),
+      pr(2, h2, { baseRef: "b1" }),
+    );
+
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
+
+    expect(links(stack)).toEqual([[2, "stale"]]);
+    expect(anchors(stack)[1]).toEqual([2, h1]);
+  });
+
+  it("finds a child behind a parent that merged main in", async () => {
+    const h1 = await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
+    const m1 = await repo.commit("main");
+    const h1m = await repo.mergeCommit("main", "b1");
+    const index = indexOf(pr(1, h1m), pr(2, h2, { baseRef: "b1" }));
+
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
+
+    expect(stack.base).toBe(m1);
+    expect(links(stack)).toEqual([[2, "behind"]]);
+    expect(anchors(stack)[1]).toEqual([2, h1]);
+    expect(issueKinds(stack)).toEqual(["needs-restack"]);
+  });
+
+  it("keeps a retargeted child behind, not on main, when its parent merged main and then squash-merged", async () => {
+    const h1 = await repo.commit("b1", "main");
+    const h2 = await repo.commit("b2", "b1");
+    await repo.commit("main");
+    const h1m = await repo.mergeCommit("main", "b1");
+    const s1 = await repo.squashMerge("b1", "main");
+    await repo.holdPr(1, h1m);
+    await repo.deleteBranch("b1");
+    const index = indexOf(
+      pr(1, h1m, { state: "merged", mergedAt: at(30), mergeCommitOid: s1 }),
+      pr(2, h2, { baseChanges: [{ from: "b1", to: "main", at: at(31) }] }),
+    );
+
+    const stack = await resolveStack(index, { pr: 2 }, repo.dir);
+
+    expect(links(stack)).toEqual([[2, "behind"]]);
+    expect(anchors(stack)[1]).toEqual([2, h1]);
+    expect(onlyFrom(await ownFiles(stack, 2), "b2")).toBe(true);
   });
 });
 
 describe("answerFacts", () => {
+  it("answers null when two commits have more than one best merge base", async () => {
+    // Criss-cross: b1 and b2 each merge the other's earlier tip.
+    const x = await repo.commit("b1", "main");
+    const y = await repo.commit("b2", "main");
+    const a = await repo.mergeCommit("b2", "b1");
+    await git(repo.dir, ["checkout", "--quiet", "--detach", y]);
+    await git(repo.dir, ["branch", "--quiet", "-f", "b3", y]);
+    const b = await repo.mergeCommit(x, "b3");
+    const all = await git(repo.dir, ["merge-base", "--all", a, b]);
+    expect(all.stdout.trim().split("\n").sort()).toEqual([x, y].sort());
+
+    const facts = await answerFacts(repo.dir, [{ kind: "merge-base", a, b }]);
+
+    expect(facts.mergeBase).toEqual({ [`${a} ${b}`]: null });
+  });
+
   it("answers null when git can't tell", async () => {
     const m0 = await repo.tip("main");
     const missing = "e".repeat(40);
@@ -247,6 +394,12 @@ describe("gitEnv", () => {
       PATH: "/usr/bin",
       GIT_CONFIG_NOSYSTEM: "1",
       GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_ATTR_NOSYSTEM: "1",
+      GIT_CONFIG_COUNT: "2",
+      GIT_CONFIG_KEY_0: "core.attributesFile",
+      GIT_CONFIG_VALUE_0: "/dev/null",
+      GIT_CONFIG_KEY_1: "core.excludesFile",
+      GIT_CONFIG_VALUE_1: "/dev/null",
       GIT_TERMINAL_PROMPT: "0",
       LC_ALL: "C",
     });

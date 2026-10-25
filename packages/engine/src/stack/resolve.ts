@@ -19,7 +19,11 @@ import { git } from "../git/run.js";
 export interface ResolveStackOptions {
   /** Where a branch's tip lives in `gitDir`. Defaults to `refs/heads/<branch>`. */
   refFor?: (branch: string) => string;
-  /** A safety stop; each round only adds facts, so real stacks need a handful. */
+  /**
+   * A safety stop. Most stacks need a handful of rounds; a chain of PRs that
+   * each need a restack takes about one more per PR. Defaults to plenty for
+   * every PR in the index.
+   */
   maxRounds?: number;
 }
 
@@ -29,14 +33,23 @@ export async function resolveStack(
   gitDir: string,
   options: ResolveStackOptions = {},
 ): Promise<Stack> {
-  const maxRounds = options.maxRounds ?? 64;
+  const maxRounds = options.maxRounds ?? 16 + 4 * index.prs.length;
   let facts = emptyFacts();
   for (let round = 0; round < maxRounds; round++) {
     const result = buildStack(index, seed, facts);
     if (result.kind === "done") return result.stack;
+    const known = factCount(facts);
     facts = mergeFacts(facts, await answerFacts(gitDir, result.requests, options.refFor));
+    // Each round must learn something, or the builder is asking in circles.
+    if (factCount(facts) === known) {
+      throw new Error(`Stack for ${index.repo} asked again for git facts it already has.`);
+    }
   }
   throw new Error(`Stack for ${index.repo} still needed git facts after ${maxRounds} rounds.`);
+}
+
+function factCount(facts: GitFacts): number {
+  return Object.values(facts).reduce((sum, table) => sum + Object.keys(table).length, 0);
 }
 
 const OID = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
@@ -67,8 +80,11 @@ export async function answerFacts(
           facts.mergeBase[key] = null;
           return;
         }
-        const result = await git(gitDir, ["merge-base", request.a, request.b]);
-        facts.mergeBase[key] = result.code === 0 ? result.stdout.trim() : null;
+        // With several best bases (criss-cross merges), plain merge-base picks one
+        // by commit date. Strata would rather say it can't tell.
+        const result = await git(gitDir, ["merge-base", "--all", request.a, request.b]);
+        const bases = result.code === 0 ? result.stdout.trim().split("\n").filter(Boolean) : [];
+        facts.mergeBase[key] = bases.length === 1 ? (bases[0] as string) : null;
         return;
       }
       case "first-parent":

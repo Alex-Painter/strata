@@ -59,6 +59,14 @@ export class StackRepo {
     return this.tip(branch);
   }
 
+  /** Squashes `branch`'s commits since `onto` into one, as an interactive rebase would. */
+  async squashBranch(branch: string, onto: string): Promise<string> {
+    await this.git(["checkout", "--quiet", branch]);
+    await this.git(["reset", "--quiet", "--soft", onto]);
+    await this.git(["commit", "--quiet", "-m", `Squash ${branch}`]);
+    return this.tip(branch);
+  }
+
   /** Rewrites the tip of `branch`, as a force-push would. */
   async amend(branch: string): Promise<string> {
     await this.git(["checkout", "--quiet", branch]);

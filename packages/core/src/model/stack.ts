@@ -76,7 +76,7 @@ export type StackSeed = { pr: number; leaf?: number } | { branch: string; leaf?:
 export interface GitFacts {
   /** Whether `a` is an ancestor of `b` (a commit is its own ancestor). */
   isAncestor: Record<string, boolean | null>;
-  /** The merge base of `a` and `b`; null when they share no history. */
+  /** The merge base of `a` and `b`; null when they share no history, or have several. */
   mergeBase: Record<string, string | null>;
   /** A commit's first parent. */
   firstParent: Record<string, string | null>;
@@ -95,12 +95,14 @@ export type FactRequest =
  * PR's own diff starts (`StackNode.anchor`).
  *
  * - `intact`: the parent's head is in the PR. Its diff starts at that head.
- * - `behind`: the parent got new commits after the PR branched. Its diff
- *   starts where the two last met, and it needs a restack.
- * - `stale`: the PR sits on a head the parent force-pushed away. Its diff
- *   starts at that old head, and it needs a restack.
- * - `re-anchored`: the PR was rebased somewhere else, usually onto the trunk
- *   after the parent merged. Its diff starts where it left its current base.
+ * - `behind`: the parent got new commits after the PR branched (more work, or
+ *   the trunk merged in). Its diff starts at the last of the parent's own
+ *   commits it has, and it needs a restack.
+ * - `stale`: the PR sits on parent commits that were force-pushed away. Its
+ *   diff starts at the last of those it has, and it needs a restack.
+ * - `re-anchored`: the PR sits on its base branch now rather than on the
+ *   parent: rebased onto it or updated from it after the parent landed, or
+ *   moved somewhere else. Its diff starts where it last met that base.
  * - `merged-into-parent`: the PR was merged into the parent's branch, so the
  *   parent's head already holds it.
  * - `unknown`: git couldn't answer, usually because a commit is missing.

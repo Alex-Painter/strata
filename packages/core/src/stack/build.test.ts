@@ -389,6 +389,89 @@ describe("buildStack", () => {
   });
 });
 
+describe("choosing parents", () => {
+  it("never takes a PR from the default branch as a parent", () => {
+    // #5 is a release PR from main; #11 and #12 are unrelated work on main.
+    const graph: Graph = { m0: [], p0: [], h11: ["m0"], h12: ["m0"] };
+    const release = index(
+      pr(5, { headRef: "main", baseRef: "production", headOid: "m0", state: "closed" }),
+      pr(11),
+      pr(12),
+    );
+    const { stack } = resolve(release, { pr: 11 }, graph, { main: "m0", production: "p0" });
+    expect(order(stack)).toEqual([11]);
+    expect(linkedGroups(release)).toEqual([]);
+  });
+
+  it("drops an old base the PR was moved off while that parent is still open", () => {
+    // #1 was opened on #2's branch, then moved to main and rebased there.
+    const graph: Graph = { m0: [], h1: ["m0"], h2: ["m0"] };
+    const moved = index(pr(1, { baseChanges: [{ from: "b2", to: "main", at: at(30) }] }), pr(2));
+    expect(order(resolve(moved, { pr: 1 }, graph, { main: "m0" }).stack)).toEqual([1]);
+    expect(order(resolve(moved, { pr: 2 }, graph, { main: "m0" }).stack)).toEqual([2]);
+  });
+
+  it("follows a reordered stack instead of calling it a cycle", () => {
+    // #2 was first, then the two swapped places and were rebased to match.
+    const graph: Graph = { m0: [], h1: ["m0"], h2: ["h1"] };
+    const swapped = index(
+      pr(1, { baseChanges: [{ from: "b2", to: "main", at: at(30) }] }),
+      pr(2, { baseRef: "b1", baseChanges: [{ from: "main", to: "b1", at: at(31) }] }),
+    );
+    for (const seed of [1, 2]) {
+      const { stack } = resolve(swapped, { pr: seed }, graph, { main: "m0", b1: "h1" });
+      expect(order(stack)).toEqual([1, 2]);
+      expect(edge(stack, 2)?.link).toBe("intact");
+      expect(stack.issues).toEqual([]);
+    }
+  });
+});
+
+describe("deep stacks", () => {
+  it("resolves a long landed stack in a few rounds", () => {
+    // Each PR was squash-merged in turn; the next was retargeted, rebased onto it and merged.
+    const n = 40;
+    const graph: Graph = { m0: [], h1: ["m0"], s1: ["m0"] };
+    const prs = [pr(1, { state: "merged", mergedAt: at(1000), mergeCommitOid: "s1" })];
+    for (let i = 2; i <= n; i++) {
+      graph[`h${i}`] = [`s${i - 1}`];
+      graph[`s${i}`] = [`s${i - 1}`];
+      prs.push(
+        pr(i, {
+          state: "merged",
+          mergedAt: at(1000 + i),
+          mergeCommitOid: `s${i}`,
+          baseChanges: [{ from: `b${i - 1}`, to: "main", at: at(1000 + i - 1) }],
+        }),
+      );
+    }
+    const { stack, rounds } = resolve(index(...prs), { pr: n }, graph, { main: `s${n}` });
+    expect(order(stack)).toHaveLength(n);
+    expect(stack.edges.every((e) => e.link === "re-anchored")).toBe(true);
+    expect(anchor(stack, n)).toBe(`s${n - 1}`);
+    expect(rounds).toBeLessThanOrEqual(5);
+  });
+
+  it("resolves a long chain where every PR needs a restack", () => {
+    // Each parent got one more commit (h<i>x) after its child branched.
+    const n = 30;
+    const graph: Graph = { m0: [], h1: ["m0"] };
+    const tips: Record<string, string> = { main: "m0" };
+    const prs: StackPr[] = [];
+    for (let i = 1; i <= n; i++) {
+      if (i > 1) graph[`h${i}`] = [`h${i - 1}`];
+      graph[`h${i}x`] = [`h${i}`];
+      const head = i < n ? `h${i}x` : `h${i}`;
+      tips[`b${i}`] = head;
+      prs.push(pr(i, { headOid: head, ...(i > 1 ? { baseRef: `b${i - 1}` } : {}) }));
+    }
+    const { stack, rounds } = resolve(index(...prs), { pr: 1 }, graph, tips);
+    expect(stack.edges.every((e) => e.link === "behind")).toBe(true);
+    expect(anchor(stack, n)).toBe(`h${n - 1}`);
+    expect(rounds).toBeLessThanOrEqual(n + 5);
+  });
+});
+
 describe("linkedGroups", () => {
   it("groups PRs joined by current or former bases, and leaves lone PRs out", () => {
     const groups = linkedGroups(
