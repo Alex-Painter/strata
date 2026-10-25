@@ -1,10 +1,10 @@
 # Strata verification map
 
-This directory is the maintained list of Strata's user-facing behaviour and how to prove each piece of it. Read this index before driving the app, then follow the matching feature file as the recipe. It describes the scaffold: only sign-in, `/api/me`, `/healthz`, the app shell and the CLI's argument handling are real. Add a file when a milestone-1 feature lands.
+This directory is the maintained list of Strata's user-facing behaviour and how to prove each piece of it. Read this index before driving the app, then follow the matching feature file as the recipe. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, the CLI's argument handling and `strata stacks`, and stacks in the web app and API. Add a file when a milestone-1 feature lands.
 
 ## Baseline preconditions
 
-- Start an instance with `.claude/skills/verify/scripts/strata-verify up`. Add `--mode oauth` for signed-out behaviour. The default bypass mode signs you in as `verify-bot`.
+- Start an instance with `.claude/skills/verify/scripts/strata-verify up`. Add `--mode oauth` for signed-out behaviour. The default bypass mode signs you in as `verify-bot`. Add `--github fixture` for anything that needs GitHub data (see [stacks.md](./stacks.md)).
 - Run `strata-verify doctor <RUN_ID>` and require it to exit 0. Keep the printed `URL`: it's on a port from 8790 up.
 - Never drive `localhost:5173` or `localhost:8787`. Those are the developer's own `pnpm dev`.
 - Re-run `up` after editing code. The instance doesn't watch for changes.
@@ -39,6 +39,7 @@ Keep implementation detail out. Name only user paths, stable handles, required s
 ## Features
 
 - [Sign-in](./sign-in.md) covers the signed-out screen, the GitHub redirect, auth error messages, the dev bypass and sign-out.
-- [App shell and navigation](./app-shell.md) covers the Changes page, the review workspace layout, client-side routes, not-found pages and caching.
-- [API surface](./api-surface.md) covers `/healthz`, `/api/me`, the milestone-1 routes that answer 501, auth gating and the CSRF check.
+- [App shell and navigation](./app-shell.md) covers the home page, client-side routes, not-found pages and caching.
+- [Stacks](./stacks.md) covers finding a stack from a PR or branch, a repo's stack list, the stack map, the PR pane, the path picker and the stack and Changes API.
+- [API surface](./api-surface.md) covers `/healthz`, `/api/me`, the milestone-1 routes that still answer 501, auth gating and the CSRF check.
 - [CLI](./cli.md) covers `strata --help`, usage errors, input validation and the `analyze` stub.

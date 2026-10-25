@@ -1,6 +1,6 @@
 # API surface
 
-The JSON API is what the web app, and later other clients, talk to. Today the live parts are the health check, the signed-in user (`/api/me`), the auth gate on every `/api` route and the CSRF origin check. Every other milestone-1 route already exists at its final path and answers `501 {"error":"Not implemented yet (milestone 1)."}` so clients can be wired up early.
+The JSON API is what the web app, and later other clients, talk to. The live parts are the health check, the signed-in user (`/api/me`), the auth gate on every `/api` route, the CSRF origin check, and the stack and Changes routes (their recipe is in [stacks.md](./stacks.md)). The other milestone-1 routes already exist at their final paths and answer `501 {"error":"Not implemented yet (milestone 1)."}` so clients can be wired up early.
 
 ## Sub-features
 
@@ -25,9 +25,8 @@ Preconditions:
 
 - **Health.** `strata-verify http $B api/healthz GET /healthz` returns `200 {"ok":true}`.
 - **Signed-in user.** `strata-verify http $B api/me GET /api/me` returns `200 {"login":"verify-bot","name":"verify-bot","avatarUrl":null}`.
-- **Auth gate.** `strata-verify http $O api/me-signed-out GET /api/me` returns `401 {"error":"Sign in required."}`. So does `strata-verify http $O api/changes-signed-out GET /api/changes`: the gate runs before the stub.
+- **Auth gate.** `strata-verify http $O api/me-signed-out GET /api/me` returns `401 {"error":"Sign in required."}`. So do `strata-verify http $O api/changes-signed-out GET /api/changes` and `GET /api/changes/abc/threads`: the gate runs before any route, stubs included.
 - **Still-501 routes.** Each of these returns `501 {"error":"Not implemented yet (milestone 1)."}` on `$B`. POST requests need `-H 'Content-Type: application/json' -d '{}'`.
-  - `GET /api/changes`, `POST /api/changes`, `GET /api/changes/abc`, `POST /api/changes/abc/runs`
   - `POST /api/changes/abc/sources`, `DELETE /api/changes/abc/sources/src1`, `GET /api/changes/abc/files`
   - `GET /api/changes/abc/threads`, `POST /api/changes/abc/threads`, `GET /api/threads/t1/messages`, `POST /api/threads/t1/messages`
 

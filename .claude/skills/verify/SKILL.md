@@ -5,7 +5,7 @@ description: Drive the real Strata app (Hono API + React web app + `strata` CLI)
 
 # Verify Strata
 
-Strata has three user surfaces: the **web app** (primary: sign-in, the Changes list, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. In the scaffold only sign-in, `/api/me`, `/healthz`, the app shell and the CLI's argument handling are real. The other milestone-1 API routes answer 501, and `strata analyze` stops at "not implemented yet". Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
+Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs) in the web app and API, and the CLI's `stacks` command and argument handling. Diffs, layers and summaries aren't built yet, the other milestone-1 API routes answer 501, and `strata analyze` stops once it has found the stack. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
 
 Everything goes through `scripts/strata-verify`, which lives next to this file. From the repo root:
 
@@ -26,7 +26,7 @@ Instead, `strata-verify up` starts its own production-shaped instance:
 
 Any number of runs can be up at once.
 
-Two modes:
+Two auth modes:
 
 | Mode               | Auth                                                                               | Use for                                                                     |
 | ------------------ | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -35,13 +35,22 @@ Two modes:
 
 The real GitHub round trip can't be completed by an agent. The dummy app gets you as far as the redirect to github.com; the callback is only verifiable for its error paths.
 
+Where GitHub data comes from (`--github`, bypass mode only):
+
+| Option           | Data                                                                                       | Use for                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `none` (default) | none: stack routes answer `Finding stacks needs a GitHub token`                             | anything that doesn't touch a repo                            |
+| `fixture`        | a stand-in GitHub (`apps/server/src/dev/fixture-github.ts`) serving the demo repo `acme/app` | stacks, Changes and the workspace, anywhere, with no token     |
+| `gh`             | real GitHub with the token from `gh auth token`, passed only to the server's environment    | a real repo on the developer's Mac; add `--checkouts owner/name=path` |
+
 ## Launch
 
 ```bash
-$V up                 # bypass mode; or: $V up --mode oauth
+$V up                 # bypass mode; or: $V up --mode oauth, or $V up --github fixture
 # RUN_ID=20261025-091902-bypass-24552
 # URL=http://localhost:8790
 # MODE=bypass
+# GITHUB=none
 # EVIDENCE=/tmp/strata-verify/runs/<RUN_ID>/evidence
 ```
 
@@ -59,7 +68,7 @@ $V doctor <RUN_ID>    # or: $V doctor latest
 
 It checks:
 
-- the process is alive
+- the process is alive, and with `--github fixture` the stand-in GitHub too
 - the port's listener is this run's PID, not someone else's
 - `/healthz` returns `{"ok":true}`
 - `/` serves the built shell (`<title>Strata</title>` plus `/assets/` scripts)
@@ -75,7 +84,7 @@ $V http latest me GET /api/me
 $V http latest logout POST /auth/logout -H 'Content-Type: application/json' -d '{}'
 ```
 
-**Web app.** Use the built-in browser (`mcp__Claude_Browser__*`). If it isn't available, use Claude in Chrome (`mcp__claude-in-chrome__*`). Point it at the run's `URL`, never at 5173 or 8787.
+**Web app.** Use the built-in browser (`mcp__Claude_Browser__*`). If it isn't available, use Claude in Chrome (`mcp__claude-in-chrome__*`). In a cloud session with neither, the environment may have Playwright and Chromium preinstalled (`require('playwright')`); drive the page from a script in your scratch folder, using roles and names as below, and save `page.locator('body').ariaSnapshot()` as the tree. Point any browser at the run's `URL`, never at 5173 or 8787.
 
 - `navigate` to `URL` + path.
 - `read_page` (filter `all`) for the accessibility tree.
@@ -86,8 +95,9 @@ Stable handles in this app:
 
 - The heading `Strata`, the link `Sign in with GitHub` (href `/auth/login`), and the auth error paragraph on the sign-in screen.
 - The link `Strata` (top bar home), the button `Sign out`, and the signed-in login as text in the top bar.
-- The heading `Changes`.
-- The landmarks `navigation "Change"` and `complementary "Chat"` in the workspace.
+- On the home page: `textbox "PR or branch"`, `button "Review"`, `textbox "Repository"`, `button "Show stacks"` and the heading `Changes`.
+- On `/repos/<owner>/<name>`: one `article "Stack from #<n>"` per stack.
+- In the workspace: the landmarks `navigation "Change"`, `main` and `complementary "Chat"`; `button "Whole stack"`; `list "Stack map"`, whose rows carry `data-pr`, a `link "#<n>"` to GitHub and a `button "Show #<n> <title>"`.
 
 There is no Playwright or headless Chrome in this repo. Don't add one just to verify.
 
@@ -137,5 +147,5 @@ When a 501 route or the `analyze` stub becomes real:
 
 1. Add or update a file in `features/` with the four standard sections. The README describes them.
 2. Remove the route from the "still 501" list in `features/api-surface.md`.
-3. If the feature needs GitHub data, the instance has no token. Either add a `--github-token-from-gh` option to `up` that passes `DEV_GITHUB_TOKEN` from `gh auth token`, or use a local fixture repo with a `base...head` range plus `--repo-path`. Keep it to the clean env and never write a token into evidence.
+3. If the feature needs GitHub data, use `up --github fixture`, and extend `apps/server/src/dev/fixture-github.ts` when it needs a shape the demo repo lacks. Use `--github gh` only for a real repo on the developer's machine. Never write a token into evidence.
 4. If it needs the LLM, the instance runs with it off by default. Opt in explicitly and note the model in the evidence.

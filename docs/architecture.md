@@ -41,6 +41,8 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 - `intent.ts`, `findings.ts`, `diagram.ts`, `context.ts`: the intent ledger, three-lens findings, the data-model diagram and context sources.
 - `chat.ts`, `api.ts`: request and response shapes shared by the server and the web app.
 
+`packages/core/src/stack/` holds the pure stack helpers, which the browser imports as `@strata/core/stack`: the builder, `summary.ts` (the slim view the stack list and the map use) and `map.ts` (the stack map's layout, one row per PR with lanes for forks, and the same map as Mermaid).
+
 ### engine
 
 `packages/engine/src/api.ts` is the contract the CLI and the server code against: `discoverStacks`, `resolveChange`, `analyzeChange`, `readFile`, `resolveAnchors` and `chat`. Stack discovery and stack Changes work (no diffs yet); the rest throw `NotImplementedError`.
@@ -57,10 +59,15 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 - `src/routes/api.ts` declares every milestone-1 route. `/api/me`, `GET /api/repos/:owner/:name/stacks` and the Changes routes (`routes/changes.ts`) work; sources, files and threads answer 501.
 - `src/runs.ts` runs analyses one at a time in-process; `src/engines.ts` gives each user an engine with their own GitHub token.
 - `src/app.ts` adds security headers, CSRF origin checks, `/healthz`, and serves the web build with an SPA fallback.
+- `src/dev/fixture-github.ts` is a stand-in GitHub (the engine's demo repo behind a GraphQL endpoint) for driving the app with no token. Outside production, `DEV_GITHUB_GRAPHQL_URL` and `DEV_GIT_REMOTE` point the server at it; the verify skill's `up --github fixture` does that.
 
 ### web
 
-`App.tsx` either renders a report embedded in the page (the CLI's output, see `lib/static-report.ts`) or signs in against the server. The workspace page is laid out as navigator, panes and chat, with placeholders for now.
+`App.tsx` either renders a report embedded in the page (the CLI's output, see `lib/static-report.ts`) or signs in against the server. Routes:
+
+- `/`: "Review a stack" (a PR URL, `owner/repo#N` or `owner/repo:branch`, read back before it's sent), "Browse a repo's stacks", and the user's Changes.
+- `/repos/:owner/:name`: the repo's stacks, each with its map, a path picker for forks and a Review button.
+- `/changes/:id`: the workspace. The left rail is the stack map (`components/StackMap.tsx`, drawn from core's layout: HTML rows, SVG edges); choosing a PR scopes the panes to it (`?pr=N`, "How it arrived"), and "Whole stack" scopes back. The centre shows the path's counts, its path picker, stack issues with their commit evidence and the report's notes. Chat is still a placeholder. It polls while a run is going.
 
 ## Highlight and chat
 
@@ -76,18 +83,22 @@ The benchmark from SPEC.md is wired in from the start as `it.todo` tests in `pac
 
 PR descriptions are shown as context but never feed the intent ledger, because they depend on how the work was split.
 
-## Milestone 1 (not built yet)
+## Milestone 1: the stack view
 
-In rough order:
+Narrowed to PR stacks (plan: "Strata milestone 1: the stack view"). In order:
 
-1. Resolve a PR, stack or commit range to a local clone and the net diff.
-2. Parse the diff into files and hunks; classify hunks into layers (path rules first, then the LLM for the rest); flag mechanical changes.
-3. Read schemas and migrations at base and head and diff them into the data-model diagram.
-4. Build the intent ledger from linked sources and run the three-lens cross-check.
-5. Assemble the report and render it in the web app and as the CLI's single page.
-6. Make the shape-invariance tests pass on one real feature split two ways.
+1. Find the stack around a PR or branch, merged and retargeted PRs included. Done: core's builder, the engine's GitHub index and git cache, `strata stacks`.
+2. Store one Change per path and run it on the server. Done.
+3. The stack map, the stack list and the path picker in the web app, from PR metadata only. Done.
+4. Each PR's own diff and the whole-stack diff, parsed into files and hunks.
+5. Layers: path rules, repo rules, `.gitattributes`, mechanical changes, then the LLM for the rest.
+6. Which PR introduced or revised each hunk, and the layer by PR matrix.
+7. The Guide and summaries, from the whole-stack diff only.
+8. The CLI's static page, and the shape-invariance check on a real stack against the same code as a plain range.
+
+The intent ledger, findings, the verdict and the data-model diagram come after milestone 1.
 
 ## Open questions
 
-- Which repo and feature to prove milestone 1 on. If it's a Python service with Pydantic or Beanie models, the data-model reader needs a Python parser (tree-sitter is the likely choice).
+- Milestone 1 is proved on a Python service with Beanie models, so the data-model reader in milestone 2 needs a Python parser (tree-sitter is the likely choice).
 - How Linear tickets and Notion pages get in: pasted text first, or their APIs from the start.

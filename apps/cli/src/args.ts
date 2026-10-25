@@ -7,9 +7,10 @@ import { parseArgs } from "node:util";
 export const USAGE = `Usage: strata analyze <input> [options]
        strata stacks <owner/repo> [options]
 
-analyze: <input> is a PR (owner/repo#123 or its URL), a stack
-(owner/repo#12,13,14), or a commit range (owner/repo@main...feature, or
-main...feature inside a local checkout).
+analyze: <input> is a PR (owner/repo#123 or its URL) or a branch
+(owner/repo:feature/x), meaning the whole stack around it; an explicit
+chain (owner/repo#12,13,14); or a commit range (owner/repo@main...feature,
+or main...feature inside a local checkout).
 
 stacks: lists every stack among the PRs updated in the last 90 days. A
 stack is a set of PRs whose branches feed into each other. Needs

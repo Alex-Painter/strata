@@ -12,7 +12,8 @@ RESERVED_PORTS=" 5173 8787 "
 
 usage() {
   cat <<'EOF'
-strata-verify up [--mode bypass|oauth] [--port N]   start an isolated instance, print RUN_ID and URL
+strata-verify up [--mode bypass|oauth] [--port N] [--github none|fixture|gh] [--checkouts owner/name=path,...]
+                                                    start an isolated instance, print RUN_ID and URL
 strata-verify doctor <run>                          read-only health check; exit 1 if not worth driving
 strata-verify http <run> <name> <METHOD> <path> [curl args...]
                                                     request against the instance, saved as evidence
@@ -50,15 +51,19 @@ free_port() {
 }
 
 cmd_up() {
-  local mode="bypass" port=""
+  local mode="bypass" port="" github="none" checkouts=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --mode) mode="$2"; shift 2 ;;
       --port) port="$2"; shift 2 ;;
+      --github) github="$2"; shift 2 ;;
+      --checkouts) checkouts="$2"; shift 2 ;;
       *) die "up: unknown option $1" ;;
     esac
   done
   case "$mode" in bypass|oauth) ;; *) die "--mode must be bypass or oauth" ;; esac
+  case "$github" in none|fixture|gh) ;; *) die "--github must be none, fixture or gh" ;; esac
+  [ "$github" = none ] || [ "$mode" = bypass ] || die "--github needs --mode bypass"
   [ -n "$port" ] || port="$(free_port)"
   [[ "$RESERVED_PORTS" == *" $port "* ]] && die "port $port belongs to the developer's pnpm dev"
   [ -z "$(port_listener "$port")" ] || die "port $port is already in use"
@@ -72,6 +77,7 @@ cmd_up() {
   echo "$mode" >"$inst/mode"
   echo "$port" >"$inst/port"
   echo "$url" >"$inst/url"
+  echo "$github" >"$inst/github"
   git -C "$REPO" rev-parse HEAD >"$inst/rev"
   git -C "$REPO" status --porcelain >"$inst/dirty"
 
@@ -91,10 +97,42 @@ cmd_up() {
     auth_env=(GITHUB_CLIENT_ID=verify-dummy-client GITHUB_CLIENT_SECRET=verify-dummy-secret
       "ALLOWED_GITHUB_LOGINS=$BOT_LOGIN")
   fi
+  # Where GitHub data comes from. The token only ever lives in the server's env.
+  local github_env=()
+  [ -n "$checkouts" ] && github_env+=("STRATA_CHECKOUTS=$checkouts")
+  if [ "$github" = fixture ]; then
+    # A stand-in GitHub serving the demo repo acme/app, with its git repo on disk.
+    (
+      cd "$REPO/apps/server"
+      nohup env -i "PATH=$PATH" "HOME=$HOME" node --import tsx src/dev/fixture-github.ts \
+        >"$inst/github.log" 2>&1 &
+      echo $! >"$inst/github.pid"
+    )
+    local i ready=""
+    for i in $(seq 1 60); do
+      ready="$(grep -m1 '^READY ' "$inst/github.log" 2>/dev/null || true)"
+      [ -n "$ready" ] && break
+      kill -0 "$(cat "$inst/github.pid")" 2>/dev/null || break
+      sleep 0.25
+    done
+    if [ -z "$ready" ]; then
+      cat "$inst/github.log" >&2
+      cmd_down "$id" >/dev/null
+      die "the fixture GitHub didn't start (log above)"
+    fi
+    local graphql remote
+    read -r _ graphql remote <<<"$ready"
+    github_env+=(DEV_GITHUB_TOKEN=verify-fixture-token "DEV_GITHUB_GRAPHQL_URL=$graphql"
+      "DEV_GIT_REMOTE=$remote")
+  elif [ "$github" = gh ]; then
+    local token
+    token="$(gh auth token 2>/dev/null)" || die "--github gh needs a signed-in gh (gh auth login)"
+    github_env+=("DEV_GITHUB_TOKEN=$token")
+  fi
   (
     cd "$REPO/apps/server"
     nohup env -i "PATH=$PATH" "HOME=$HOME" NODE_ENV=development "PORT=$port" "PUBLIC_URL=$url" \
-      "DATA_DIR=$inst/data" "WEB_DIST=$inst/web" "${auth_env[@]}" \
+      "DATA_DIR=$inst/data" "WEB_DIST=$inst/web" "${auth_env[@]}" ${github_env[@]+"${github_env[@]}"} \
       node --import tsx src/main.ts >"$inst/server.log" 2>&1 &
     echo $! >"$inst/pid"
   )
@@ -105,6 +143,7 @@ cmd_up() {
       echo "RUN_ID=$id"
       echo "URL=$url"
       echo "MODE=$mode"
+      echo "GITHUB=$github"
       echo "EVIDENCE=$dir/evidence"
       return 0
     fi
@@ -124,8 +163,13 @@ cmd_doctor() {
   [ -n "$pid" ] || die "run $(basename "$dir") has no instance (already down?)"
   check() { if [ "$1" = ok ]; then echo "ok    $2"; else echo "FAIL  $2"; fail=1; fi; }
 
-  echo "run   $(basename "$dir")  mode=$mode  url=$url  pid=$pid"
+  local github gpid; github="$(instance_var "$dir" github)"; gpid="$(instance_var "$dir" github.pid)"
+  echo "run   $(basename "$dir")  mode=$mode  github=${github:-none}  url=$url  pid=$pid"
   kill -0 "$pid" 2>/dev/null && check ok "process $pid alive" || check fail "process $pid alive"
+  if [ "$github" = fixture ]; then
+    kill -0 "$gpid" 2>/dev/null && check ok "fixture GitHub $gpid alive" \
+      || check fail "fixture GitHub ${gpid:-?} alive"
+  fi
   listener="$(port_listener "$port")"
   [ "$listener" = "$pid" ] && check ok "port $port owned by this run" \
     || check fail "port $port owned by this run (listener: ${listener:-none})"
@@ -201,16 +245,24 @@ cmd_note() {
   echo "saved $ev"
 }
 
-cmd_down() {
-  local dir; dir="$(run_dir "$1")"
-  local pid; pid="$(instance_var "$dir" pid)"
+stop_pid() {
+  local pid="$1"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
     kill "$pid"
     local i
     for i in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
     kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
   fi
+  return 0
+}
+
+cmd_down() {
+  local dir; dir="$(run_dir "$1")"
+  stop_pid "$(instance_var "$dir" pid)"
+  # The fixture GitHub deletes its repo when it stops.
+  stop_pid "$(instance_var "$dir" github.pid)"
   [ -f "$dir/instance/server.log" ] && cp "$dir/instance/server.log" "$dir/evidence/server.log"
+  [ -f "$dir/instance/github.log" ] && cp "$dir/instance/github.log" "$dir/evidence/github.log"
   rm -rf "$dir/instance" "$dir/cli-data"
   echo "down  $(basename "$dir")  evidence kept in $dir/evidence"
 }
