@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# Starts, checks and tears down isolated Strata instances for verification,
+# and records evidence (command, stdout, stderr, exit code) per run.
+# Usage: strata-verify help
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --show-toplevel)"
+VERIFY_HOME="${STRATA_VERIFY_HOME:-/tmp/strata-verify}"
+BOT_LOGIN="verify-bot"
+# Ports the developer's own `pnpm dev` uses. Never bind or drive them.
+RESERVED_PORTS=" 5173 8787 "
+
+usage() {
+  cat <<'EOF'
+strata-verify up [--mode bypass|oauth] [--port N]   start an isolated instance, print RUN_ID and URL
+strata-verify doctor <run>                          read-only health check; exit 1 if not worth driving
+strata-verify http <run> <name> <METHOD> <path> [curl args...]
+                                                    request against the instance, saved as evidence
+strata-verify cli <run> <name> [strata args...]     run the strata CLI in a clean env, saved as evidence
+strata-verify capture <run> <name> -- <cmd...>      run any command, saved as evidence
+strata-verify note <run> <name>                     save stdin (e.g. a browser page snapshot) as evidence
+strata-verify down <run>                            stop the instance and delete its data; keep evidence
+strata-verify list                                  runs and whether their instance is up
+<run> is a RUN_ID from `up`, or `latest`.
+EOF
+}
+
+die() { echo "strata-verify: $*" >&2; exit 1; }
+
+run_dir() {
+  local id="$1"
+  if [ "$id" = "latest" ]; then
+    id="$(ls -1t "$VERIFY_HOME/runs" 2>/dev/null | head -1)"
+    [ -n "$id" ] || die "no runs under $VERIFY_HOME/runs"
+  fi
+  [ -d "$VERIFY_HOME/runs/$id" ] || die "unknown run $id"
+  echo "$VERIFY_HOME/runs/$id"
+}
+
+instance_var() { cat "$1/instance/$2" 2>/dev/null || true; }
+
+port_listener() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -1 || true; }
+
+free_port() {
+  local port=8790
+  while [ -n "$(port_listener "$port")" ] || [[ "$RESERVED_PORTS" == *" $port "* ]]; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
+
+cmd_up() {
+  local mode="bypass" port=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --mode) mode="$2"; shift 2 ;;
+      --port) port="$2"; shift 2 ;;
+      *) die "up: unknown option $1" ;;
+    esac
+  done
+  case "$mode" in bypass|oauth) ;; *) die "--mode must be bypass or oauth" ;; esac
+  [ -n "$port" ] || port="$(free_port)"
+  [[ "$RESERVED_PORTS" == *" $port "* ]] && die "port $port belongs to the developer's pnpm dev"
+  [ -z "$(port_listener "$port")" ] || die "port $port is already in use"
+
+  local id dir inst url
+  id="$(date +%Y%m%d-%H%M%S)-$mode-$$"
+  dir="$VERIFY_HOME/runs/$id"
+  inst="$dir/instance"
+  url="http://localhost:$port"
+  mkdir -p "$inst/data" "$dir/evidence"
+  echo "$mode" >"$inst/mode"
+  echo "$port" >"$inst/port"
+  echo "$url" >"$inst/url"
+  git -C "$REPO" rev-parse HEAD >"$inst/rev"
+  git -C "$REPO" status --porcelain >"$inst/dirty"
+
+  # The instance gets its own web build, so the repo's apps/web/dist and the
+  # developer's servers are never touched.
+  echo "Building the web app into $inst/web ..." >&2
+  if ! (cd "$REPO/apps/web" && "$REPO/apps/web/node_modules/.bin/vite" build --outDir "$inst/web" --emptyOutDir --logLevel warn) >"$inst/build.log" 2>&1; then
+    cat "$inst/build.log" >&2
+    die "web build failed (log: $inst/build.log)"
+  fi
+
+  # env -i keeps the developer's .env and shell secrets out of the instance.
+  local auth_env=(DEV_AUTH_BYPASS=1 "DEV_GITHUB_LOGIN=$BOT_LOGIN")
+  if [ "$mode" = "oauth" ]; then
+    # Dummy OAuth app: enough for the server to start and show the sign-in
+    # flow. The GitHub round trip can never complete with these values.
+    auth_env=(GITHUB_CLIENT_ID=verify-dummy-client GITHUB_CLIENT_SECRET=verify-dummy-secret
+      "ALLOWED_GITHUB_LOGINS=$BOT_LOGIN")
+  fi
+  (
+    cd "$REPO/apps/server"
+    nohup env -i "PATH=$PATH" "HOME=$HOME" NODE_ENV=development "PORT=$port" "PUBLIC_URL=$url" \
+      "DATA_DIR=$inst/data" "WEB_DIST=$inst/web" "${auth_env[@]}" \
+      node --import tsx src/main.ts >"$inst/server.log" 2>&1 &
+    echo $! >"$inst/pid"
+  )
+
+  local i
+  for i in $(seq 1 60); do
+    if curl -sf "$url/healthz" >/dev/null 2>&1; then
+      echo "RUN_ID=$id"
+      echo "URL=$url"
+      echo "MODE=$mode"
+      echo "EVIDENCE=$dir/evidence"
+      return 0
+    fi
+    kill -0 "$(cat "$inst/pid")" 2>/dev/null || break
+    sleep 0.5
+  done
+  cat "$inst/server.log" >&2
+  cmd_down "$id" >/dev/null
+  die "instance did not become healthy on $url (server log above)"
+}
+
+cmd_doctor() {
+  local dir; dir="$(run_dir "$1")"
+  local pid port url mode fail=0 listener body code
+  pid="$(instance_var "$dir" pid)"; port="$(instance_var "$dir" port)"
+  url="$(instance_var "$dir" url)"; mode="$(instance_var "$dir" mode)"
+  [ -n "$pid" ] || die "run $(basename "$dir") has no instance (already down?)"
+  check() { if [ "$1" = ok ]; then echo "ok    $2"; else echo "FAIL  $2"; fail=1; fi; }
+
+  echo "run   $(basename "$dir")  mode=$mode  url=$url  pid=$pid"
+  kill -0 "$pid" 2>/dev/null && check ok "process $pid alive" || check fail "process $pid alive"
+  listener="$(port_listener "$port")"
+  [ "$listener" = "$pid" ] && check ok "port $port owned by this run" \
+    || check fail "port $port owned by this run (listener: ${listener:-none})"
+  body="$(curl -s "$url/healthz" || true)"
+  [ "$body" = '{"ok":true}' ] && check ok "/healthz -> $body" || check fail "/healthz -> ${body:-no answer}"
+  body="$(curl -s "$url/" || true)"
+  if [[ "$body" == *"<title>Strata</title>"* && "$body" == *'src="/assets/'* ]]; then
+    check ok "/ serves the built app shell"
+  else
+    check fail "/ serves the built app shell"
+  fi
+  code="$(curl -s -o /tmp/strata-verify-me.$$ -w '%{http_code}' "$url/api/me" || true)"
+  body="$(cat /tmp/strata-verify-me.$$ 2>/dev/null)"; rm -f /tmp/strata-verify-me.$$
+  if [ "$mode" = bypass ]; then
+    [[ "$code" = 200 && "$body" == *"\"login\":\"$BOT_LOGIN\""* ]] && check ok "/api/me -> 200 $BOT_LOGIN" \
+      || check fail "/api/me -> $code $body (want 200 $BOT_LOGIN)"
+  else
+    [ "$code" = 401 ] && check ok "/api/me -> 401 (signed out)" || check fail "/api/me -> $code (want 401)"
+  fi
+  if [ "$(git -C "$REPO" rev-parse HEAD)" = "$(instance_var "$dir" rev)" ]; then
+    check ok "HEAD unchanged since launch ($(git -C "$REPO" rev-parse --short HEAD))"
+  else
+    check fail "HEAD moved since launch; run down and up again"
+  fi
+  [ -s "$dir/instance/dirty" ] && echo "note  launched from a dirty tree (uncommitted changes are included)"
+  return $fail
+}
+
+# record <dir> <name> <cmd...>: runs the command and saves it as evidence.
+record() {
+  local dir="$1" name="$2"; shift 2
+  local ev="$dir/evidence/$name" status=0
+  mkdir -p "$(dirname "$ev")"
+  if [ -n "${RECORD_LABEL:-}" ]; then echo "$RECORD_LABEL" >"$ev.cmd"; else printf "%q " "$@" >"$ev.cmd"; echo >>"$ev.cmd"; fi
+  "$@" >"$ev.out" 2>"$ev.err" || status=$?
+  echo "$status" >"$ev.exit"
+  echo "\$ $(cat "$ev.cmd")"
+  echo "--- stdout"; cat "$ev.out"; [ -s "$ev.out" ] && [ -n "$(tail -c1 "$ev.out")" ] && echo
+  echo "--- stderr"; cat "$ev.err"; [ -s "$ev.err" ] && [ -n "$(tail -c1 "$ev.err")" ] && echo
+  echo "--- exit $status  (saved to $ev.{cmd,out,err,exit})"
+}
+
+cmd_http() {
+  local dir; dir="$(run_dir "$1")"
+  local name="$2" method="$3" path="$4"; shift 4
+  # Same-origin header so the server's CSRF check treats POSTs like the web app's.
+  record "$dir" "$name" curl -sS -i -X "$method" -H "Origin: $(instance_var "$dir" url)" "$@" \
+    "$(instance_var "$dir" url)$path"
+}
+
+cmd_cli() {
+  local dir; dir="$(run_dir "$1")"
+  local name="$2"; shift 2
+  mkdir -p "$dir/cli-data"
+  local RECORD_LABEL; RECORD_LABEL="strata $(printf "%q " "$@")(clean env, HOME=$dir/cli-data)"
+  record "$dir" "$name" env -i "PATH=$PATH" "HOME=$dir/cli-data" \
+    "$REPO/node_modules/.bin/tsx" "$REPO/apps/cli/src/main.ts" "$@"
+}
+
+cmd_capture() {
+  local dir; dir="$(run_dir "$1")"
+  local name="$2"; shift 2
+  [ "${1:-}" = "--" ] && shift
+  [ $# -gt 0 ] || die "capture needs a command after --"
+  record "$dir" "$name" "$@"
+}
+
+cmd_note() {
+  local dir; dir="$(run_dir "$1")"
+  local ev="$dir/evidence/$2"
+  mkdir -p "$(dirname "$ev")"
+  cat >"$ev"
+  echo "saved $ev"
+}
+
+cmd_down() {
+  local dir; dir="$(run_dir "$1")"
+  local pid; pid="$(instance_var "$dir" pid)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid"
+    local i
+    for i in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep 0.25; done
+    kill -0 "$pid" 2>/dev/null && kill -9 "$pid"
+  fi
+  [ -f "$dir/instance/server.log" ] && cp "$dir/instance/server.log" "$dir/evidence/server.log"
+  rm -rf "$dir/instance" "$dir/cli-data"
+  echo "down  $(basename "$dir")  evidence kept in $dir/evidence"
+}
+
+cmd_list() {
+  local d pid
+  for d in "$VERIFY_HOME"/runs/*/; do
+    [ -d "$d" ] || continue
+    pid="$(instance_var "$d" pid)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      echo "$(basename "$d")  up  $(instance_var "$d" url)  pid=$pid"
+    else
+      echo "$(basename "$d")  down  evidence=${d}evidence"
+    fi
+  done
+}
+
+cmd="${1:-help}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  up) cmd_up "$@" ;;
+  doctor) [ $# -eq 1 ] || die "doctor <run>"; cmd_doctor "$1" ;;
+  http) [ $# -ge 4 ] || die "http <run> <name> <METHOD> <path>"; cmd_http "$@" ;;
+  cli) [ $# -ge 2 ] || die "cli <run> <name> [args...]"; cmd_cli "$@" ;;
+  capture) [ $# -ge 3 ] || die "capture <run> <name> -- <cmd...>"; cmd_capture "$@" ;;
+  note) [ $# -eq 2 ] || die "note <run> <name>"; cmd_note "$@" ;;
+  down) [ $# -eq 1 ] || die "down <run>"; cmd_down "$1" ;;
+  list) cmd_list ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac
