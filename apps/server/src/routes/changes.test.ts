@@ -76,6 +76,18 @@ describe("GET /api/repos/:owner/:name/stacks", () => {
       [2, "open", 1, "intact"],
       [3, "open", 2, "intact"],
     ]);
+    const chain = body.stacks[1];
+    expect(chain?.base).toBe(demo.m0);
+    expect(chain?.prs[0]).toMatchObject({
+      mergeCommitOid: demo.s1,
+      headRef: "b1",
+      baseRef: "main",
+    });
+    expect(chain?.prs[1]?.linkEvidence.map((e) => e.label)).toEqual([
+      "#2 was retargeted from b1",
+      "#1's head branch is b1",
+      "#1's head, inside #2",
+    ]);
   });
 
   it("says when GitHub can't see the repo", async () => {

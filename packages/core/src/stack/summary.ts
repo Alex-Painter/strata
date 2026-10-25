@@ -7,7 +7,7 @@ import type { StackSummary } from "../model/api.js";
 import type { Stack } from "../model/stack.js";
 
 export function summarizeStack(stack: Stack): StackSummary {
-  const links = new Map(stack.edges.map((edge) => [edge.child, edge.link]));
+  const edges = new Map(stack.edges.map((edge) => [edge.child, edge]));
   const prs = stack.nodes.map(({ pr, parent }) => ({
     number: pr.number,
     title: pr.title,
@@ -16,8 +16,13 @@ export function summarizeStack(stack: Stack): StackSummary {
     state: pr.state,
     draft: pr.draft,
     updatedAt: pr.updatedAt,
+    mergedAt: pr.mergedAt,
+    baseRef: pr.baseRef,
+    headRef: pr.headRef,
+    mergeCommitOid: pr.mergeCommitOid,
     parent,
-    link: links.get(pr.number) ?? null,
+    link: edges.get(pr.number)?.link ?? null,
+    linkEvidence: edges.get(pr.number)?.evidence ?? [],
     review: pr.review,
     checks: pr.checks,
   }));
@@ -25,6 +30,7 @@ export function summarizeStack(stack: Stack): StackSummary {
     id: stack.id,
     repo: stack.repo,
     trunk: stack.trunk.name,
+    base: stack.base,
     root: stack.root,
     prs,
     paths: stack.paths,

@@ -5,8 +5,7 @@
  * verdict. Everything here stays pure so it can be tested without git or a
  * network, and so the same input always gives the same Change.
  *
- * The browser imports `@strata/core/model` only.
+ * The browser imports `@strata/core/model` and `@strata/core/stack` only.
  */
 export * from "./model/index.js";
-export * from "./stack/build.js";
-export * from "./stack/summary.js";
+export * from "./stack/index.js";

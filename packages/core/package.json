@@ -6,7 +6,8 @@
   "description": "Strata's domain model, and from milestone 1 its deterministic analysis. Pure: no filesystem, network or process access.",
   "exports": {
     ".": "./src/index.ts",
-    "./model": "./src/model/index.ts"
+    "./model": "./src/model/index.ts",
+    "./stack": "./src/stack/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

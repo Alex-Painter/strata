@@ -2,6 +2,7 @@
  * HTTP contract between `apps/server` and `apps/web`. Both import these types,
  * so a change here is a compile error on both sides rather than a runtime 404.
  */
+import type { Evidence } from "./change.js";
 import type { ContextKind, ContextSource } from "./context.js";
 import type { ChangeReport } from "./report.js";
 import type { LinkState, PrState, StackIssue, StackPr } from "./stack.js";
@@ -36,10 +37,17 @@ export interface StackPrSummary {
   state: PrState;
   draft: boolean;
   updatedAt: string;
+  mergedAt: string | null;
+  baseRef: string;
+  headRef: string;
+  /** For merged PRs: the commit it landed as. */
+  mergeCommitOid: string | null;
   /** Null for the bottom PR. */
   parent: number | null;
   /** How it sits on its parent; null for the bottom PR. */
   link: LinkState | null;
+  /** The commits and PRs the link rests on. */
+  linkEvidence: Evidence[];
   review: StackPr["review"];
   checks: StackPr["checks"];
 }
@@ -48,6 +56,8 @@ export interface StackSummary {
   id: string;
   repo: string;
   trunk: string;
+  /** Where the stack left the trunk; null when git couldn't tell. */
+  base: string | null;
   root: number;
   /** Depth first from the bottom, siblings by PR number. */
   prs: StackPrSummary[];
