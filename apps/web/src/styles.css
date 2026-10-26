@@ -21,6 +21,30 @@
   --color-closed: #cf222e;
   --color-warn: #9a6700;
   --color-warn-bg: #fff8e5;
+  /*
+   * Layers, in LAYERS order: a categorical palette checked for colour-blind
+   * separation between neighbours. Mechanical lines are grey.
+   */
+  --color-layer-data-model: #2a78d6;
+  --color-layer-api: #eb6834;
+  --color-layer-logic: #1baf7a;
+  --color-layer-ui: #eda100;
+  --color-layer-tests: #e87ba4;
+  --color-layer-config: #008300;
+  --color-layer-docs: #6250d6;
+  --color-layer-other: #e34948;
+  --color-mechanical: #c4c4cc;
+  /* The matrix's shading: one hue, light to dark, with the ink that reads on each step. */
+  --color-heat-1: #cde2fb;
+  --color-heat-2: #9ec5f4;
+  --color-heat-3: #6da7ec;
+  --color-heat-4: #2a78d6;
+  --color-heat-5: #1c5cab;
+  --color-heat-ink-1: #1b1b1f;
+  --color-heat-ink-2: #1b1b1f;
+  --color-heat-ink-3: #1b1b1f;
+  --color-heat-ink-4: #ffffff;
+  --color-heat-ink-5: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,6 +64,26 @@
     --color-closed: #f85149;
     --color-warn: #d29922;
     --color-warn-bg: #2b2111;
+    --color-layer-data-model: #3987e5;
+    --color-layer-api: #d95926;
+    --color-layer-logic: #199e70;
+    --color-layer-ui: #c98500;
+    --color-layer-tests: #d55181;
+    --color-layer-config: #008300;
+    --color-layer-docs: #9085e9;
+    --color-layer-other: #e66767;
+    --color-mechanical: #4a4a53;
+    /* Dark steps: little recedes into the surface, a lot is brightest. */
+    --color-heat-1: #104281;
+    --color-heat-2: #1c5cab;
+    --color-heat-3: #2a78d6;
+    --color-heat-4: #5598e7;
+    --color-heat-5: #86b6ef;
+    --color-heat-ink-1: #e8e8ec;
+    --color-heat-ink-2: #e8e8ec;
+    --color-heat-ink-3: #101012;
+    --color-heat-ink-4: #101012;
+    --color-heat-ink-5: #101012;
   }
 }
 

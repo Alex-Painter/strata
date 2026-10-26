@@ -1,5 +1,7 @@
 import type { ChangeReport, StackSummary } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
+import { layerMatrix, prLayerBars } from "@strata/core/stack";
+import { useMemo } from "react";
 import { countPrs } from "../lib/format";
 import { layerAnchor } from "./Diff";
 import { CopyMermaid, StackMap } from "./StackMap";
@@ -20,6 +22,7 @@ export function Navigator({
   onScope: (pr: number | null) => void;
 }) {
   const path = summary?.defaultPath ?? [];
+  const bars = useMemo(() => (report ? prLayerBars(layerMatrix(report)) : undefined), [report]);
   const pathPrs = summary?.prs.filter((pr) => path.includes(pr.number)) ?? [];
   return (
     <nav
@@ -49,6 +52,7 @@ export function Navigator({
               path={path}
               active={scope}
               onSelect={(pr) => onScope(pr === scope ? null : pr)}
+              {...(bars ? { bars } : {})}
             />
           </div>
         </>

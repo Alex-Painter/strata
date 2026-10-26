@@ -1,28 +1,38 @@
 import type { StackPrSummary, StackSummary } from "@strata/core/model";
-import { layoutStackMap, type StackMapEdge, stackMermaid } from "@strata/core/stack";
+import { LAYERS } from "@strata/core/model";
+import {
+  layoutStackMap,
+  type PrLayerBar,
+  type StackMapEdge,
+  stackMermaid,
+} from "@strata/core/stack";
 import { useMemo, useState } from "react";
 import { linkLabel } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
 import { ReviewMarks, StateBadge } from "./PrStatus";
 
 const ROW = 52;
+/** Rows are taller once each PR has a layer bar. */
+const ROW_WITH_BAR = 64;
 const LANE = 14;
 const PAD = 11;
 
 const x = (lane: number) => PAD + lane * LANE;
-const y = (row: number) => row * ROW + ROW / 2;
+const y = (row: number, height: number) => row * height + height / 2;
 
 /**
  * The stack drawn the way it grew: the trunk at the bottom, each PR on its own
  * row above the one it targets, tips on top. Core decides where everything
  * sits (layoutStackMap); this only draws it. With `onSelect`, choosing a PR
- * scopes the page to it, so the map doubles as the navigation rail.
+ * scopes the page to it, so the map doubles as the navigation rail. With
+ * `bars`, each PR shows its lines by layer, mechanical ones in grey.
  */
 export function StackMap({
   stack,
   path,
   active = null,
   onSelect,
+  bars,
 }: {
   stack: StackSummary;
   /** The path in view. PRs off it are dimmed. */
@@ -30,12 +40,16 @@ export function StackMap({
   /** The PR the page is scoped to, if any. */
   active?: number | null;
   onSelect?: (pr: number) => void;
+  /** Each PR's lines by layer, once its diff is analysed. */
+  bars?: Map<number, PrLayerBar>;
 }) {
   const layout = useMemo(() => layoutStackMap(stack), [stack]);
+  const row = bars ? ROW_WITH_BAR : ROW;
+  const widest = Math.max(1, ...[...(bars?.values() ?? [])].map((bar) => total(bar)));
   const prs = new Map(stack.prs.map((pr) => [pr.number, pr]));
   const onPath = (n: number) => !path || path.includes(n);
   const gutter = x(layout.lanes - 1) + PAD + 4;
-  const height = (layout.trunkRow + 1) * ROW;
+  const height = (layout.trunkRow + 1) * row;
 
   return (
     <div className="relative" style={{ height }}>
@@ -46,7 +60,7 @@ export function StackMap({
         className="pointer-events-none absolute top-0 left-0"
       >
         {layout.edges.map((edge) => (
-          <EdgeLine key={edge.child} edge={edge} dim={!onPath(edge.child)} />
+          <EdgeLine key={edge.child} edge={edge} dim={!onPath(edge.child)} row={row} />
         ))}
         {layout.nodes.map((node) => {
           const pr = prs.get(node.pr) as StackPrSummary;
@@ -54,7 +68,7 @@ export function StackMap({
             <Dot
               key={node.pr}
               cx={x(node.lane)}
-              cy={y(node.row)}
+              cy={y(node.row, row)}
               pr={pr}
               active={node.pr === active}
               dim={!onPath(node.pr)}
@@ -63,7 +77,7 @@ export function StackMap({
         })}
         <rect
           x={x(0) - 4}
-          y={y(layout.trunkRow) - 4}
+          y={y(layout.trunkRow, row) - 4}
           width={8}
           height={8}
           rx={2}
@@ -77,7 +91,7 @@ export function StackMap({
             data-pr={node.pr}
             data-row={node.row}
             data-lane={node.lane}
-            style={{ height: ROW, paddingLeft: gutter }}
+            style={{ height: row, paddingLeft: gutter }}
           >
             <PrRow
               pr={prs.get(node.pr) as StackPrSummary}
@@ -85,12 +99,13 @@ export function StackMap({
               active={node.pr === active}
               dim={!onPath(node.pr)}
               {...(onSelect ? { onSelect } : {})}
+              {...(bars ? { bar: bars.get(node.pr) ?? null, widest } : {})}
             />
           </li>
         ))}
         <li
           data-trunk={stack.trunk}
-          style={{ height: ROW, paddingLeft: gutter }}
+          style={{ height: row, paddingLeft: gutter }}
           className="flex flex-col justify-center px-2 text-muted"
         >
           <span className="font-mono text-text">{stack.trunk}</span>
@@ -119,12 +134,17 @@ function PrRow({
   active,
   dim,
   onSelect,
+  bar,
+  widest = 1,
 }: {
   pr: StackPrSummary;
   repo: string;
   active: boolean;
   dim: boolean;
   onSelect?: (pr: number) => void;
+  /** Undefined when the map has no bars; null for a PR without one. */
+  bar?: PrLayerBar | null;
+  widest?: number;
 }) {
   const link = linkLabel(pr.link, pr.parent, pr.baseRef);
   const restack = pr.link === "behind" || pr.link === "stale";
@@ -176,20 +196,69 @@ function PrRow({
         )}
         {link && <span className={`truncate ${restack ? "text-warn" : ""}`}>{link}</span>}
       </div>
+      {bar !== undefined && <LayerBar bar={bar} widest={widest} />}
     </div>
   );
 }
 
-function EdgeLine({ edge, dim }: { edge: StackMapEdge; dim: boolean }) {
+/**
+ * A PR's lines as a bar, as long as its share of the busiest PR's, split by
+ * layer in review order, with mechanical lines in grey at the end.
+ */
+function LayerBar({ bar, widest }: { bar: PrLayerBar | null; widest: number }) {
+  // PRs off the path, or with no diff, have no bar.
+  if (!bar) return <div className="h-3" />;
+  const all = total(bar);
+  const summary = `${bar.meaningful} lines in ${bar.files === 1 ? "1 file" : `${bar.files} files`}${
+    bar.mechanical > 0 ? `, plus ${bar.mechanical} mechanical` : ""
+  }`;
+  return (
+    <div className="flex h-3 min-w-0 items-center gap-1.5" data-bar>
+      <div
+        role="img"
+        aria-label={summary}
+        title={summary}
+        className="flex h-1 min-w-1 gap-[2px]"
+        style={{ width: `${Math.max(4, (all / widest) * 100)}%` }}
+      >
+        {bar.segments.map((segment) => (
+          <span
+            key={segment.layer}
+            title={`${LAYERS[segment.layer].title}: ${segment.lines} lines`}
+            className="h-full rounded-full"
+            style={{
+              flexGrow: segment.lines,
+              background: `var(--color-layer-${segment.layer})`,
+            }}
+            data-layer={segment.layer}
+          />
+        ))}
+        {bar.mechanical > 0 && (
+          <span
+            title={`Mechanical: ${bar.mechanical} lines`}
+            className="h-full rounded-full"
+            style={{ flexGrow: bar.mechanical, background: "var(--color-mechanical)" }}
+            data-layer="mechanical"
+          />
+        )}
+      </div>
+      <span className="shrink-0 font-mono text-[10px] leading-3 text-muted">{bar.meaningful}</span>
+    </div>
+  );
+}
+
+const total = (bar: PrLayerBar) => bar.meaningful + bar.mechanical;
+
+function EdgeLine({ edge, dim, row }: { edge: StackMapEdge; dim: boolean; row: number }) {
   const fx = x(edge.from.lane);
-  const fy = y(edge.from.row);
+  const fy = y(edge.from.row, row);
   const tx = x(edge.to.lane);
-  const ty = y(edge.to.row);
+  const ty = y(edge.to.row, row);
   // Same lane: straight up. Otherwise turn into the child's lane within one row, then go straight up.
   const d =
     fx === tx
       ? `M${fx} ${fy}V${ty}`
-      : `M${fx} ${fy}C${fx} ${fy - ROW * 0.55} ${tx} ${fy - ROW * 0.45} ${tx} ${fy - ROW}V${ty}`;
+      : `M${fx} ${fy}C${fx} ${fy - row * 0.55} ${tx} ${fy - row * 0.45} ${tx} ${fy - row}V${ty}`;
   return (
     <path
       d={d}

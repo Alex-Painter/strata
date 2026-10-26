@@ -8,7 +8,8 @@ import type {
   StackNode,
   StackSummary,
 } from "@strata/core/model";
-import type { ReactNode } from "react";
+import { layerMatrix } from "@strata/core/stack";
+import { type ReactNode, useMemo } from "react";
 import {
   ago,
   CHECKS_LABEL,
@@ -19,8 +20,10 @@ import {
   REVIEW_LABEL,
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
-import { Files } from "./Diff";
+import { originChips, revisedBy, revisionChips } from "../lib/provenance";
+import { Files, fileAnchor } from "./Diff";
 import { EvidenceList } from "./EvidenceList";
+import { LayerMatrixView } from "./LayerMatrix";
 import { PathPicker } from "./PathPicker";
 import { StateBadge } from "./PrStatus";
 
@@ -75,6 +78,7 @@ export function PaneArea({
                 report={report}
                 stack={stack}
                 summary={summary}
+                onScope={onScope}
                 {...(onPickPath ? { onPickPath } : {})}
                 pickingPath={pickingPath}
                 pickError={pickError}
@@ -149,6 +153,7 @@ function StackPane({
   report,
   stack,
   summary,
+  onScope,
   onPickPath,
   pickingPath,
   pickError,
@@ -156,6 +161,7 @@ function StackPane({
   report: ChangeReport;
   stack: Stack;
   summary: StackSummary;
+  onScope: (pr: number | null) => void;
   onPickPath?: (tip: number) => void;
   pickingPath: number | null;
   pickError: string | null;
@@ -163,6 +169,9 @@ function StackPane({
   const path = stack.selectedPath;
   const pathPrs = summary.prs.filter((pr) => path.includes(pr.number));
   const issues = stack.issues.filter((issue) => issue.prs.some((n) => path.includes(n)));
+  const matrix = useMemo(() => layerMatrix(report), [report]);
+  const chips = useMemo(() => originChips(report.parts), [report]);
+  const titles = new Map(stack.nodes.map((node) => [node.pr.number, node.pr.title]));
   return (
     <>
       <header className="space-y-1">
@@ -195,9 +204,35 @@ function StackPane({
           ))}
         </ul>
       )}
-      {report.change.revisions && <Files files={report.change.files} hunks={report.change.hunks} />}
+      {report.change.revisions && (
+        <>
+          <LayerMatrixView
+            matrix={matrix}
+            titles={titles}
+            onOpen={(pr, file) => {
+              if (pr !== null) onScope(pr);
+              showFile(file);
+            }}
+          />
+          <Files
+            files={report.change.files}
+            hunks={report.change.hunks}
+            chips={chips}
+            onPr={onScope}
+          />
+        </>
+      )}
     </>
   );
+}
+
+/** Opens a file's diff and scrolls to it, once the pane showing it has rendered. */
+function showFile(path: string) {
+  setTimeout(() => {
+    const element = document.getElementById(fileAnchor(path));
+    if (element instanceof HTMLDetailsElement) element.open = true;
+    element?.scrollIntoView({ block: "start" });
+  }, 0);
 }
 
 function PrPane({
@@ -322,13 +357,23 @@ function PrPane({
         )}
       </dl>
       <Issues repo={stack.repo} issues={issues} />
-      {part && <PartDiff stack={stack} node={node} part={part} />}
+      {part && <PartDiff stack={stack} node={node} part={part} onScope={onScope} />}
     </>
   );
 }
 
 /** One PR's own diff, with how Strata built it and how it compares with GitHub's. */
-function PartDiff({ stack, node, part }: { stack: Stack; node: StackNode; part: PrPart }) {
+function PartDiff({
+  stack,
+  node,
+  part,
+  onScope,
+}: {
+  stack: Stack;
+  node: StackNode;
+  part: PrPart;
+  onScope: (pr: number | null) => void;
+}) {
   const n = node.pr.number;
   const conflicted = stack.issues.some(
     (issue) => issue.kind === "replay-conflict" && issue.prs.includes(n),
@@ -349,8 +394,46 @@ function PartDiff({ stack, node, part }: { stack: Stack; node: StackNode; part: 
         <GitHubDiffers repo={stack.repo} pr={n} check={part.github} />
       )}
       {how && <p className="text-muted">{how}</p>}
-      {part.how !== "unknown" && <Files files={part.files} hunks={part.hunks} />}
+      <RevisedLater part={part} path={stack.selectedPath} onScope={onScope} />
+      {part.how !== "unknown" && (
+        <Files files={part.files} hunks={part.hunks} chips={revisionChips(part)} onPr={onScope} />
+      )}
     </>
+  );
+}
+
+/** Says when later PRs changed this PR's lines again, which the hunk chips then mark. */
+function RevisedLater({
+  part,
+  path,
+  onScope,
+}: {
+  part: PrPart;
+  path: number[];
+  onScope: (pr: number | null) => void;
+}) {
+  const later = revisedBy(part, path);
+  if (later.length === 0) return null;
+  const total = later.reduce((sum, item) => sum + item.lines, 0);
+  return (
+    <p role="note" aria-label="Revised later">
+      {total === 1 ? "1 line" : `${total} lines`} this PR added {total === 1 ? "was" : "were"}{" "}
+      changed again later, in{" "}
+      {later.map((item, i) => (
+        <span key={item.pr}>
+          {i > 0 && (i === later.length - 1 ? " and " : ", ")}
+          <button
+            type="button"
+            onClick={() => onScope(item.pr)}
+            className="font-mono text-accent hover:underline"
+            title={item.lines === 1 ? "1 line" : `${item.lines} lines`}
+          >
+            #{item.pr}
+          </button>
+        </span>
+      ))}
+      .
+    </p>
   );
 }
 

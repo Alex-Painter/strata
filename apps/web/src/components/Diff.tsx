@@ -8,12 +8,32 @@ const OPEN_FILE_LINES = 400;
 /** Once this many lines are open, the rest start closed, so big stacks stay quick. */
 const OPEN_TOTAL_LINES = 3000;
 
+/** A note on a hunk about which PR it came from, or which PR changed it again. */
+export interface HunkChip {
+  pr: number;
+  text: string;
+  /** Says what the chip claims in full. */
+  title: string;
+}
+
 /**
  * The files of a diff by layer, in review order, then by directory, then each
  * file's hunks. Mechanical files and hunks start collapsed with their reason,
  * and line counts leave them out.
  */
-export function Files({ files, hunks }: { files: FileChange[]; hunks: Hunk[] }) {
+export function Files({
+  files,
+  hunks,
+  chips,
+  onPr,
+}: {
+  files: FileChange[];
+  hunks: Hunk[];
+  /** By hunk id. */
+  chips?: Map<string, HunkChip[]>;
+  /** Choosing a chip's PR. */
+  onPr?: (pr: number) => void;
+}) {
   const byId = new Map(hunks.map((hunk) => [hunk.id, hunk]));
   const hunksOf = (file: FileChange) =>
     file.hunkIds.map((id) => byId.get(id)).filter((hunk) => hunk !== undefined);
@@ -88,6 +108,8 @@ export function Files({ files, hunks }: { files: FileChange[]; hunks: Hunk[] }) 
                     file={file}
                     hunks={hunksOf(file)}
                     initiallyOpen={opens.get(file.path) ?? false}
+                    chips={chips}
+                    onPr={onPr}
                   />
                 )),
               )}
@@ -134,10 +156,14 @@ function FileDiff({
   file,
   hunks,
   initiallyOpen,
+  chips,
+  onPr,
 }: {
   file: FileChange;
   hunks: Hunk[];
   initiallyOpen: boolean;
+  chips: Map<string, HunkChip[]> | undefined;
+  onPr: ((pr: number) => void) | undefined;
 }) {
   // Closed files render no lines, so a big diff costs nothing until opened.
   const [open, setOpen] = useState(initiallyOpen);
@@ -172,7 +198,13 @@ function FileDiff({
             <div className="overflow-x-auto">
               <table className="w-full border-collapse font-mono text-[12px] leading-5">
                 {hunks.map((hunk) => (
-                  <HunkRows key={hunk.id} hunk={hunk} inMechanicalFile={file.mechanical !== null} />
+                  <HunkRows
+                    key={hunk.id}
+                    hunk={hunk}
+                    inMechanicalFile={file.mechanical !== null}
+                    chips={chips?.get(hunk.id) ?? []}
+                    onPr={onPr}
+                  />
                 ))}
               </table>
             </div>
@@ -183,15 +215,42 @@ function FileDiff({
   );
 }
 
-function HunkRows({ hunk, inMechanicalFile }: { hunk: Hunk; inMechanicalFile: boolean }) {
+function HunkRows({
+  hunk,
+  inMechanicalFile,
+  chips,
+  onPr,
+}: {
+  hunk: Hunk;
+  inMechanicalFile: boolean;
+  chips: HunkChip[];
+  onPr: ((pr: number) => void) | undefined;
+}) {
   // A mechanical hunk in a meaningful file stays folded until asked for.
   const [shown, setShown] = useState(inMechanicalFile || hunk.mechanical === null);
   return (
     <tbody data-hunk={hunk.id} data-mechanical={hunk.mechanical?.kind}>
       <tr className="bg-raised text-muted">
-        <td colSpan={3} className="px-3 py-0.5 whitespace-pre">
-          @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-          {hunk.section && ` ${hunk.section}`}
+        <td colSpan={3} className="px-3 py-0.5">
+          <div className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate whitespace-pre">
+              @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+              {hunk.section && ` ${hunk.section}`}
+            </span>
+            {chips.map((chip) => (
+              <button
+                key={`${chip.pr} ${chip.text}`}
+                type="button"
+                title={chip.title}
+                disabled={!onPr}
+                onClick={() => onPr?.(chip.pr)}
+                className="shrink-0 rounded border border-line bg-surface px-1.5 font-sans text-[11px] text-muted hover:text-accent"
+                data-chip={chip.pr}
+              >
+                {chip.text}
+              </button>
+            ))}
+          </div>
         </td>
       </tr>
       {shown ? (

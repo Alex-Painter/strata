@@ -70,9 +70,18 @@ const h10 = await remote.write(
   },
   "b9",
 );
+// #11 also passes the TTL through, rewriting two of #10's lines.
 const h11 = await remote.write(
   "b11",
   {
+    "app/jobs/warm_cache.py": lines(
+      "from app.forecast_cache import TTL, cache_key",
+      "",
+      "",
+      "async def warm_all(accounts, cache, forecasts):",
+      "    for account in accounts:",
+      "        cache.set(cache_key(account.id), await forecasts.build(account), ttl=TTL)",
+    ),
     "web/admin/CacheStats.tsx": lines(
       "export function CacheStats({ hits, misses }: { hits: number; misses: number }) {",
       "  const rate = hits + misses === 0 ? 0 : hits / (hits + misses);",
