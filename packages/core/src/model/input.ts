@@ -97,6 +97,22 @@ export function describeInput(input: ChangeInput): string {
   }
 }
 
+const REMOTE = [
+  // git@github.com:owner/repo.git
+  new RegExp(`^[\\w.-]+@github\\.com:${REPO}$`),
+  // https://github.com/owner/repo.git, ssh://git@github.com/owner/repo.git, git://…
+  new RegExp(`^(?:https?|ssh|git)://(?:[^@/]+@)?github\\.com(?::\\d+)?/${REPO}/?$`),
+];
+
+/** The GitHub repo a git remote URL points at, as owner/name, or null if it isn't one. */
+export function parseGitHubRemote(url: string): string | null {
+  for (const pattern of REMOTE) {
+    const match = pattern.exec(url.trim());
+    if (match) return `${match[1]}/${(match[2] as string).replace(/\.git$/, "")}`;
+  }
+  return null;
+}
+
 function github(owner: string | undefined, name: string | undefined): RepoRef {
   return { kind: "github", owner: owner as string, name: name as string };
 }

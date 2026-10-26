@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ChangeInputError, describeInput, parseChangeInput } from "./input.js";
+import { ChangeInputError, describeInput, parseChangeInput, parseGitHubRemote } from "./input.js";
 
 const repo = { kind: "github", owner: "GlyphicAI", name: "maverick-backend" };
 
@@ -49,5 +49,28 @@ describe("parseChangeInput", () => {
       }),
     ).toBe("a/b#7 up to #9");
     expect(describeInput(parseChangeInput("a/b@main...x"))).toBe("a/b@main...x");
+  });
+});
+
+describe("parseGitHubRemote", () => {
+  it.each([
+    ["git@github.com:acme/app.git", "acme/app"],
+    ["git@github.com:acme/app", "acme/app"],
+    ["https://github.com/acme/app.git", "acme/app"],
+    ["https://github.com/acme/app", "acme/app"],
+    ["https://x-access-token@github.com/acme/my.app.git", "acme/my.app"],
+    ["ssh://git@github.com/acme/app.git", "acme/app"],
+    ["ssh://git@github.com:443/acme/app.git", "acme/app"],
+  ])("reads %s", (url, repo) => {
+    expect(parseGitHubRemote(url)).toBe(repo);
+  });
+
+  it.each([
+    "git@gitlab.com:acme/app.git",
+    "https://github.com.evil.example/acme/app",
+    "https://github.com/acme",
+    "/home/me/app",
+  ])("finds no GitHub repo in %s", (url) => {
+    expect(parseGitHubRemote(url)).toBeNull();
   });
 });
