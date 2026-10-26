@@ -1,10 +1,12 @@
 /**
  * Prints a report in brief, the way `strata analyze` shows it: the path, each
- * PR's own diff, the whole-stack diff's files by layer, the layer by PR
- * matrix, then issues and notes.
+ * PR's own diff and summary, the whole stack's summary and Guide, its files by
+ * layer, the layer by PR matrix, then issues and notes. Each sentence ends
+ * with the hunks it rests on, as path:line.
  */
 import {
   type ChangeReport,
+  type Claim,
   type FileChange,
   LAYERS,
   type LayerMatrix,
@@ -14,6 +16,8 @@ import {
 
 /** Longer whole-stack file lists are cut, and say how many were left out. */
 const MAX_FILES = 40;
+/** Paths named per Guide section. */
+const SECTION_PATHS = 4;
 
 export function formatReport(report: ChangeReport): string {
   const { change, stack } = report;
@@ -36,7 +40,24 @@ export function formatReport(report: ChangeReport): string {
       if (part.github && !part.github.same) {
         lines.push(`  ${" ".repeat(width)}  GitHub's diff differs: ${part.github.reason}`);
       }
+      for (const claim of part.summary) lines.push(`  ${" ".repeat(width)}  ${sentence(claim)}`);
     }
+    lines.push("");
+  }
+
+  if (report.summary.length > 0) {
+    lines.push("Summary", ...report.summary.map((claim) => `  ${sentence(claim)}`), "");
+  }
+  // Strata's own groups are the layers below, so the Guide is printed only once Claude ordered it.
+  if (report.guide.by === "llm") {
+    lines.push("Guide");
+    report.guide.sections.forEach((section, i) => {
+      const n = `${i + 1}. `;
+      const more = section.paths.length - SECTION_PATHS;
+      const paths = section.paths.slice(0, SECTION_PATHS).join(", ");
+      lines.push(`  ${n}${section.title}: ${paths}${more > 0 ? `, and ${more} more` : ""}`);
+      for (const claim of section.about) lines.push(`  ${" ".repeat(n.length)}${sentence(claim)}`);
+    });
     lines.push("");
   }
 
@@ -105,6 +126,10 @@ function matrixLines(matrix: LayerMatrix): string[] {
     row(title, heads),
     ...matrix.rows.map((r, i) => row(`  ${LAYERS[r.layer].title}`, cells[i] ?? [])),
   ];
+}
+
+function sentence(claim: Claim): string {
+  return `${claim.text} [${claim.evidence.map((item) => item.label).join(", ")}]`;
 }
 
 function partLine(part: PrPart): string {

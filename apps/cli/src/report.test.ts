@@ -68,6 +68,59 @@ describe("formatReport", () => {
     expect(text).not.toContain("Elsewhere.");
   });
 
+  it("prints each summary sentence with the hunks it rests on, and Claude's Guide", async () => {
+    const report = await analyze("acme/app#3");
+    const evidence = (path: string) => [
+      { anchor: { source: { kind: "pr" as const, number: 1 } }, label: path },
+    ];
+    const claim = (text: string, ...paths: string[]) => ({
+      text,
+      confidence: "medium" as const,
+      evidence: paths.flatMap(evidence),
+    });
+    report.summary = [claim("Adds three notes.", "b1-2.txt:1", "b3-4.txt:1")];
+    const [one] = report.parts;
+    if (one) one.summary = [claim("Adds the first note.", "b1-2.txt:1")];
+    report.guide = {
+      by: "llm",
+      sections: [
+        {
+          id: "guide_1",
+          title: "Notes",
+          about: [claim("All three notes.", "b2-3.txt:1")],
+          paths: ["a", "b", "c", "d", "e", "f"],
+          hunkIds: [],
+        },
+        { id: "guide_2", title: "Docs: top level", about: [], paths: ["g"], hunkIds: [] },
+      ],
+    };
+    const text = formatReport(report);
+    expect(text).toContain(
+      "  #1  direct    1 file     +1 -0        Add the forecast model\n" +
+        "      Adds the first note. [b1-2.txt:1]\n",
+    );
+    expect(text).toContain(
+      [
+        "",
+        "Summary",
+        "  Adds three notes. [b1-2.txt:1, b3-4.txt:1]",
+        "",
+        "Guide",
+        "  1. Notes: a, b, c, d, and 2 more",
+        "     All three notes. [b2-3.txt:1]",
+        "  2. Docs: top level: g",
+        "",
+        "Whole stack: 3 files, +3 -0",
+      ].join("\n"),
+    );
+  });
+
+  it("leaves Strata's own Guide out, since the layers below are its groups", async () => {
+    const text = formatReport(await analyze("acme/app#3"));
+    expect(text).not.toContain("Summary\n");
+    expect(text).not.toContain("Guide\n");
+  });
+
   it("says which layers Claude chose", async () => {
     const report = await analyze("acme/app#3");
     const [file] = report.change.files;
