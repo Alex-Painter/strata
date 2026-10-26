@@ -79,9 +79,9 @@ describe("engine.resolveChange for stacks", () => {
     expect(lone.hints).toHaveLength(1);
   });
 
-  it("leaves commit ranges for later", async () => {
+  it("leaves ranges in a local checkout for later", async () => {
     await expect(
-      engine().resolveChange(parseChangeInput("acme/app@main...b4")),
+      engine().resolveChange(parseChangeInput("main...b4", { localRepoPath: remote.dir })),
     ).rejects.toBeInstanceOf(NotImplementedError);
   });
 });

@@ -19,7 +19,8 @@ import { type FeatureShape, featureShape, type ShapeRepo } from "./testing/featu
 /**
  * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1): one feature built
  * five ways (see testing/feature-shapes.ts) must give the same whole-stack
- * view, while "How it arrived" shows each split as it is. The repo lets
+ * view, and so must the same code given as a plain range with no PRs at all,
+ * while "How it arrived" shows each split as it is. The repo lets
  * Claude sort files no rule matched and write the summaries, through fakes
  * that record what they're asked, so the questions are held to the same
  * standard.
@@ -71,38 +72,46 @@ function fakeClaude() {
 const isWhole = (body: Analysed["bodies"][number]) => !body.system.includes("one pull request");
 
 const analysed = new Map<FeatureShape, Analysed>();
+/** The stack shape's code given as a plain range, with no PRs at all. */
+let range: Omit<Analysed, "shape">;
 let dataDir: string;
+
+/** Analyses `input` in its own data folder, with fakes standing in for Claude. */
+async function analyse(shape: ShapeRepo, folder: string, input: string) {
+  const settings = settingsPath(join(dataDir, folder), "acme/app");
+  await mkdir(dirname(settings), { recursive: true });
+  await writeFile(settings, JSON.stringify({ sendCodeToAnthropic: true }));
+  const asked: LayerRequest[] = [];
+  const layerJudge: LayerJudge = async (request) => {
+    asked.push(request);
+    return request.files.map((file) => ({
+      path: file.path,
+      layer: "logic",
+      reason: `Service code in ${file.path}`,
+    }));
+  };
+  const { client, bodies } = fakeClaude();
+  const engine = createEngine({
+    dataDir: join(dataDir, folder),
+    githubPort: shape.github,
+    gitRemote: () => shape.remote.dir,
+    now: () => new Date(Date.UTC(2026, 9, 2)),
+    layerJudge,
+    anthropicClient: client,
+  });
+  const parsed = parseChangeInput(input);
+  const report = await engine.analyzeChange(parsed);
+  const { gitDir } = await engine.resolveChange(parsed);
+  return { report, gitDir, asked, bodies };
+}
 
 beforeAll(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "strata-shapes-"));
   for (const name of SHAPES) {
     const shape = await featureShape(name);
-    const settings = settingsPath(join(dataDir, name), "acme/app");
-    await mkdir(dirname(settings), { recursive: true });
-    await writeFile(settings, JSON.stringify({ sendCodeToAnthropic: true }));
-    const asked: LayerRequest[] = [];
-    const layerJudge: LayerJudge = async (request) => {
-      asked.push(request);
-      return request.files.map((file) => ({
-        path: file.path,
-        layer: "logic",
-        reason: `Service code in ${file.path}`,
-      }));
-    };
-    const { client, bodies } = fakeClaude();
-    const engine = createEngine({
-      dataDir: join(dataDir, name),
-      githubPort: shape.github,
-      gitRemote: () => shape.remote.dir,
-      now: () => new Date(Date.UTC(2026, 9, 2)),
-      layerJudge,
-      anthropicClient: client,
-    });
-    const input = parseChangeInput(`acme/app#${shape.tip}`);
-    const report = await engine.analyzeChange(input);
-    const { gitDir } = await engine.resolveChange(input);
-    analysed.set(name, { shape, report, gitDir, asked, bodies });
+    analysed.set(name, { shape, ...(await analyse(shape, name, `acme/app#${shape.tip}`)) });
   }
+  range = await analyse(get("stack").shape, "range", "acme/app@main...b4");
 }, 60_000);
 
 afterAll(async () => {
@@ -268,6 +277,17 @@ describe("shape invariance", () => {
       const paths = get(name).report.change.files.map((file) => file.path);
       expect(paths, name).not.toContain("README.md");
     }
+  });
+
+  it("gives the same canonical report and questions as the same code given as a range", () => {
+    const stack = get("stack");
+    expect(range.report.stack).toBeNull();
+    expect(range.report.parts).toEqual([]);
+    expect(stableStringify(canonicalReport(range.report))).toBe(
+      stableStringify(canonicalReport(stack.report)),
+    );
+    expect(range.asked).toEqual(stack.asked);
+    expect(JSON.stringify(range.bodies)).toBe(JSON.stringify(stack.bodies.filter(isWhole)));
   });
 
   it("gives a fork two paths, and the Change for one of them", () => {

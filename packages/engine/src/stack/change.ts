@@ -10,21 +10,16 @@ import {
   type ChangeInput,
   type ChangeReport,
   describeRepo,
-  guideGroups,
   linkedGroups,
   type PrIndex,
   REPORT_SCHEMA_VERSION,
-  ruleGuide,
   type Stack,
   type StackSeed,
   stableId,
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
-import type { LayerJudge } from "../layers/judge.js";
-import type { AskJson } from "../llm.js";
-import type { RepoSettings } from "../settings.js";
-import { type Summaries, writeSummaries } from "../summaries/summaries.js";
+import { type ClaudeSteps, summarise, wholeNotes } from "../whole.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
 
@@ -92,14 +87,9 @@ export async function resolveStackChange(
 export async function stackReport(
   resolved: ResolvedChange & { stack: Stack },
   options: AnalyzeOptions,
-  meta: {
+  meta: ClaudeSteps & {
     engineVersion: string;
     startedAt: Date;
-    settings: RepoSettings;
-    /** Null unless the repo's settings let its code go to Claude and there's a key. */
-    judge: LayerJudge | null;
-    /** Asks Claude for the summaries. Null when the judge would be. */
-    ask: AskJson | null;
     /** The model `ask` uses. */
     model?: string;
   },
@@ -115,14 +105,7 @@ export async function stackReport(
   };
   const path = stack.selectedPath;
   const whole = diffs.whole;
-  let summaries: Summaries;
-  if (meta.ask) {
-    options.onProgress?.("Writing the summaries");
-    summaries = await writeSummaries(whole?.model ?? null, diffs.parts, meta.ask, options.signal);
-  } else {
-    const groups = whole ? guideGroups(whole.model) : [];
-    summaries = { summary: [], guide: ruleGuide(groups), parts: new Map(), notes: [] };
-  }
+  const summaries = await summarise(whole?.model ?? null, diffs.parts, meta, options);
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -150,8 +133,7 @@ export async function stackReport(
     notes: [
       ...diffNotes(stack, diffs),
       ...diffs.layerNotes,
-      ...guessNotes(resolved, diffs, meta),
-      ...summaryNotes(resolved, diffs, meta),
+      ...wholeNotes(resolved.repo, whole?.model ?? null, meta),
       ...summaries.notes,
     ],
     raw: { diff: whole?.diff ?? "" },
@@ -162,23 +144,6 @@ export async function stackReport(
       durationMs: Date.now() - meta.startedAt.getTime(),
     },
   };
-}
-
-/** Says why there's no summary, when Claude wasn't asked. */
-function summaryNotes(
-  resolved: ResolvedChange,
-  diffs: StackDiffs,
-  meta: { settings: RepoSettings; ask: AskJson | null },
-): string[] {
-  if (meta.ask || !diffs.whole) return [];
-  const without = "There's no summary, and the Guide shows Strata's own groups";
-  if (meta.settings.sendCodeToAnthropic) {
-    return [`${without}: this repo lets Claude write them, but Strata has no Anthropic API key.`];
-  }
-  return [
-    `${without}. To have Claude write them, turn on sendCodeToAnthropic in ` +
-      `settings/${describeRepo(resolved.repo)}.json in Strata's data folder.`,
-  ];
 }
 
 /** Says when the whole-stack diff doesn't cover the whole path. */
@@ -202,28 +167,6 @@ function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
     ];
   }
   return [];
-}
-
-/** Says how to place files whose layer is only a guess, when Claude wasn't asked. */
-function guessNotes(
-  resolved: ResolvedChange,
-  diffs: StackDiffs,
-  meta: { settings: RepoSettings; judge: LayerJudge | null },
-): string[] {
-  if (meta.judge) return [];
-  const guessed = diffs.whole?.model.files.filter((file) => file.layer.by === "default") ?? [];
-  if (guessed.length === 0) return [];
-  const one = guessed.length === 1;
-  const files = one ? "the layer of 1 file" : `the layers of ${guessed.length} files`;
-  if (meta.settings.sendCodeToAnthropic) {
-    return [
-      `Strata guessed ${files}. This repo lets Claude sort ${one ? "it" : "them"}, but Strata has no Anthropic API key.`,
-    ];
-  }
-  return [
-    `Strata guessed ${files}. To place ${one ? "it" : "them"}, add layer rules or turn on ` +
-      `sendCodeToAnthropic in settings/${describeRepo(resolved.repo)}.json in Strata's data folder.`,
-  ];
 }
 
 function describePrs(numbers: number[]): string {

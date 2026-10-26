@@ -8,6 +8,7 @@ import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
 import { type AskJson, cachedAsk, createLlm, type LlmSettings } from "./llm.js";
 import { serialize } from "./lock.js";
+import { rangeReport, resolveRangeChange } from "./range.js";
 import { loadRepoSettings, type RepoSettings } from "./settings.js";
 import {
   resolveStackChange,
@@ -19,10 +20,9 @@ import { discoverStacks } from "./stack/discover.js";
 import { ENGINE_VERSION } from "./version.js";
 
 /**
- * Wires the engine together. Stack discovery works; the other operations are
- * still stubs, so the CLI and server can be built and tested against the real
- * contract while milestone 1 fills in: resolving a Change, the analysis
- * pipeline over @strata/core, anchor resolution, and chat.
+ * Wires the engine together. Stacks and ranges on GitHub repos work; ranges in
+ * a local checkout, reading files, anchor resolution and chat are still stubs,
+ * so the CLI and server can be built and tested against the real contract.
  */
 export const createEngine: CreateEngine = (config) => {
   const llm = createLlm(config);
@@ -42,31 +42,42 @@ export const createEngine: CreateEngine = (config) => {
       });
     },
     async resolveChange(input) {
-      const stackInput = asStackInput(input);
-      return serialize(lockKey(config, repoName(stackInput)), () =>
-        resolveStackInput(config, stackInput),
+      const gh = githubInput(input);
+      return serialize(lockKey(config, repoName(gh)), async () =>
+        gh.kind === "range"
+          ? resolveRangeChange(gh, await openCache(config, repoName(gh)))
+          : resolveStackInput(config, gh),
       );
     },
     async analyzeChange(input, options = {}) {
       const startedAt = new Date();
-      const stackInput = asStackInput(input);
+      const gh = githubInput(input);
+      const repo = repoName(gh);
       // The diffs write commits into the cache and read its branches, so they
       // run under the same lock as the fetch.
-      return serialize(lockKey(config, repoName(stackInput)), async () => {
-        options.onProgress?.("Finding the stack");
-        const resolved = await resolveStackInput(config, stackInput);
-        options.signal?.throwIfAborted();
-        options.onProgress?.("Building the diffs");
-        const settings = await loadRepoSettings(config.dataDir, repoName(stackInput));
+      return serialize(lockKey(config, repo), async () => {
+        const settings = await loadRepoSettings(config.dataDir, repo);
         const ask = settings.sendCodeToAnthropic && llm ? summaryAsk(config, llm) : null;
-        return stackReport(resolved, options, {
+        const meta = {
           engineVersion: ENGINE_VERSION,
           startedAt,
           settings,
           judge: layerJudge(config, llm, settings),
           ask,
           ...(llm ? { model: llm.model } : {}),
-        });
+        };
+        if (gh.kind === "range") {
+          options.onProgress?.("Finding the range");
+          const resolved = await resolveRangeChange(gh, await openCache(config, repo));
+          options.signal?.throwIfAborted();
+          options.onProgress?.("Building the diff");
+          return rangeReport(resolved, options, meta);
+        }
+        options.onProgress?.("Finding the stack");
+        const resolved = await resolveStackInput(config, gh);
+        options.signal?.throwIfAborted();
+        options.onProgress?.("Building the diffs");
+        return stackReport(resolved, options, meta);
       });
     },
     async readFile() {
@@ -132,23 +143,21 @@ function loadIndex(config: EngineConfig, repo: string): Promise<PrIndex> {
   });
 }
 
-type GitHubStackInput = StackInput & { repo: Extract<RepoRef, { kind: "github" }> };
+type GitHubInput = ChangeInput & { repo: Extract<RepoRef, { kind: "github" }> };
 
-function repoName(input: GitHubStackInput): string {
+function repoName(input: GitHubInput): string {
   return `${input.repo.owner}/${input.repo.name}`;
 }
 
 /** Call with the repo's lock held. */
-async function resolveStackInput(config: EngineConfig, input: GitHubStackInput) {
+async function resolveStackInput(config: EngineConfig, input: StackInput & GitHubInput) {
   const repo = repoName(input);
   const index = await loadIndex(config, repo);
   return resolveStackChange(input, index, await openCache(config, repo));
 }
 
-function asStackInput(input: ChangeInput): GitHubStackInput {
-  if (input.kind === "range") throw new NotImplementedError("Resolving a commit range");
-  if (input.repo.kind !== "github") {
-    throw new StackInputError("Stacks come from GitHub; give the repo as owner/repo.");
-  }
-  return input as GitHubStackInput;
+function githubInput(input: ChangeInput): GitHubInput {
+  if (input.repo.kind === "github") return input as GitHubInput;
+  if (input.kind === "range") throw new NotImplementedError("Ranges in a local checkout");
+  throw new StackInputError("Stacks come from GitHub; give the repo as owner/repo.");
 }

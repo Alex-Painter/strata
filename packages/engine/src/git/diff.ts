@@ -97,6 +97,19 @@ export async function branchTip(gitDir: string, branch: string): Promise<string 
   return code === 0 ? stdout.trim() : null;
 }
 
+/** A branch or commit id as a full commit id, or null when the cache doesn't have it. */
+export async function resolveCommit(gitDir: string, ref: string): Promise<string | null> {
+  // A leading "-" would be read as an option.
+  if (ref.startsWith("-")) return null;
+  const { code, stdout } = await git(gitDir, [
+    "rev-parse",
+    "--verify",
+    "--quiet",
+    `${ref}^{commit}`,
+  ]);
+  return code === 0 ? stdout.trim() : null;
+}
+
 /** The single best merge base, or null when there is none or several. */
 export async function mergeBase(gitDir: string, a: string, b: string): Promise<string | null> {
   const { code, stdout } = await git(gitDir, ["merge-base", "--all", a, b]);

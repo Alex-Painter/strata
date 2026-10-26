@@ -21,34 +21,23 @@
  */
 import {
   buildDiff,
-  createClassifier,
-  type DiffModel,
   type Evidence,
   type FileChange,
   type GitHubDiffCheck,
-  type LayerRule,
   type PrPart,
   type Stack,
   type StackEdge,
   type StackIssue,
   type StackNode,
 } from "@strata/core";
-import {
-  branchTip,
-  commitTree,
-  diffText,
-  mergeBase,
-  readBlob,
-  replay,
-  treeOf,
-} from "../git/diff.js";
-import { judgeLayers, type LayerJudge } from "../layers/judge.js";
+import { branchTip, commitTree, diffText, mergeBase, replay, treeOf } from "../git/diff.js";
+import { buildWholeDiff, type WholeDiff, type WholeDiffOptions } from "../whole.js";
 import { buildProvenance } from "./provenance.js";
 
 export interface StackDiffs {
   parts: PrPart[];
   /** From where the stack left the trunk to the last PR placed. Null when no PR could be. */
-  whole: { from: string; to: string; diff: string; model: DiffModel } | null;
+  whole: WholeDiff | null;
   /** Replay conflicts. They belong with the stack's own issues. */
   issues: StackIssue[];
   /** The PRs the whole-stack diff covers, bottom first. */
@@ -57,13 +46,7 @@ export interface StackDiffs {
   layerNotes: string[];
 }
 
-export interface StackDiffOptions {
-  /** The repo's own layer rules, from its settings. */
-  repoRules?: readonly LayerRule[];
-  /** Asks Claude about files no rule matched. Only set when the repo allows it. */
-  judge?: LayerJudge | null;
-  signal?: AbortSignal;
-}
+export type StackDiffOptions = WholeDiffOptions;
 
 /** Where one PR's diff starts and ends, before it's read. */
 type Step = Pick<PrPart, "pr" | "how" | "from" | "to">;
@@ -111,29 +94,9 @@ export async function buildStackDiffs(
     end = to;
   }
 
-  // The repo's .gitattributes as the whole stack leaves it, so every diff is
-  // classified the same way however the work was split.
-  const top = end ?? stack.base;
-  const rules = {
-    repoRules: options.repoRules ?? [],
-    gitattributes: top ? await readBlob(gitDir, top, ".gitattributes") : null,
-  };
-  let classifier = createClassifier(rules);
-  let whole: StackDiffs["whole"] = null;
-  const layerNotes: string[] = [];
-  if (stack.base && end) {
-    const diff = await diffText(gitDir, stack.base, end);
-    let model = buildDiff(diff, { classifier });
-    if (options.judge) {
-      const { judged, notes } = await judgeLayers(model, options.judge, options.signal);
-      layerNotes.push(...notes);
-      if (judged.size > 0) {
-        classifier = createClassifier({ ...rules, judged });
-        model = buildDiff(diff, { classifier });
-      }
-    }
-    whole = { from: stack.base, to: end, diff, model };
-  }
+  // Classified with the repo's .gitattributes as the whole stack leaves it, so
+  // every diff is sorted the same way however the work was split.
+  const { whole, classifier, layerNotes } = await buildWholeDiff(gitDir, stack.base, end, options);
 
   const built: Array<Omit<PrPart, "provenance" | "summary">> = [];
   for (const step of steps) {
