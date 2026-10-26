@@ -63,4 +63,13 @@ describe("formatReport", () => {
     expect(text).toContain("\n  ! On the path.\n  - Summaries");
     expect(text).not.toContain("Elsewhere.");
   });
+
+  it("says which layers Claude chose", async () => {
+    const report = await analyze("acme/app#3");
+    const [file] = report.change.files;
+    if (file) {
+      file.layer = { layer: "docs", by: "llm", reason: "A note for #1", confidence: "medium" };
+    }
+    expect(formatReport(report)).toContain("    A b1-2.txt  +1 -0  (Claude: A note for #1)\n");
+  });
 });

@@ -290,11 +290,12 @@ export function fileFacts(file: FileChange): string[] {
   return facts;
 }
 
-/** Why the file is in its layer, said plainly enough to check. */
+/** Why the file is in its layer, said plainly enough to check, and who decided. */
 function layerFact(file: FileChange): string {
   const { layer } = file;
-  const guess = layer.confidence === "low" ? ", a guess" : "";
-  return `${LAYERS[layer.layer].title}: ${layer.reason}${guess}`;
+  const who =
+    layer.by === "llm" ? ", Claude's call" : layer.confidence === "low" ? ", a guess" : "";
+  return `${LAYERS[layer.layer].title}: ${layer.reason}${who}`;
 }
 
 /** Lines in hunks that aren't mechanical. */

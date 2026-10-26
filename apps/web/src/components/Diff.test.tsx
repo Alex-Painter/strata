@@ -106,6 +106,28 @@ describe("Files", () => {
     );
   });
 
+  it("says when Claude chose the layer", () => {
+    const { files, hunks } = buildDiff(adding("app/jobs/warm.py", "pass"), {
+      classifier: createClassifier({
+        judged: new Map([
+          [
+            "app/jobs/warm.py",
+            {
+              layer: "logic",
+              by: "llm",
+              reason: "A job that warms the cache",
+              confidence: "medium",
+            },
+          ],
+        ]),
+      }),
+    });
+    document.body.innerHTML = renderToStaticMarkup(<Files files={files} hunks={hunks} />);
+    expect(document.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
+      "Added · Logic: A job that warms the cache, Claude's call",
+    );
+  });
+
   it("collapses mechanical files with their reason, and leaves them out of the counts", () => {
     const page = render(
       [

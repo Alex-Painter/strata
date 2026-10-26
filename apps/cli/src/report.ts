@@ -53,8 +53,9 @@ export function formatReport(report: ChangeReport): string {
     const indent = group.title ? "    " : "  ";
     for (const file of group.files.slice(0, MAX_FILES - shown)) {
       const mechanical = file.mechanical ? `  (${file.mechanical.reason})` : "";
+      const judged = file.layer.by === "llm" ? `  (Claude: ${file.layer.reason})` : "";
       lines.push(
-        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${mechanical}`,
+        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${mechanical}${judged}`,
       );
       shown++;
     }
