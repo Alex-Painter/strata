@@ -62,7 +62,7 @@ Each repo can have its own settings, kept in Strata's data folder rather than in
 ```
 
 - `layerRules` run before Strata's own rules. `layer` is one of `data-model`, `api`, `logic`, `ui`, `tests`, `config`, `docs` or `other`, and `reason` is shown next to every file the rule matches.
-- `sendCodeToAnthropic` lets Strata send the paths and first changed lines of files no rule matched to the Anthropic API, so Claude can choose their layer. It also needs `ANTHROPIC_API_KEY`. Answers are cached in the data folder, so the same stack isn't asked about twice.
+- `sendCodeToAnthropic` lets Strata send the repo's code to the Anthropic API. Claude then chooses the layer of files no rule matched (from their paths and first changed lines), and writes the summary and the Guide's sections from the whole-stack diff and a summary of each PR from its own diff. It also needs `ANTHROPIC_API_KEY`. Answers are cached in the data folder, so the same stack isn't asked about twice. Without it, there's no summary and the Guide is Strata's own groups.
 
 ## GitHub sign-in
 
