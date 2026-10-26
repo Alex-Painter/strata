@@ -45,7 +45,9 @@ export function formatReport(report: ChangeReport): string {
     }
     lines.push("");
   } else if (change.revisions) {
-    lines.push(`${change.revisions.base.slice(0, 7)}...${change.revisions.head.slice(0, 7)}`, "");
+    const range = `${change.revisions.base.slice(0, 7)}...${change.revisions.head.slice(0, 7)}`;
+    // A range typed as short commit ids is its own title.
+    lines.push(...(range === change.title ? [] : [range]), "");
   }
 
   if (report.summary.length > 0) {
