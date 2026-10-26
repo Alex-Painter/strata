@@ -1,6 +1,6 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   type ChangeReport,
   canonicalReport,
@@ -11,12 +11,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createEngine } from "./engine.js";
 import { treeOf } from "./git/diff.js";
 import { gitOk } from "./git/run.js";
+import type { LayerJudge, LayerRequest } from "./layers/judge.js";
+import { settingsPath } from "./settings.js";
 import { type FeatureShape, featureShape, type ShapeRepo } from "./testing/feature-shapes.js";
 
 /**
  * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1): one feature built
  * five ways (see testing/feature-shapes.ts) must give the same whole-stack
- * view, while "How it arrived" shows each split as it is.
+ * view, while "How it arrived" shows each split as it is. The repo lets
+ * Claude sort files no rule matched, through a fake that records what it's
+ * asked, so the questions are held to the same standard.
  */
 const SHAPES: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "fork"];
 
@@ -24,6 +28,7 @@ interface Analysed {
   shape: ShapeRepo;
   report: ChangeReport;
   gitDir: string;
+  asked: LayerRequest[];
 }
 
 const analysed = new Map<FeatureShape, Analysed>();
@@ -33,16 +38,29 @@ beforeAll(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "strata-shapes-"));
   for (const name of SHAPES) {
     const shape = await featureShape(name);
+    const settings = settingsPath(join(dataDir, name), "acme/app");
+    await mkdir(dirname(settings), { recursive: true });
+    await writeFile(settings, JSON.stringify({ sendCodeToAnthropic: true }));
+    const asked: LayerRequest[] = [];
+    const layerJudge: LayerJudge = async (request) => {
+      asked.push(request);
+      return request.files.map((file) => ({
+        path: file.path,
+        layer: "logic",
+        reason: `Service code in ${file.path}`,
+      }));
+    };
     const engine = createEngine({
       dataDir: join(dataDir, name),
       githubPort: shape.github,
       gitRemote: () => shape.remote.dir,
       now: () => new Date(Date.UTC(2026, 9, 2)),
+      layerJudge,
     });
     const input = parseChangeInput(`acme/app#${shape.tip}`);
     const report = await engine.analyzeChange(input);
     const { gitDir } = await engine.resolveChange(input);
-    analysed.set(name, { shape, report, gitDir });
+    analysed.set(name, { shape, report, gitDir, asked });
   }
 }, 60_000);
 
@@ -96,6 +114,23 @@ describe("shape invariance", () => {
       ["docs", ["docs/forecasts.md"], 1, 0],
     ]);
     for (const name of same) expect(layers(name), name).toEqual(layers("one-pr"));
+  });
+
+  it("asks Claude the same question however the feature was split", () => {
+    const one = get("one-pr");
+    expect(one.asked).toHaveLength(1);
+    expect(one.asked[0]?.files.map((file) => file.path)).toEqual(["app/services/forecasts.py"]);
+    for (const name of same) expect(get(name).asked, name).toEqual(one.asked);
+    const services = (name: FeatureShape) =>
+      get(name).report.change.files.find((file) => file.path === "app/services/forecasts.py");
+    expect(services("one-pr")?.layer).toMatchObject({ by: "llm", layer: "logic" });
+    // Each part's copy of the file gets the whole stack's answer.
+    for (const name of same) {
+      for (const part of get(name).report.parts) {
+        const file = part.files.find((f) => f.path === "app/services/forecasts.py");
+        if (file) expect(file.layer, `${name} #${part.pr}`).toEqual(services("one-pr")?.layer);
+      }
+    }
   });
 
   it("gives identical canonical reports", () => {

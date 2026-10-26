@@ -3,8 +3,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseChangeInput } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { EngineConfig } from "../api.js";
 import { createEngine } from "../engine.js";
 import type { GitHubPort } from "../github/port.js";
+import type { LayerJudge, LayerRequest } from "../layers/judge.js";
 import { settingsPath } from "../settings.js";
 import { demoRepo } from "../testing/demo-repo.js";
 import { fakeGitHub, prNode } from "../testing/fake-github.js";
@@ -21,13 +23,20 @@ afterEach(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 
-const analyze = (github: GitHubPort, input: string) =>
+const analyze = (github: GitHubPort, input: string, config: Partial<EngineConfig> = {}) =>
   createEngine({
     dataDir,
     githubPort: github,
     gitRemote: () => remote.dir,
     now: () => new Date(Date.UTC(2026, 9, 2)),
+    ...config,
   }).analyzeChange(parseChangeInput(input));
+
+async function writeSettings(settings: object) {
+  const path = settingsPath(dataDir, "acme/app");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify(settings));
+}
 
 const lines = (...values: string[]) => `${values.join("\n")}\n`;
 
@@ -167,16 +176,9 @@ describe("each PR's diff", () => {
     const h2 = await remote.write("b2", { "uv.lock": lines("version = 2") }, "b1");
     await remote.holdPr(1, h1);
     await remote.holdPr(2, h2);
-    const settings = settingsPath(dataDir, "acme/app");
-    await mkdir(dirname(settings), { recursive: true });
-    await writeFile(
-      settings,
-      JSON.stringify({
-        layerRules: [
-          { id: "billing", layer: "data-model", paths: ["billing/**"], reason: "Money" },
-        ],
-      }),
-    );
+    await writeSettings({
+      layerRules: [{ id: "billing", layer: "data-model", paths: ["billing/**"], reason: "Money" }],
+    });
     const github = fakeGitHub("acme/app", [prNode(1, h1), prNode(2, h2, { baseRefName: "b1" })]);
     const report = await analyze(github, "acme/app#2");
 
@@ -198,5 +200,79 @@ describe("each PR's diff", () => {
       expect(file.layer).toEqual(byPath.get(file.path)?.layer);
       expect(file.mechanical).toEqual(byPath.get(file.path)?.mechanical);
     }
+  });
+
+  it("asks Claude about the whole stack's unmatched files, only when the repo allows it", async () => {
+    const h1 = await remote.write(
+      "b1",
+      {
+        "app/billing.py": lines("class Invoice: ..."),
+        "app/models/user.py": lines("class User: ..."),
+      },
+      "main",
+    );
+    const h2 = await remote.write(
+      "b2",
+      { "app/billing.py": lines("class Invoice:", "    total = 0") },
+      "b1",
+    );
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2);
+    const github = fakeGitHub("acme/app", [prNode(1, h1), prNode(2, h2, { baseRefName: "b1" })]);
+    const requests: LayerRequest[] = [];
+    const layerJudge: LayerJudge = async (request) => {
+      requests.push(request);
+      return request.files.map((file) => ({
+        path: file.path,
+        layer: "data-model",
+        reason: "Defines the invoice model",
+      }));
+    };
+
+    const off = await analyze(github, "acme/app#2", { layerJudge });
+    expect(requests).toEqual([]);
+    expect(off.change.files.find((f) => f.path === "app/billing.py")?.layer.by).toBe("default");
+    expect(off.notes).toContain(
+      "Strata guessed the layer of 1 file. To place it, add layer rules or turn on " +
+        "sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
+    );
+
+    await writeSettings({ sendCodeToAnthropic: true });
+    const on = await analyze(github, "acme/app#2", { layerJudge });
+    // Only the whole-stack diff is asked about, so how it was split can't matter.
+    expect(requests).toEqual([
+      {
+        known: [{ path: "app/models/user.py", layer: "data-model" }],
+        files: [
+          {
+            path: "app/billing.py",
+            status: "added",
+            lines: ["+class Invoice:", "+    total = 0"],
+          },
+        ],
+      },
+    ]);
+    const judged = {
+      layer: "data-model",
+      by: "llm",
+      reason: "Defines the invoice model",
+      confidence: "medium",
+    };
+    expect(on.change.files.find((f) => f.path === "app/billing.py")?.layer).toEqual(judged);
+    for (const part of on.parts) {
+      expect(part.files.find((f) => f.path === "app/billing.py")?.layer).toEqual(judged);
+    }
+    expect(on.change.layers.map((group) => group.layer)).toEqual(["data-model"]);
+    expect(on.notes.some((note) => note.includes("guessed"))).toBe(false);
+  });
+
+  it("says when the repo allows Claude but there's no key", async () => {
+    const h1 = await remote.write("b1", { "app/billing.py": lines("x = 1") }, "main");
+    await remote.holdPr(1, h1);
+    await writeSettings({ sendCodeToAnthropic: true });
+    const report = await analyze(fakeGitHub("acme/app", [prNode(1, h1)]), "acme/app#1");
+    expect(report.notes).toContain(
+      "Strata guessed the layer of 1 file. This repo lets Claude sort it, but Strata has no Anthropic API key.",
+    );
   });
 });

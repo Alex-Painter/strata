@@ -1,12 +1,14 @@
+import { join } from "node:path";
 import { type ChangeInput, linkedGroups, type PrIndex, type RepoRef } from "@strata/core";
 import type { CreateEngine, EngineConfig } from "./api.js";
 import { NotImplementedError } from "./errors.js";
 import { RepoCache } from "./git/cache.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
-import { createLlm } from "./llm.js";
+import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
+import { createLlm, type LlmSettings } from "./llm.js";
 import { serialize } from "./lock.js";
-import { loadRepoSettings } from "./settings.js";
+import { loadRepoSettings, type RepoSettings } from "./settings.js";
 import {
   resolveStackChange,
   type StackInput,
@@ -55,10 +57,12 @@ export const createEngine: CreateEngine = (config) => {
         const resolved = await resolveStackInput(config, stackInput);
         options.signal?.throwIfAborted();
         options.onProgress?.("Building the diffs");
+        const settings = await loadRepoSettings(config.dataDir, repoName(stackInput));
         return stackReport(resolved, options, {
           engineVersion: ENGINE_VERSION,
           startedAt,
-          settings: await loadRepoSettings(config.dataDir, repoName(stackInput)),
+          settings,
+          judge: layerJudge(config, llm, settings),
         });
       });
     },
@@ -74,6 +78,17 @@ export const createEngine: CreateEngine = (config) => {
     },
   };
 };
+
+/** Claude sorts unmatched files only for repos whose settings allow their code to be sent. */
+function layerJudge(
+  config: EngineConfig,
+  llm: LlmSettings | null,
+  settings: RepoSettings,
+): LayerJudge | null {
+  if (!settings.sendCodeToAnthropic) return null;
+  if (config.layerJudge) return config.layerJudge;
+  return llm ? createLlmLayerJudge(llm, join(config.dataDir, "llm-cache", "layers")) : null;
+}
 
 function githubPort(config: EngineConfig): GitHubPort {
   if (config.githubPort) return config.githubPort;

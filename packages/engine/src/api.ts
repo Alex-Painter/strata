@@ -15,6 +15,7 @@ import type {
   Stack,
 } from "@strata/core";
 import type { GitHubPort } from "./github/port.js";
+import type { LayerJudge } from "./layers/judge.js";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
@@ -36,6 +37,12 @@ export interface EngineConfig {
   now?: () => Date;
   /** Without a key, LLM steps are skipped and the report says so. */
   anthropicApiKey?: string;
+  /**
+   * Replaces the Anthropic-backed judge of layers for files no rule matched;
+   * tests pass a fake. Either way it's only asked for repos whose settings
+   * turn on sendCodeToAnthropic.
+   */
+  layerJudge?: LayerJudge;
   /** Defaults to DEFAULT_MODEL. */
   model?: string;
   log?: (message: string) => void;

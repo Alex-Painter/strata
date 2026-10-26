@@ -4,6 +4,7 @@ import { createClassifier } from "./layers/classify.js";
 import { parseGitAttributes } from "./layers/gitattributes.js";
 import { mechanicalFile, mechanicalHunk } from "./layers/mechanical.js";
 import { createPathClassifier } from "./layers/rules.js";
+import type { LayerAssignment } from "./model/change.js";
 import { compareLayers, LAYER_IDS, LAYERS } from "./model/layers.js";
 
 describe("layer definitions", () => {
@@ -151,6 +152,36 @@ describe(".gitattributes", () => {
     expect(classifier.mechanicalFile(client as ParsedFile)).toEqual({
       kind: "generated",
       reason: "Marked linguist-generated in .gitattributes",
+    });
+  });
+});
+
+describe("Claude's judgements", () => {
+  it("apply only where the rules have nothing better than a guess", () => {
+    const judgement: LayerAssignment = {
+      layer: "data-model",
+      by: "llm",
+      reason: "Defines the invoice table",
+      confidence: "medium",
+    };
+    const classifier = createClassifier({
+      judged: new Map([
+        ["app/invoices.py", judgement],
+        ["app/routers/x.py", { ...judgement, layer: "logic" }],
+      ]),
+    });
+    const [guessed, ruled, unasked] = parseDiff(
+      [
+        diffAdding("app/invoices.py", "class Invoice: ..."),
+        diffAdding("app/routers/x.py", "router = None"),
+        diffAdding("app/other.py", "x = 1"),
+      ].join(""),
+    );
+    expect(classifier.layer(guessed as ParsedFile)).toEqual(judgement);
+    expect(classifier.layer(ruled as ParsedFile)).toMatchObject({ layer: "api", by: "rule" });
+    expect(classifier.layer(unasked as ParsedFile)).toMatchObject({
+      layer: "logic",
+      by: "default",
     });
   });
 });

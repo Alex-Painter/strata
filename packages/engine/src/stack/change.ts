@@ -1,7 +1,8 @@
 /**
  * Turns a stack input into a Change: find the stack, pick the path, build
- * each PR's diff and the whole-stack diff, and describe it. Layers and
- * summaries come in later slices, so the report says it doesn't have them yet.
+ * each PR's diff and the whole-stack diff, sort them into layers, and
+ * describe it. Summaries come in a later slice, so the report says it doesn't
+ * have them yet.
  */
 import {
   type ChangeHint,
@@ -17,6 +18,7 @@ import {
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
+import type { LayerJudge } from "../layers/judge.js";
 import type { RepoSettings } from "../settings.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
@@ -85,10 +87,18 @@ export async function resolveStackChange(
 export async function stackReport(
   resolved: ResolvedChange & { stack: Stack },
   options: AnalyzeOptions,
-  meta: { engineVersion: string; startedAt: Date; settings: RepoSettings },
+  meta: {
+    engineVersion: string;
+    startedAt: Date;
+    settings: RepoSettings;
+    /** Null unless the repo's settings let its code go to Claude and there's a key. */
+    judge: LayerJudge | null;
+  },
 ): Promise<ChangeReport> {
   const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir, {
     repoRules: meta.settings.layerRules,
+    judge: meta.judge,
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   const stack: Stack = {
     ...resolved.stack,
@@ -119,7 +129,12 @@ export async function stackReport(
     summary: [],
     layerSummaries: [],
     diagrams: [],
-    notes: [...diffNotes(stack, diffs), "Summaries aren't computed yet."],
+    notes: [
+      ...diffNotes(stack, diffs),
+      ...diffs.layerNotes,
+      ...guessNotes(resolved, diffs, meta),
+      "Summaries aren't computed yet.",
+    ],
     raw: { diff: whole?.diff ?? "" },
     analysis: {
       engineVersion: meta.engineVersion,
@@ -150,6 +165,28 @@ function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
     ];
   }
   return [];
+}
+
+/** Says how to place files whose layer is only a guess, when Claude wasn't asked. */
+function guessNotes(
+  resolved: ResolvedChange,
+  diffs: StackDiffs,
+  meta: { settings: RepoSettings; judge: LayerJudge | null },
+): string[] {
+  if (meta.judge) return [];
+  const guessed = diffs.whole?.model.files.filter((file) => file.layer.by === "default") ?? [];
+  if (guessed.length === 0) return [];
+  const one = guessed.length === 1;
+  const files = one ? "the layer of 1 file" : `the layers of ${guessed.length} files`;
+  if (meta.settings.sendCodeToAnthropic) {
+    return [
+      `Strata guessed ${files}. This repo lets Claude sort ${one ? "it" : "them"}, but Strata has no Anthropic API key.`,
+    ];
+  }
+  return [
+    `Strata guessed ${files}. To place ${one ? "it" : "them"}, add layer rules or turn on ` +
+      `sendCodeToAnthropic in settings/${describeRepo(resolved.repo)}.json in Strata's data folder.`,
+  ];
 }
 
 function describePrs(numbers: number[]): string {

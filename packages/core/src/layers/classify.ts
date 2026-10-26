@@ -1,8 +1,10 @@
 /**
  * Puts each file of a diff in a layer and says what's mechanical. In order:
  * the repo's own rules, the repo's .gitattributes, Strata's default rules,
- * then a low-confidence fallback by extension. Everything here depends only on
- * paths, diff lines and the repo's settings, never on how the work was split.
+ * Claude's judgement for files no rule matched (when the repo allows it), then
+ * a low-confidence fallback by extension. Everything here depends only on
+ * paths, diff lines, the repo's settings and those judgements, never on how
+ * the work was split.
  */
 import type { ParsedFile, ParsedHunk } from "../diff/parse.js";
 import type { LayerAssignment, MechanicalVerdict } from "../model/change.js";
@@ -22,6 +24,11 @@ export interface ClassifierOptions {
   repoRules?: readonly LayerRule[];
   /** The text of the repo's root .gitattributes, if it has one. */
   gitattributes?: string | null;
+  /**
+   * Layers Claude gave for files no rule matched, by path. They're only used
+   * where the rules have nothing better than a guess.
+   */
+  judged?: ReadonlyMap<string, LayerAssignment>;
 }
 
 export function createClassifier(options: ClassifierOptions = {}): Classifier {
@@ -43,7 +50,9 @@ export function createClassifier(options: ClassifierOptions = {}): Classifier {
           confidence: "high",
         };
       }
-      return byDefault(file.path);
+      const assigned = byDefault(file.path);
+      if (assigned.by === "default") return options.judged?.get(file.path) ?? assigned;
+      return assigned;
     },
     mechanicalFile: (file) => mechanicalFile(file, attributes(file.path)),
     mechanicalHunk,

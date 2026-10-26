@@ -13,6 +13,11 @@
  *
  * The chain's commits only differ from a real restack in their author, date
  * and message, so the whole-stack diff is the same however the work was split.
+ *
+ * Every diff is then sorted into layers by one classifier, built from the
+ * whole stack: the repo's rules, its .gitattributes at the top of the stack,
+ * and, when the repo allows it, Claude's layers for the whole-stack files no
+ * rule matched.
  */
 import {
   buildDiff,
@@ -37,6 +42,7 @@ import {
   replay,
   treeOf,
 } from "../git/diff.js";
+import { judgeLayers, type LayerJudge } from "../layers/judge.js";
 
 export interface StackDiffs {
   parts: PrPart[];
@@ -46,11 +52,16 @@ export interface StackDiffs {
   issues: StackIssue[];
   /** The PRs the whole-stack diff covers, bottom first. */
   placed: number[];
+  /** Anything the report should say about how files were sorted into layers. */
+  layerNotes: string[];
 }
 
 export interface StackDiffOptions {
   /** The repo's own layer rules, from its settings. */
   repoRules?: readonly LayerRule[];
+  /** Asks Claude about files no rule matched. Only set when the repo allows it. */
+  judge?: LayerJudge | null;
+  signal?: AbortSignal;
 }
 
 /** Where one PR's diff starts and ends, before it's read. */
@@ -102,10 +113,26 @@ export async function buildStackDiffs(
   // The repo's .gitattributes as the whole stack leaves it, so every diff is
   // classified the same way however the work was split.
   const top = end ?? stack.base;
-  const classifier = createClassifier({
+  const rules = {
     repoRules: options.repoRules ?? [],
     gitattributes: top ? await readBlob(gitDir, top, ".gitattributes") : null,
-  });
+  };
+  let classifier = createClassifier(rules);
+  let whole: StackDiffs["whole"] = null;
+  const layerNotes: string[] = [];
+  if (stack.base && end) {
+    const diff = await diffText(gitDir, stack.base, end);
+    let model = buildDiff(diff, { classifier });
+    if (options.judge) {
+      const { judged, notes } = await judgeLayers(model, options.judge, options.signal);
+      layerNotes.push(...notes);
+      if (judged.size > 0) {
+        classifier = createClassifier({ ...rules, judged });
+        model = buildDiff(diff, { classifier });
+      }
+    }
+    whole = { from: stack.base, to: end, diff, model };
+  }
 
   const parts: PrPart[] = [];
   for (const step of steps) {
@@ -120,13 +147,7 @@ export async function buildStackDiffs(
       node.pr.state === "open" ? await compareWithGitHub(gitDir, stack, node, edge, part) : null;
     parts.push({ ...part, github });
   }
-
-  let whole: StackDiffs["whole"] = null;
-  if (stack.base && end) {
-    const diff = await diffText(gitDir, stack.base, end);
-    whole = { from: stack.base, to: end, diff, model: buildDiff(diff, { classifier }) };
-  }
-  return { parts, whole, issues, placed };
+  return { parts, whole, issues, placed, layerNotes };
 }
 
 function conflictIssue(
