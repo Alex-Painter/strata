@@ -11,7 +11,4 @@ coverage/
 .strata/
 *.sqlite
 *.sqlite-*
-# CLI output written into the repo root by default.
-strata-report*.html
-strata-report*.json
 .DS_Store

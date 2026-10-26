@@ -57,6 +57,25 @@ describe("formatReport", () => {
     );
   });
 
+  it("prints a range as its whole diff, with no PRs or matrix", async () => {
+    expect(formatReport(await analyze("acme/app@main...b3"))).toBe(
+      [
+        "acme/app: main...b3",
+        `${demo.m0.slice(0, 7)}...${demo.heads[3]?.slice(0, 7)}`,
+        "",
+        "Whole diff: 3 files, +3 -0",
+        "  Docs",
+        "    A b1-2.txt  +1 -0",
+        "    A b2-3.txt  +1 -0",
+        "    A b3-4.txt  +1 -0",
+        "",
+        "  - There's no summary, and the Guide shows Strata's own groups. To have Claude write " +
+          "them, turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
+        "",
+      ].join("\n"),
+    );
+  });
+
   it("lists the stack's issues on the path only", async () => {
     const report = await analyze("acme/app#3");
     report.stack?.issues.push(

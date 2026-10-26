@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCommand, UsageError } from "./args.js";
+import { parseCommand, resolvePaths, UsageError } from "./args.js";
 
 describe("parseCommand", () => {
   it("shows help with no arguments or -h", () => {
@@ -26,8 +26,17 @@ describe("parseCommand", () => {
       input: "main...feature",
       repoPath: "../x",
       sources: ["spec.md", "ticket.md"],
-      out: "strata-report.html",
       json: "r.json",
+    });
+  });
+
+  it("leaves the input and the output paths unset when they aren't given", () => {
+    expect(parseCommand(["analyze"])).toEqual({ kind: "analyze", sources: [] });
+    expect(parseCommand(["analyze", "--repo-path", "~/w/app", "--out", "p.html"])).toEqual({
+      kind: "analyze",
+      repoPath: "~/w/app",
+      sources: [],
+      out: "p.html",
     });
   });
 
@@ -43,7 +52,6 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["review", "a/b#1"])).toThrow(UsageError);
     expect(() => parseCommand(["analyze", "a/b#1", "--nope"])).toThrow(UsageError);
     expect(() => parseCommand(["analyze", "a/b#1", "extra"])).toThrow(UsageError);
-    expect(() => parseCommand(["analyze"])).toThrow(/needs an <input>/);
   });
 
   it("parses stacks with a checkout and JSON output", () => {
@@ -57,5 +65,21 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["stacks"])).toThrow(/needs an <owner\/repo>/);
     expect(() => parseCommand(["stacks", "acme/app#12"])).toThrow(/owner\/repo/);
     expect(() => parseCommand(["stacks", "acme/app", "--out", "x.html"])).toThrow(UsageError);
+  });
+
+  it("makes paths absolute against the folder the CLI was started in", () => {
+    const command = parseCommand(["analyze", "a/b#1", "--repo-path", "../app", "--out", "p.html"]);
+    expect(resolvePaths(command, "/home/me/work")).toEqual({
+      kind: "analyze",
+      input: "a/b#1",
+      sources: [],
+      repoPath: "/home/me/app",
+      out: "/home/me/work/p.html",
+    });
+    expect(resolvePaths(parseCommand(["stacks", "a/b", "--json", "/tmp/s.json"]), "/x")).toEqual({
+      kind: "stacks",
+      repo: "a/b",
+      json: "/tmp/s.json",
+    });
   });
 });

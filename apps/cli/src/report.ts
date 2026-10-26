@@ -1,8 +1,9 @@
 /**
  * Prints a report in brief, the way `strata analyze` shows it: the path, each
  * PR's own diff and summary, the whole stack's summary and Guide, its files by
- * layer, the layer by PR matrix, then issues and notes. Each sentence ends
- * with the hunks it rests on, as path:line.
+ * layer, the layer by PR matrix, then issues and notes. A range has no PRs,
+ * so it's the whole diff alone. Each sentence ends with the hunks it rests
+ * on, as path:line.
  */
 import {
   type ChangeReport,
@@ -43,6 +44,8 @@ export function formatReport(report: ChangeReport): string {
       for (const claim of part.summary) lines.push(`  ${" ".repeat(width)}  ${sentence(claim)}`);
     }
     lines.push("");
+  } else if (change.revisions) {
+    lines.push(`${change.revisions.base.slice(0, 7)}...${change.revisions.head.slice(0, 7)}`, "");
   }
 
   if (report.summary.length > 0) {
@@ -61,10 +64,11 @@ export function formatReport(report: ChangeReport): string {
     lines.push("");
   }
 
+  const whole = stack ? "Whole stack" : "Whole diff";
   lines.push(
     change.revisions
-      ? `Whole stack: ${fileCount(change.files)}, ${totals(change.files)}`
-      : "No whole-stack diff.",
+      ? `${whole}: ${fileCount(change.files)}, ${totals(change.files)}`
+      : `No ${whole.toLowerCase()}.`,
   );
   const byPath = new Map(change.files.map((file) => [file.path, file]));
   // By layer once classified; a report without layers lists files by path.
