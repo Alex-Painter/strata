@@ -50,7 +50,12 @@ Each repo can have its own settings, kept in Strata's data folder rather than in
 ```json
 {
   "layerRules": [
-    { "id": "billing", "layer": "data-model", "paths": ["billing/**"], "reason": "Billing is always inspected" }
+    {
+      "id": "billing",
+      "layer": "data-model",
+      "paths": ["billing/**"],
+      "reason": "Billing is always inspected"
+    }
   ],
   "sendCodeToAnthropic": true
 }
