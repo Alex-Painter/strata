@@ -50,6 +50,42 @@ export async function readBlob(
   return code === 0 ? stdout : null;
 }
 
+/**
+ * The commit behind each line of `path`, by line number from 1, over the
+ * commits from `from` (exclusive) to `to`. Lines older than `from` get `from`.
+ *
+ * Forward, the lines are `path` at `to`, each with the commit that wrote it.
+ * With `reverse`, they're `path` at `from`, each with the last commit it was
+ * still there in: `to` if it survived, or the commit before the one that
+ * changed or removed it.
+ */
+export async function blame(
+  gitDir: string,
+  from: string,
+  to: string,
+  path: string,
+  options: { reverse?: boolean } = {},
+): Promise<string[]> {
+  const out = await gitOk(gitDir, [
+    ...NO_ATTRIBUTES,
+    "blame",
+    "--porcelain",
+    "--no-textconv",
+    ...(options.reverse ? ["--reverse"] : []),
+    `${from}..${to}`,
+    "--",
+    path,
+  ]);
+  const commits: string[] = [];
+  for (const line of out.split("\n")) {
+    // Each line of the file is a header (commit, line before, line now),
+    // optional details, then the line itself after a tab.
+    const header = /^([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)/.exec(line);
+    if (header) commits[Number(header[2])] = header[1] as string;
+  }
+  return commits;
+}
+
 /** A branch's tip in the cache, or null when it isn't there. */
 export async function branchTip(gitDir: string, branch: string): Promise<string | null> {
   const { code, stdout } = await git(gitDir, [

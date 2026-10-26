@@ -205,6 +205,26 @@ export interface PrPart {
   hunks: Hunk[];
   /** For open PRs: how GitHub's diff of the PR compares. Null when it can't be told. */
   github: GitHubDiffCheck | null;
+  /** Where this PR's lines went. Null for PRs off Strata's chain (`apart`, `unknown`). */
+  provenance: PartProvenance | null;
+}
+
+/**
+ * Where a PR's lines went, from git blame over Strata's own chain of commits.
+ * Like the rest of a part, it's about how the work arrived, so it never feeds
+ * the whole-stack view. Mechanical and binary files aren't traced.
+ */
+export interface PartProvenance {
+  /**
+   * Whole-stack hunks with lines from this PR: lines it added that are still
+   * there at the top of the stack, and trunk lines it removed.
+   */
+  inWhole: Array<{ hunkId: string; added: number; removed: number }>;
+  /**
+   * This PR's own hunks with added lines that a later PR on the path changed
+   * or removed. Lines a later PR only adds next to them don't count.
+   */
+  revisedLater: Array<{ hunkId: string; by: number; lines: number }>;
 }
 
 /**

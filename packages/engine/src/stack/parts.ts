@@ -43,6 +43,7 @@ import {
   treeOf,
 } from "../git/diff.js";
 import { judgeLayers, type LayerJudge } from "../layers/judge.js";
+import { buildProvenance } from "./provenance.js";
 
 export interface StackDiffs {
   parts: PrPart[];
@@ -134,7 +135,7 @@ export async function buildStackDiffs(
     whole = { from: stack.base, to: end, diff, model };
   }
 
-  const parts: PrPart[] = [];
+  const built: Array<Omit<PrPart, "provenance">> = [];
   for (const step of steps) {
     const node = nodes.get(step.pr) as StackNode;
     const { files, hunks } =
@@ -145,8 +146,22 @@ export async function buildStackDiffs(
     const edge = edges.get(step.pr) ?? null;
     const github =
       node.pr.state === "open" ? await compareWithGitHub(gitDir, stack, node, edge, part) : null;
-    parts.push({ ...part, github });
+    built.push({ ...part, github });
   }
+
+  const chain = steps.flatMap((step) =>
+    (step.how === "direct" || step.how === "replayed") && step.to
+      ? [{ pr: step.pr, commit: step.to }]
+      : [],
+  );
+  const provenance =
+    stack.base && whole
+      ? await buildProvenance(gitDir, stack.base, chain, whole.model, built)
+      : new Map();
+  const parts: PrPart[] = built.map((part) => ({
+    ...part,
+    provenance: provenance.get(part.pr) ?? null,
+  }));
   return { parts, whole, issues, placed, layerNotes };
 }
 
@@ -184,7 +199,7 @@ async function compareWithGitHub(
   stack: Stack,
   node: StackNode,
   edge: StackEdge | null,
-  part: Omit<PrPart, "github">,
+  part: Omit<PrPart, "github" | "provenance">,
 ): Promise<GitHubDiffCheck | null> {
   if (part.how === "unknown") return null;
   const { pr } = node;
@@ -234,7 +249,7 @@ function differsBecause(
   stack: Stack,
   node: StackNode,
   edge: StackEdge | null,
-  part: Omit<PrPart, "github">,
+  part: Omit<PrPart, "github" | "provenance">,
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;

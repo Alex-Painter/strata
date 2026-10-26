@@ -96,16 +96,14 @@ const PART_3 = {
   ),
 };
 
-/** The fix for #2's mistake, and the doc. */
+/** The fix for #2's mistake, which rewrites #2's last line, and the doc. */
 const PART_4 = {
   "app/services/forecasts.py": lines(
     "from app.models.account import Account",
     "",
     "",
     "def forecast_for(account: Account) -> list[float]:",
-    "    if not account.forecast_enabled:",
-    "        return []",
-    "    return [0.0] * 12",
+    "    return [0.0] * 12 if account.forecast_enabled else []",
   ),
   "docs/forecasts.md": lines(
     "# Forecasts",

@@ -16,8 +16,9 @@ import type { PrPart, Stack } from "./stack.js";
  * 2: the stack, and verdict, ledger and findings became optional.
  * 3: each PR's own diff, and the whole-stack diff as the Change's files.
  * 4: layers and mechanical verdicts on every file and hunk.
+ * 5: where each PR's lines went (PrPart.provenance).
  */
-export const REPORT_SCHEMA_VERSION = 4;
+export const REPORT_SCHEMA_VERSION = 5;
 
 export type VerdictStatus =
   /** A gate failed or a blocker finding exists. */
