@@ -6,16 +6,16 @@ See [SPEC.md](SPEC.md) for the product and [docs/architecture.md](docs/architect
 
 ## Status
 
-Scaffolding for milestone 1. Sign-in, the database, the web shell and the deploy setup work; the analysis engine and most API routes are stubs that answer "not implemented yet".
+Milestone 1, the stack view, is built and checked against fixtures (see [docs/architecture.md](docs/architecture.md#milestone-1-the-stack-view)); it still needs checking on a real repo. Context sources, chat and ranges in the web app answer "not implemented yet".
 
 ## Layout
 
 ```
 packages/core     Domain model and shared types (Change, layers, anchors, report, chat, API)
-packages/engine   Analysis engine contract; stubbed for now
+packages/engine   Analysis engine: PR index, git cache, stacks, diffs, layers, summaries
 apps/server       Hono API: GitHub sign-in, sessions, SQLite, serves the web build
 apps/web          Vite + React single-page app
-apps/cli          `strata` command that will write a self-contained review page
+apps/cli          `strata` command: prints a stack or range and writes a self-contained review page
 ```
 
 ## Quick start
@@ -42,6 +42,24 @@ Open http://localhost:5173. With `DEV_AUTH_BYPASS=1` you're signed in as `DEV_GI
 | `pnpm format`                              | Biome with fixes applied                                           |
 | `pnpm --filter @strata/server db:generate` | Generates a migration after editing `apps/server/src/db/schema.ts` |
 | `pnpm --filter @strata/cli start --help`   | Runs the CLI                                                       |
+
+## The CLI
+
+```sh
+GITHUB_TOKEN="$(gh auth token)" pnpm --filter @strata/cli start analyze 'owner/repo#123' --repo-path ~/work/repo
+```
+
+`analyze` takes a PR, a branch (`owner/repo:feature/x`), a chain (`owner/repo#12,13,14`) or a range (`owner/repo@main...feature`). With no input, it's the stack around the branch checked out in `--repo-path`, or in the folder you run it from. It prints the stack in brief, then writes the review page and the report as JSON to `reports/<owner>/<name>/` in the data folder (`~/.strata`, or `--data-dir`); `--out` and `--json` choose other paths. Strata won't write inside a git checkout, so a page of work code can't be committed by accident. The page is the web app's static build with the report in it, so build that first: `pnpm --filter @strata/web build`.
+
+`strata stacks owner/repo` lists a repo's stacks. Both commands only read a checkout; Strata keeps its own clone in the data folder.
+
+To check that a real stack gives the same whole-stack view as the same code given as a plain range:
+
+```sh
+GITHUB_TOKEN="$(gh auth token)" pnpm --filter @strata/cli exec tsx scripts/stack-vs-range.ts 'owner/repo#123' --repo-path ~/work/repo
+```
+
+It prints `Same: the canonical reports are equal.` and exits 0, or lists where they differ (places only, never code) and exits 1.
 
 ## Repo settings
 
