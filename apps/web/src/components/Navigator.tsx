@@ -1,11 +1,12 @@
 import type { ChangeReport, StackSummary } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { countPrs } from "../lib/format";
+import { layerAnchor } from "./Diff";
 import { CopyMermaid, StackMap } from "./StackMap";
 
 /**
  * The rail: the whole stack, then the stack map, where choosing a PR scopes
- * the panes to it. Layers join it once the diff is analysed.
+ * the panes to it. For the whole stack, its layers link to their files.
  */
 export function Navigator({
   report,
@@ -52,21 +53,27 @@ export function Navigator({
           </div>
         </>
       )}
-      {report && report.change.layers.length > 0 && (
-        <div className="border-t border-line p-2">
+      {report && scope === null && report.change.layers.length > 0 && (
+        <section aria-label="Layers" className="border-t border-line p-2">
           <div className="px-2 py-1 text-xs font-medium tracking-wide text-muted uppercase">
             Layers
           </div>
           {report.change.layers.map((group) => (
-            <div
+            <a
               key={group.layer}
-              className="flex justify-between rounded px-2 py-1 hover:bg-raised"
+              href={`#${layerAnchor(group.layer)}`}
+              className="flex items-baseline gap-2 rounded px-2 py-1 hover:bg-raised"
             >
-              <span>{LAYERS[group.layer].title}</span>
+              <span className="flex-1">{LAYERS[group.layer].title}</span>
+              {LAYERS[group.layer].inspect && (
+                <span className="text-[11px] text-warn" title="Inspect these changes closely.">
+                  Inspect
+                </span>
+              )}
               <span className="text-muted">{group.files.length}</span>
-            </div>
+            </a>
           ))}
-        </div>
+        </section>
       )}
     </nav>
   );

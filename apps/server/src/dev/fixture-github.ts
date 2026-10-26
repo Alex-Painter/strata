@@ -17,8 +17,8 @@ import { demoRepo, prNode, StackRepo } from "@strata/engine/testing";
 const remote = await StackRepo.create();
 const demo = await demoRepo(remote);
 
-// One more stack, with review and CI states and some code to read: #10 is
-// behind #9, and #11 is a draft on top.
+// One more stack, with review and CI states and some code to read across
+// several layers: #10 is behind #9, and #11 is a draft on top.
 const lines = (...values: string[]) => `${values.join("\n")}\n`;
 await remote.write(
   "b9",
@@ -31,6 +31,13 @@ await remote.write(
       "",
       "def cache_key(account_id: str) -> str:",
       '    return f"forecast:{account_id}"',
+    ),
+    "migrations/0042_forecast_cache.sql": lines(
+      "create table forecast_cache (",
+      "  account_id text primary key,",
+      "  payload jsonb not null,",
+      "  built_at timestamptz not null",
+      ");",
     ),
   },
   "main",
@@ -45,6 +52,20 @@ const h10 = await remote.write(
       "async def warm_all(accounts, cache, forecasts):",
       "    for account in accounts:",
       "        cache.set(cache_key(account.id), await forecasts.build(account))",
+    ),
+    "tests/test_warm_cache.py": lines(
+      "from app.forecast_cache import cache_key",
+      "",
+      "",
+      "def test_cache_key():",
+      '    assert cache_key("a1") == "forecast:a1"',
+    ),
+    "uv.lock": lines(
+      "version = 1",
+      "",
+      "[[package]]",
+      'name = "apscheduler"',
+      'version = "3.11.0"',
     ),
   },
   "b9",

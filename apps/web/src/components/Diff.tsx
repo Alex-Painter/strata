@@ -1,4 +1,5 @@
-import type { DiffLine, FileChange, Hunk } from "@strata/core/model";
+import type { DiffLine, FileChange, Hunk, LayerId } from "@strata/core/model";
+import { compareLayers, LAYERS } from "@strata/core/model";
 import { useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
 
@@ -8,23 +9,29 @@ const OPEN_FILE_LINES = 400;
 const OPEN_TOTAL_LINES = 3000;
 
 /**
- * The files of a diff, grouped by directory, then each file's hunks. Layers
- * replace the grouping in a later slice.
+ * The files of a diff by layer, in review order, then by directory, then each
+ * file's hunks. Mechanical files and hunks start collapsed with their reason,
+ * and line counts leave them out.
  */
 export function Files({ files, hunks }: { files: FileChange[]; hunks: Hunk[] }) {
   const byId = new Map(hunks.map((hunk) => [hunk.id, hunk]));
-  const groups = byDirectory(files);
+  const hunksOf = (file: FileChange) =>
+    file.hunkIds.map((id) => byId.get(id)).filter((hunk) => hunk !== undefined);
+  const layers = byLayer(files);
   let budget = OPEN_TOTAL_LINES;
   const opens = new Map(
-    files.map((file) => {
-      const size = file.additions + file.deletions;
-      const open = size <= OPEN_FILE_LINES && size <= budget;
-      if (open) budget -= size;
-      return [file.path, open];
-    }),
+    layers.flatMap(([, dirs]) =>
+      dirs.flatMap(([, group]) =>
+        group.map((file) => {
+          const size = file.additions + file.deletions;
+          const open = !file.mechanical && size <= OPEN_FILE_LINES && size <= budget;
+          if (open) budget -= size;
+          return [file.path, open] as const;
+        }),
+      ),
+    ),
   );
-  const additions = files.reduce((sum, file) => sum + file.additions, 0);
-  const deletions = files.reduce((sum, file) => sum + file.deletions, 0);
+  const counts = meaningful(files, byId);
 
   return (
     <section aria-labelledby="files-heading" className="space-y-3">
@@ -32,9 +39,9 @@ export function Files({ files, hunks }: { files: FileChange[]; hunks: Hunk[] }) 
         <h2 id="files-heading" className="font-semibold">
           Files
         </h2>
-        <span className="text-muted">
+        <span className="text-muted" title={`All lines: ${lineCount(...totals(files))}`}>
           {files.length === 1 ? "1 file" : `${files.length} files`} ·{" "}
-          {lineCount(additions, deletions)}
+          {lineCount(counts.additions, counts.deletions)}
         </span>
       </header>
       {files.length === 0 ? (
@@ -42,36 +49,84 @@ export function Files({ files, hunks }: { files: FileChange[]; hunks: Hunk[] }) 
       ) : (
         <>
           <nav aria-label="File list" className="rounded-md border border-line bg-surface py-1">
-            {groups.map(([dir, group]) => (
-              <div key={dir} className="py-0.5">
-                <div className="px-3 font-mono text-[11px] text-muted">{dir || "/"}</div>
-                {group.map((file) => (
-                  <a
-                    key={file.path}
-                    href={`#${fileAnchor(file.path)}`}
-                    className="flex items-baseline gap-2 px-3 py-0.5 pl-6 hover:bg-raised"
-                  >
-                    <StatusMark status={file.status} />
-                    <span className="min-w-0 flex-1 truncate font-mono">{basename(file.path)}</span>
-                    <LineCount file={file} />
-                  </a>
+            {layers.map(([layer, dirs]) => (
+              <div key={layer} data-layer={layer} className="py-1">
+                <LayerHeading layer={layer} files={dirs.flatMap(([, group]) => group)} />
+                {dirs.map(([dir, group]) => (
+                  <div key={dir}>
+                    <div className="px-3 pl-6 font-mono text-[11px] text-muted">{dir || "/"}</div>
+                    {group.map((file) => (
+                      <a
+                        key={file.path}
+                        href={`#${fileAnchor(file.path)}`}
+                        className="flex items-baseline gap-2 px-3 py-0.5 pl-9 hover:bg-raised"
+                      >
+                        <StatusMark status={file.status} />
+                        <span className="min-w-0 flex-1 truncate font-mono">
+                          {basename(file.path)}
+                        </span>
+                        <LineCount file={file} hunks={hunksOf(file)} />
+                      </a>
+                    ))}
+                  </div>
                 ))}
               </div>
             ))}
           </nav>
-          {groups.flatMap(([, group]) =>
-            group.map((file) => (
-              <FileDiff
-                key={file.path}
-                file={file}
-                hunks={file.hunkIds.map((id) => byId.get(id)).filter((h) => h !== undefined)}
-                initiallyOpen={opens.get(file.path) ?? false}
-              />
-            )),
-          )}
+          {layers.map(([layer, dirs]) => (
+            <section
+              key={layer}
+              id={layerAnchor(layer)}
+              aria-label={LAYERS[layer].title}
+              className="scroll-mt-4 space-y-3"
+            >
+              <LayerHeading layer={layer} files={dirs.flatMap(([, group]) => group)} as="h3" />
+              {dirs.flatMap(([, group]) =>
+                group.map((file) => (
+                  <FileDiff
+                    key={file.path}
+                    file={file}
+                    hunks={hunksOf(file)}
+                    initiallyOpen={opens.get(file.path) ?? false}
+                  />
+                )),
+              )}
+            </section>
+          ))}
         </>
       )}
     </section>
+  );
+}
+
+function LayerHeading({
+  layer,
+  files,
+  as = "div",
+}: {
+  layer: LayerId;
+  files: FileChange[];
+  as?: "div" | "h3";
+}) {
+  const Tag = as;
+  const definition = LAYERS[layer];
+  return (
+    <Tag
+      className={`flex items-baseline gap-2 ${as === "h3" ? "pt-2 font-semibold" : "px-3 font-medium"}`}
+    >
+      <span title={definition.description}>{definition.title}</span>
+      {definition.inspect && (
+        <span
+          className="rounded border border-warn/40 px-1 text-[11px] font-normal text-warn"
+          title="Changes here must be right first time, so inspect them closely."
+        >
+          Inspect
+        </span>
+      )}
+      <span className="text-[11px] font-normal text-muted">
+        {files.length === 1 ? "1 file" : `${files.length} files`}
+      </span>
+    </Tag>
   );
 }
 
@@ -94,24 +149,30 @@ function FileDiff({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       className="scroll-mt-4 rounded-md border border-line bg-surface"
       data-file={file.path}
+      data-mechanical={file.mechanical?.kind}
     >
       <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2 select-none">
         <span className="min-w-0 flex-1 truncate font-mono">
           {file.oldPath && <span className="text-muted">{file.oldPath} → </span>}
           {file.path}
         </span>
-        <LineCount file={file} />
+        {file.mechanical && (
+          <span className="shrink-0 rounded bg-raised px-1.5 text-[11px] text-muted">
+            {file.mechanical.reason}
+          </span>
+        )}
+        <LineCount file={file} hunks={hunks} />
       </summary>
       {open && (
         <div className="border-t border-line">
-          {facts.length > 0 && (
-            <p className="border-b border-line px-3 py-1.5 text-muted">{facts.join(" · ")}</p>
-          )}
+          <p className="border-b border-line px-3 py-1.5 text-muted">
+            {[...facts, layerFact(file)].join(" · ")}
+          </p>
           {hunks.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse font-mono text-[12px] leading-5">
                 {hunks.map((hunk) => (
-                  <HunkRows key={hunk.id} hunk={hunk} />
+                  <HunkRows key={hunk.id} hunk={hunk} inMechanicalFile={file.mechanical !== null} />
                 ))}
               </table>
             </div>
@@ -122,19 +183,36 @@ function FileDiff({
   );
 }
 
-function HunkRows({ hunk }: { hunk: Hunk }) {
+function HunkRows({ hunk, inMechanicalFile }: { hunk: Hunk; inMechanicalFile: boolean }) {
+  // A mechanical hunk in a meaningful file stays folded until asked for.
+  const [shown, setShown] = useState(inMechanicalFile || hunk.mechanical === null);
   return (
-    <tbody data-hunk={hunk.id}>
+    <tbody data-hunk={hunk.id} data-mechanical={hunk.mechanical?.kind}>
       <tr className="bg-raised text-muted">
         <td colSpan={3} className="px-3 py-0.5 whitespace-pre">
           @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
           {hunk.section && ` ${hunk.section}`}
         </td>
       </tr>
-      {hunk.lines.map((line) => (
-        // Old and new numbers together are unique within a hunk.
-        <LineRow key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`} line={line} />
-      ))}
+      {shown ? (
+        hunk.lines.map((line) => (
+          // Old and new numbers together are unique within a hunk.
+          <LineRow key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`} line={line} />
+        ))
+      ) : (
+        <tr>
+          <td colSpan={3} className="px-3 py-1 font-sans text-muted">
+            {hunk.mechanical?.reason}, {hunk.lines.length} lines.{" "}
+            <button
+              type="button"
+              onClick={() => setShown(true)}
+              className="text-accent hover:underline"
+            >
+              Show
+            </button>
+          </td>
+        </tr>
+      )}
     </tbody>
   );
 }
@@ -170,12 +248,22 @@ function StatusMark({ status }: { status: FileChange["status"] }) {
   );
 }
 
-function LineCount({ file }: { file: FileChange }) {
+/** Meaningful lines, with every line in the tooltip. Mechanical files show theirs muted. */
+function LineCount({ file, hunks }: { file: FileChange; hunks: Hunk[] }) {
   if (file.binary) return <span className="shrink-0 text-muted">binary</span>;
+  const all = lineCount(file.additions, file.deletions);
+  if (file.mechanical) {
+    return (
+      <span className="shrink-0 font-mono text-[11px] text-muted" title={`All lines: ${all}`}>
+        {all}
+      </span>
+    );
+  }
+  const counts = meaningful([file], new Map(hunks.map((hunk) => [hunk.id, hunk])));
   return (
-    <span className="shrink-0 font-mono text-[11px]">
-      <span className="text-open">+{file.additions}</span>{" "}
-      <span className="text-closed">−{file.deletions}</span>
+    <span className="shrink-0 font-mono text-[11px]" title={`All lines: ${all}`}>
+      <span className="text-open">+{counts.additions}</span>{" "}
+      <span className="text-closed">−{counts.deletions}</span>
     </span>
   );
 }
@@ -202,7 +290,57 @@ export function fileFacts(file: FileChange): string[] {
   return facts;
 }
 
-function byDirectory(files: FileChange[]): [string, FileChange[]][] {
+/** Why the file is in its layer, said plainly enough to check. */
+function layerFact(file: FileChange): string {
+  const { layer } = file;
+  const guess = layer.confidence === "low" ? ", a guess" : "";
+  return `${LAYERS[layer.layer].title}: ${layer.reason}${guess}`;
+}
+
+/** Lines in hunks that aren't mechanical. */
+export function meaningful(
+  files: FileChange[],
+  byId: Map<string, Hunk>,
+): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const file of files) {
+    if (file.mechanical) continue;
+    for (const id of file.hunkIds) {
+      const hunk = byId.get(id);
+      if (!hunk || hunk.mechanical) continue;
+      for (const line of hunk.lines) {
+        if (line.kind === "add") additions++;
+        else if (line.kind === "del") deletions++;
+      }
+    }
+  }
+  return { additions, deletions };
+}
+
+function totals(files: FileChange[]): [number, number] {
+  return [
+    files.reduce((sum, file) => sum + file.additions, 0),
+    files.reduce((sum, file) => sum + file.deletions, 0),
+  ];
+}
+
+type Directories = [dir: string, files: FileChange[]][];
+
+/** Layers in review order, then directories by path. */
+function byLayer(files: FileChange[]): [LayerId, Directories][] {
+  const layers = new Map<LayerId, FileChange[]>();
+  for (const file of files) {
+    const group = layers.get(file.layer.layer);
+    if (group) group.push(file);
+    else layers.set(file.layer.layer, [file]);
+  }
+  return [...layers.entries()]
+    .sort(([a], [b]) => compareLayers(a, b))
+    .map(([layer, group]) => [layer, byDirectory(group)]);
+}
+
+function byDirectory(files: FileChange[]): Directories {
   const groups = new Map<string, FileChange[]>();
   for (const file of files) {
     const dir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : "";
@@ -217,3 +355,6 @@ const basename = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** The id of a file's diff on the page. */
 export const fileAnchor = (path: string) => `file:${path}`;
+
+/** The id of a layer's section on the page. */
+export const layerAnchor = (layer: LayerId) => `layer:${layer}`;
