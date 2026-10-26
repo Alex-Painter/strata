@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ChangeReport, parseChangeInput } from "@strata/core";
+import { type ChangeReport, layerMatrix, parseChangeInput } from "@strata/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createEngine } from "../engine.js";
 import { type FeatureShape, featureShape, type ShapeRepo } from "../testing/feature-shapes.js";
@@ -98,5 +98,67 @@ describe("provenance", () => {
     const lock = get("stack").change.hunks.find((hunk) => hunk.path === "uv.lock");
     const shared = get("stack").parts.flatMap((part) => part.provenance?.inWhole ?? []);
     expect(shared.some((share) => share.hunkId === lock?.id)).toBe(false);
+  });
+});
+
+describe("the layer by PR matrix", () => {
+  const grid = (report: ChangeReport) =>
+    layerMatrix(report).rows.map((row) => [
+      row.layer,
+      ...row.cells.map((c) =>
+        c.files.length ? `${c.meaningful}/${c.mechanical}/${c.revised}` : "",
+      ),
+    ]);
+
+  it("has a column per PR, then Net, with #2's revised line in its logic cell", () => {
+    const matrix = layerMatrix(get("stack"));
+    expect(matrix.prs).toEqual([1, 2, 3, 4]);
+    // meaningful/mechanical/revised for #1, #2, #3, #4 and Net.
+    expect(grid(get("stack"))).toEqual([
+      ["data-model", "1/0/0", "", "", "", "1/0/0"],
+      ["api", "", "", "8/0/0", "", "8/0/0"],
+      ["logic", "", "5/0/1", "", "2/0/0", "5/0/0"],
+      ["tests", "", "", "6/0/0", "", "6/0/0"],
+      ["config", "0/2/0", "", "", "", "0/2/0"],
+      ["docs", "", "", "", "3/0/0", "3/0/0"],
+    ]);
+    expect(matrix.max).toBe(8);
+  });
+
+  it("gives Net the whole stack's layers however the work was split", () => {
+    const net = (report: ChangeReport) =>
+      layerMatrix(report).rows.map((row) => [row.layer, row.cells.at(-1)]);
+    const whole = get("one-pr").change.layers.map((group) => group.layer);
+    expect(net(get("one-pr")).map(([layer]) => layer)).toEqual(whole);
+    for (const name of SHAPES) expect(net(get(name)), name).toEqual(net(get("one-pr")));
+  });
+
+  it("gives a one-PR stack a column equal to Net", () => {
+    for (const row of layerMatrix(get("one-pr")).rows) {
+      const [pr, net] = row.cells;
+      expect({ ...pr, pr: null, evidence: [] }, row.layer).toEqual({ ...net, evidence: [] });
+    }
+  });
+
+  it("backs every non-empty cell with its hunks", () => {
+    for (const name of SHAPES) {
+      const report = get(name);
+      for (const row of layerMatrix(report).rows) {
+        for (const c of row.cells) {
+          if (c.files.length === 0) {
+            expect(c.evidence).toEqual([]);
+            continue;
+          }
+          const hunks =
+            c.pr === null ? report.change.hunks : report.parts.find((p) => p.pr === c.pr)?.hunks;
+          expect(c.evidence.length, `${name} ${row.layer} ${c.pr}`).toBeGreaterThan(0);
+          for (const item of c.evidence) {
+            const source = item.anchor.source;
+            const id = source.kind === "hunk" || source.kind === "pr-hunk" ? source.hunkId : null;
+            expect(hunks?.some((hunk) => hunk.id === id)).toBe(true);
+          }
+        }
+      }
+    }
   });
 });

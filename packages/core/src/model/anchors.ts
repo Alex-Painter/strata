@@ -33,6 +33,8 @@ export type SourceRef =
   | { kind: "ledger"; entryId: string }
   /** A pull request in the Change's repo. */
   | { kind: "pr"; number: number }
+  /** One hunk of a PR's own diff on the stack (its PrPart). */
+  | { kind: "pr-hunk"; pr: number; hunkId: string }
   /** A commit, by full object id. */
   | { kind: "commit"; oid: string };
 
@@ -83,6 +85,8 @@ export function sourceKey(ref: SourceRef): string {
       return `ledger:${ref.entryId}`;
     case "pr":
       return `pr:${ref.number}`;
+    case "pr-hunk":
+      return `pr-hunk:${ref.pr}:${ref.hunkId}`;
     case "commit":
       return `commit:${ref.oid}`;
   }
