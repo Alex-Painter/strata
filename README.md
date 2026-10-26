@@ -43,6 +43,22 @@ Open http://localhost:5173. With `DEV_AUTH_BYPASS=1` you're signed in as `DEV_GI
 | `pnpm --filter @strata/server db:generate` | Generates a migration after editing `apps/server/src/db/schema.ts` |
 | `pnpm --filter @strata/cli start --help`   | Runs the CLI                                                       |
 
+## Repo settings
+
+Each repo can have its own settings, kept in Strata's data folder rather than in the repo: `settings/<owner>/<name>.json` under `~/.strata` for the CLI (or `--data-dir`), and under `DATA_DIR` (`.data` in dev) for the server. Without the file, everything is off.
+
+```json
+{
+  "layerRules": [
+    { "id": "billing", "layer": "data-model", "paths": ["billing/**"], "reason": "Billing is always inspected" }
+  ],
+  "sendCodeToAnthropic": true
+}
+```
+
+- `layerRules` run before Strata's own rules. `layer` is one of `data-model`, `api`, `logic`, `ui`, `tests`, `config`, `docs` or `other`, and `reason` is shown next to every file the rule matches.
+- `sendCodeToAnthropic` lets Strata send the paths and first changed lines of files no rule matched to the Anthropic API, so Claude can choose their layer. It also needs `ANTHROPIC_API_KEY`. Answers are cached in the data folder, so the same stack isn't asked about twice.
+
 ## GitHub sign-in
 
 1. Create an OAuth App at https://github.com/settings/developers.

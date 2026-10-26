@@ -43,6 +43,8 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 
 `packages/core/src/diff/parse.ts` parses git's diff output (checked against a golden file of real git output), and `change/build.ts` turns it into files and hunks, sorted by path, with hunk ids from their content. `change/canonical.ts` is the view the shape-invariance tests compare.
 
+`packages/core/src/layers/` sorts files into layers and finds mechanical changes, from paths, diff lines and the repo's settings only. In order: the repo's own rules, `linguist-documentation` in its root `.gitattributes`, Strata's default path rules (`rules.ts`), Claude's layer for files no rule matched (when the engine was given one), then a low-confidence guess by extension. `mechanical.ts` folds lockfiles, snapshots, binaries, generated and vendored files, unchanged renames and whitespace-only hunks, each with its reason.
+
 `packages/core/src/stack/` holds the pure stack helpers, which the browser imports as `@strata/core/stack`: the builder, `summary.ts` (the slim view the stack list and the map use) and `map.ts` (the stack map's layout, one row per PR with lanes for forks, and the same map as Mermaid).
 
 ### engine
@@ -52,7 +54,9 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 - `github/` reads the PR index (90 days of PRs with retarget and force-push events) over GraphQL and caches it in the data folder.
 - `git/` runs git without the user's config, attributes, ignore files or credential helpers, and keeps Strata's own bare clone of each repo, borrowing objects from a local checkout once (`STRATA_CHECKOUTS`, or the CLI's `--repo-path`).
 - `git/diff.ts` diffs with fixed settings, replays a PR's changes onto another commit with `merge-tree` (no refs, index or working tree; git 2.38 or later), and writes commits with a fixed author and date.
-- `stack/` answers the stack builder's git questions and turns a stack path into a Change. `stack/parts.ts` writes Strata's own chain of commits, one per PR from where the stack left the trunk: a PR's head as it is when it sits on the stack so far, or its changes replayed on, as a restack would, when its link is broken. Each PR's diff runs from the commit below to its own, and the whole-stack diff from the start to the last. A replay conflict stops the chain there and raises `replay-conflict`.
+- `stack/` answers the stack builder's git questions and turns a stack path into a Change. `stack/parts.ts` writes Strata's own chain of commits, one per PR from where the stack left the trunk: a PR's head as it is when it sits on the stack so far, or its changes replayed on, as a restack would, when its link is broken. Each PR's diff runs from the commit below to its own, and the whole-stack diff from the start to the last. A replay conflict stops the chain there and raises `replay-conflict`. Every diff is sorted into layers by one classifier built from the whole stack: the repo's rules, its `.gitattributes` at the top of the stack, and Claude's answers about the whole-stack diff, which each PR's diff reuses by path.
+- `settings.ts` reads a repo's own settings from Strata's data folder, never from the repo: `settings/<owner>/<name>.json`, with `layerRules` and `sendCodeToAnthropic`.
+- `layers/judge.ts` asks Claude for the layer of whole-stack files no rule matched, only for repos whose settings turn on `sendCodeToAnthropic` and only with an Anthropic key. It sends paths, the first changed lines of each file and the placed files' layers, asks for JSON against a schema, and caches each answer under `llm-cache/layers/` by a hash of the exact request, so the same diff gets the same answer on every run. A failed request leaves those files' guesses in place and says so in the report's notes.
 
 ### server
 
@@ -70,7 +74,7 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 
 - `/`: "Review a stack" (a PR URL, `owner/repo#N` or `owner/repo:branch`, read back before it's sent), "Browse a repo's stacks", and the user's Changes.
 - `/repos/:owner/:name`: the repo's stacks, each with its map, a path picker for forks and a Review button.
-- `/changes/:id`: the workspace. The left rail is the stack map (`components/StackMap.tsx`, drawn from core's layout: HTML rows, SVG edges); choosing a PR scopes the panes to it (`?pr=N`, "How it arrived"), and "Whole stack" scopes back. The centre shows the path's counts, its path picker, stack issues with their commit evidence, the report's notes and the whole-stack diff (`components/Diff.tsx`: files by directory, then each file's hunks). A PR's scope shows that PR's own diff, and a banner when GitHub's diff of it differs. It polls while a run is going. Chat returns with highlight-to-chat.
+- `/changes/:id`: the workspace. The left rail is the stack map (`components/StackMap.tsx`, drawn from core's layout: HTML rows, SVG edges); choosing a PR scopes the panes to it (`?pr=N`, "How it arrived"), and "Whole stack" scopes back. The centre shows the path's counts, its path picker, stack issues with their commit evidence, the report's notes and the whole-stack diff (`components/Diff.tsx`: files by layer in review order, then by directory, then each file's hunks; layers to inspect are flagged, each file says why it's in its layer, and mechanical files and hunks start folded with their reason). In the whole-stack scope the rail's layers link to their sections. A PR's scope shows that PR's own diff, and a banner when GitHub's diff of it differs. It polls while a run is going. Chat returns with highlight-to-chat.
 
 ## Highlight and chat
 
@@ -82,7 +86,7 @@ The workspace shows all of a Change's context together and lets the reviewer hig
 
 ## Shape invariance
 
-The benchmark from SPEC.md runs in `packages/engine/src/shape-invariance.test.ts`. One maverick-like feature (`engine/src/testing/feature-shapes.ts`) is built as one PR, as four chained PRs, with the bottom PR squash-merged while main moves on, with the second PR then rebased, and as a fork. The first four must give the same whole-stack patch-id, files, hunks and canonical report. Layer classification is still `it.todo` in `packages/core/src/layers.test.ts`.
+The benchmark from SPEC.md runs in `packages/engine/src/shape-invariance.test.ts`. One maverick-like feature (`engine/src/testing/feature-shapes.ts`) is built as one PR, as four chained PRs, with the bottom PR squash-merged while main moves on, with the second PR then rebased, and as a fork. The first four must give the same whole-stack patch-id, files, hunks, layers and canonical report, and ask Claude (a fake that records its questions) the same question about the files no rule matched. `packages/core/src/layers.test.ts` holds the layer rules as a table of paths.
 
 PR descriptions are shown as context but never feed the intent ledger, because they depend on how the work was split.
 
@@ -94,7 +98,7 @@ Narrowed to PR stacks (plan: "Strata milestone 1: the stack view"). In order:
 2. Store one Change per path and run it on the server. Done.
 3. The stack map, the stack list and the path picker in the web app, from PR metadata only. Done.
 4. Each PR's own diff and the whole-stack diff, parsed into files and hunks, with a banner when GitHub's diff of a PR differs. Done, in the web app and `strata analyze`.
-5. Layers: path rules, repo rules, `.gitattributes`, mechanical changes, then the LLM for the rest.
+5. Layers: path rules, repo rules, `.gitattributes`, mechanical changes, then Claude for the rest when a repo allows it. Done, in the web app and `strata analyze`. The maverick paths in the rule table still need checking against the real repo.
 6. Which PR introduced or revised each hunk, and the layer by PR matrix.
 7. The Guide and summaries, from the whole-stack diff only.
 8. The CLI's static page, and the shape-invariance check on a real stack against the same code as a plain range.
