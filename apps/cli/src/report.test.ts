@@ -42,11 +42,12 @@ describe("formatReport", () => {
         "  #3  direct    1 file     +1 -0        Add the forecast route",
         "",
         "Whole stack: 3 files, +3 -0",
-        "  A b1-2.txt  +1 -0",
-        "  A b2-3.txt  +1 -0",
-        "  A b3-4.txt  +1 -0",
+        "  Docs",
+        "    A b1-2.txt  +1 -0",
+        "    A b2-3.txt  +1 -0",
+        "    A b3-4.txt  +1 -0",
         "",
-        "  - Layers and summaries aren't computed yet.",
+        "  - Summaries aren't computed yet.",
         "",
       ].join("\n"),
     );
@@ -59,7 +60,7 @@ describe("formatReport", () => {
       { kind: "needs-restack", prs: [6], message: "Elsewhere.", evidence: [] },
     );
     const text = formatReport(report);
-    expect(text).toContain("\n  ! On the path.\n  - Layers");
+    expect(text).toContain("\n  ! On the path.\n  - Summaries");
     expect(text).not.toContain("Elsewhere.");
   });
 });

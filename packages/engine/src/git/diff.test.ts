@@ -1,7 +1,7 @@
 import { parseDiff } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { StackRepo } from "../testing/stack-repo.js";
-import { commitTree, diffText, replay, treeOf } from "./diff.js";
+import { commitTree, diffText, gitVersion, readBlob, replay, treeOf } from "./diff.js";
 import { gitOk } from "./run.js";
 
 let repo: StackRepo;
@@ -35,6 +35,35 @@ describe("diffText", () => {
     expect(file).toMatchObject({ path: "docs/notes.md", oldPath: "notes.md", status: "renamed" });
     // Three lines of context, whatever diff.context says.
     expect(file?.hunks[0]?.lines.filter((line) => line.kind === "context")).toHaveLength(3);
+  });
+});
+
+const [major, minor] = await gitVersion();
+
+describe("in-tree attributes", () => {
+  // attr.tree arrived in git 2.42; Strata's cache is bare, so older git never
+  // reads in-tree attributes there anyway.
+  it.skipIf(major < 2 || (major === 2 && minor < 42))(
+    "don't change diffs, even in a checkout",
+    async () => {
+      const before = await repo.write(
+        "b",
+        { ".gitattributes": "*.txt -diff\n", "a.txt": "one\n" },
+        "main",
+      );
+      const after = await repo.write("b", { "a.txt": "two\n" });
+      const [file] = parseDiff(await diffText(repo.dir, before, after));
+      expect(file?.binary).toBe(false);
+      expect(file?.hunks).toHaveLength(1);
+    },
+  );
+});
+
+describe("readBlob", () => {
+  it("reads a file at a commit, or null", async () => {
+    const head = await repo.write("b", { "docs/a.md": "hello\n" }, "main");
+    expect(await readBlob(repo.dir, head, "docs/a.md")).toBe("hello\n");
+    expect(await readBlob(repo.dir, head, "missing.md")).toBeNull();
   });
 });
 

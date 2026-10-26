@@ -7,10 +7,19 @@
 import { git, gitEnv, gitOk } from "./run.js";
 
 /**
+ * Attributes from a tree that doesn't exist, so the repo's own .gitattributes
+ * (a diff driver, `-diff`, a merge driver) can't change diffs or replays.
+ * Strata reads the linguist attributes itself. Git before 2.42 ignores the
+ * setting, and reads no in-tree attributes in a bare repo anyway.
+ */
+const NO_ATTRIBUTES = ["-c", "attr.tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904"];
+
+/**
  * Fixed diff settings, so neither git's defaults changing under config nor a
  * user's settings can change what the parser sees. See core's diff/parse.ts.
  */
 export const DIFF_ARGS = [
+  ...NO_ATTRIBUTES,
   "-c",
   "core.quotePath=true",
   "diff",
@@ -29,6 +38,16 @@ export function diffText(gitDir: string, from: string, to: string): Promise<stri
 
 export function treeOf(gitDir: string, commit: string): Promise<string> {
   return gitOk(gitDir, ["rev-parse", "--verify", `${commit}^{tree}`]).then((out) => out.trim());
+}
+
+/** A file's text at a commit, or null when it isn't there. */
+export async function readBlob(
+  gitDir: string,
+  commit: string,
+  path: string,
+): Promise<string | null> {
+  const { code, stdout } = await git(gitDir, ["cat-file", "blob", `${commit}:${path}`]);
+  return code === 0 ? stdout : null;
 }
 
 /** A branch's tip in the cache, or null when it isn't there. */
@@ -91,6 +110,7 @@ export async function replay(
 ): Promise<ReplayResult> {
   const standIn = await commitTree(gitDir, await treeOf(gitDir, ours), base, "Strata replay");
   const { code, stdout, stderr } = await git(gitDir, [
+    ...NO_ATTRIBUTES,
     "merge-tree",
     "--write-tree",
     "--name-only",

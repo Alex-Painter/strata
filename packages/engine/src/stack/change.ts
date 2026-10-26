@@ -17,6 +17,7 @@ import {
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
+import type { RepoSettings } from "../settings.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
 
@@ -84,9 +85,11 @@ export async function resolveStackChange(
 export async function stackReport(
   resolved: ResolvedChange & { stack: Stack },
   options: AnalyzeOptions,
-  meta: { engineVersion: string; startedAt: Date },
+  meta: { engineVersion: string; startedAt: Date; settings: RepoSettings },
 ): Promise<ChangeReport> {
-  const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir);
+  const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir, {
+    repoRules: meta.settings.layerRules,
+  });
   const stack: Stack = {
     ...resolved.stack,
     issues: [...resolved.stack.issues, ...diffs.issues],
@@ -116,7 +119,7 @@ export async function stackReport(
     summary: [],
     layerSummaries: [],
     diagrams: [],
-    notes: [...diffNotes(stack, diffs), "Layers and summaries aren't computed yet."],
+    notes: [...diffNotes(stack, diffs), "Summaries aren't computed yet."],
     raw: { diff: whole?.diff ?? "" },
     analysis: {
       engineVersion: meta.engineVersion,

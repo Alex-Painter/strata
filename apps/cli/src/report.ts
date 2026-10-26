@@ -1,8 +1,8 @@
 /**
  * Prints a report in brief, the way `strata analyze` shows it: the path, each
- * PR's own diff, the whole-stack diff's files, then issues and notes.
+ * PR's own diff, the whole-stack diff's files by layer, then issues and notes.
  */
-import type { ChangeReport, FileChange, PrPart } from "@strata/core";
+import { type ChangeReport, type FileChange, LAYERS, type PrPart } from "@strata/core";
 
 /** Longer whole-stack file lists are cut, and say how many were left out. */
 const MAX_FILES = 40;
@@ -37,12 +37,29 @@ export function formatReport(report: ChangeReport): string {
       ? `Whole stack: ${fileCount(change.files)}, ${totals(change.files)}`
       : "No whole-stack diff.",
   );
-  for (const file of change.files.slice(0, MAX_FILES)) {
-    lines.push(`  ${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}`);
+  const byPath = new Map(change.files.map((file) => [file.path, file]));
+  // By layer once classified; a report without layers lists files by path.
+  const groups =
+    change.layers.length > 0
+      ? change.layers.map((group) => ({
+          title: `${LAYERS[group.layer].title}${LAYERS[group.layer].inspect ? " (inspect)" : ""}`,
+          files: group.files.map((f) => byPath.get(f.path)).filter((f) => f !== undefined),
+        }))
+      : [{ title: null, files: change.files }];
+  let shown = 0;
+  for (const group of groups) {
+    if (shown >= MAX_FILES) break;
+    if (group.title) lines.push(`  ${group.title}`);
+    const indent = group.title ? "    " : "  ";
+    for (const file of group.files.slice(0, MAX_FILES - shown)) {
+      const mechanical = file.mechanical ? `  (${file.mechanical.reason})` : "";
+      lines.push(
+        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${mechanical}`,
+      );
+      shown++;
+    }
   }
-  if (change.files.length > MAX_FILES) {
-    lines.push(`  … and ${change.files.length - MAX_FILES} more`);
-  }
+  if (change.files.length > shown) lines.push(`  … and ${change.files.length - shown} more`);
 
   const path = stack?.selectedPath ?? [];
   const issues = stack?.issues.filter((issue) => issue.prs.some((n) => path.includes(n))) ?? [];

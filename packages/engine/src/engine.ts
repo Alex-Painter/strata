@@ -6,6 +6,7 @@ import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlm } from "./llm.js";
 import { serialize } from "./lock.js";
+import { loadRepoSettings } from "./settings.js";
 import {
   resolveStackChange,
   type StackInput,
@@ -57,6 +58,7 @@ export const createEngine: CreateEngine = (config) => {
         return stackReport(resolved, options, {
           engineVersion: ENGINE_VERSION,
           startedAt,
+          settings: await loadRepoSettings(config.dataDir, repoName(stackInput)),
         });
       });
     },

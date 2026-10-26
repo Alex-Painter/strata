@@ -1,10 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { parseChangeInput } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createEngine } from "../engine.js";
 import type { GitHubPort } from "../github/port.js";
+import { settingsPath } from "../settings.js";
 import { demoRepo } from "../testing/demo-repo.js";
 import { fakeGitHub, prNode } from "../testing/fake-github.js";
 import { StackRepo } from "../testing/stack-repo.js";
@@ -148,7 +149,54 @@ describe("each PR's diff", () => {
     ]);
     expect(report.notes).toEqual([
       "The whole-stack diff covers #1 only. #2 and #3 aren't in it. The stack's issues say why.",
-      "Layers and summaries aren't computed yet.",
+      "Summaries aren't computed yet.",
     ]);
+  });
+
+  it("sorts every part into layers with the repo's rules and .gitattributes", async () => {
+    await remote.write("main", { ".gitattributes": "clients/** linguist-generated\n" });
+    const h1 = await remote.write(
+      "b1",
+      {
+        "billing/invoice.py": lines("TOTAL = 0"),
+        "app/models/user.py": lines("class User: ..."),
+        "clients/api.ts": lines("export {};"),
+      },
+      "main",
+    );
+    const h2 = await remote.write("b2", { "uv.lock": lines("version = 2") }, "b1");
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2);
+    const settings = settingsPath(dataDir, "acme/app");
+    await mkdir(dirname(settings), { recursive: true });
+    await writeFile(
+      settings,
+      JSON.stringify({
+        layerRules: [
+          { id: "billing", layer: "data-model", paths: ["billing/**"], reason: "Money" },
+        ],
+      }),
+    );
+    const github = fakeGitHub("acme/app", [prNode(1, h1), prNode(2, h2, { baseRefName: "b1" })]);
+    const report = await analyze(github, "acme/app#2");
+
+    expect(
+      report.change.layers.map((group) => [group.layer, group.files.map((f) => f.path)]),
+    ).toEqual([
+      ["data-model", ["app/models/user.py", "billing/invoice.py"]],
+      ["logic", ["clients/api.ts"]],
+      ["config", ["uv.lock"]],
+    ]);
+    const byPath = new Map(report.change.files.map((file) => [file.path, file]));
+    expect(byPath.get("billing/invoice.py")?.layer.reason).toBe("Money: matches billing/**");
+    expect(byPath.get("clients/api.ts")?.mechanical?.reason).toBe(
+      "Marked linguist-generated in .gitattributes",
+    );
+    expect(byPath.get("uv.lock")?.mechanical?.kind).toBe("lockfile");
+    // Each part's files get the same layer as in the whole stack.
+    for (const file of report.parts.flatMap((part) => part.files)) {
+      expect(file.layer).toEqual(byPath.get(file.path)?.layer);
+      expect(file.mechanical).toEqual(byPath.get(file.path)?.mechanical);
+    }
   });
 });

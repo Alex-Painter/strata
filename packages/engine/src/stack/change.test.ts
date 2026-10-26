@@ -89,13 +89,13 @@ describe("engine.analyzeChange for stacks", () => {
       onProgress: (step) => steps.push(step),
     });
 
-    expect(report.schemaVersion).toBe(3);
+    expect(report.schemaVersion).toBe(4);
     expect(report.stack?.selectedPath).toEqual([1, 2, 3]);
     expect(report.change.title).toBe("Add the forecast model");
     expect(report.change.files).toHaveLength(3);
     expect(report.parts.map((part) => part.pr)).toEqual([1, 2, 3]);
     expect(report.verdict).toBeUndefined();
-    expect(report.notes).toEqual(["Layers and summaries aren't computed yet."]);
+    expect(report.notes).toEqual(["Summaries aren't computed yet."]);
     expect(steps).toEqual(["Finding the stack", "Building the diffs"]);
   });
 

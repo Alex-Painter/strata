@@ -79,6 +79,25 @@ describe("shape invariance", () => {
     }
   });
 
+  it("sorts the whole stack into the same layers", () => {
+    const layers = (name: FeatureShape) =>
+      get(name).report.change.layers.map((group) => [
+        group.layer,
+        group.files.map((file) => file.path),
+        group.meaningfulHunks,
+        group.mechanicalHunks,
+      ]);
+    expect(layers("one-pr")).toEqual([
+      ["data-model", ["app/models/account.py"], 1, 0],
+      ["api", ["app/routers/forecasts.py"], 1, 0],
+      ["logic", ["app/services/forecasts.py"], 1, 0],
+      ["tests", ["tests/test_forecasts.py"], 1, 0],
+      ["config", ["uv.lock"], 0, 1],
+      ["docs", ["docs/forecasts.md"], 1, 0],
+    ]);
+    for (const name of same) expect(layers(name), name).toEqual(layers("one-pr"));
+  });
+
   it("gives identical canonical reports", () => {
     const expected = stableStringify(canonicalReport(get("one-pr").report));
     for (const name of same) {

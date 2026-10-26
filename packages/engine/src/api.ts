@@ -11,7 +11,6 @@ import type {
   ChangeRevisions,
   ChatMessage,
   ContextSource,
-  LayerRule,
   RepoRef,
   Stack,
 } from "@strata/core";
@@ -39,8 +38,6 @@ export interface EngineConfig {
   anthropicApiKey?: string;
   /** Defaults to DEFAULT_MODEL. */
   model?: string;
-  /** Repo-specific layer rules, checked before the defaults. */
-  layerRules?: LayerRule[];
   log?: (message: string) => void;
 }
 

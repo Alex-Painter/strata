@@ -16,17 +16,27 @@
  */
 import {
   buildDiff,
+  createClassifier,
   type DiffModel,
   type Evidence,
   type FileChange,
   type GitHubDiffCheck,
+  type LayerRule,
   type PrPart,
   type Stack,
   type StackEdge,
   type StackIssue,
   type StackNode,
 } from "@strata/core";
-import { branchTip, commitTree, diffText, mergeBase, replay, treeOf } from "../git/diff.js";
+import {
+  branchTip,
+  commitTree,
+  diffText,
+  mergeBase,
+  readBlob,
+  replay,
+  treeOf,
+} from "../git/diff.js";
 
 export interface StackDiffs {
   parts: PrPart[];
@@ -38,10 +48,22 @@ export interface StackDiffs {
   placed: number[];
 }
 
-export async function buildStackDiffs(stack: Stack, gitDir: string): Promise<StackDiffs> {
+export interface StackDiffOptions {
+  /** The repo's own layer rules, from its settings. */
+  repoRules?: readonly LayerRule[];
+}
+
+/** Where one PR's diff starts and ends, before it's read. */
+type Step = Pick<PrPart, "pr" | "how" | "from" | "to">;
+
+export async function buildStackDiffs(
+  stack: Stack,
+  gitDir: string,
+  options: StackDiffOptions = {},
+): Promise<StackDiffs> {
   const nodes = new Map(stack.nodes.map((node) => [node.pr.number, node]));
   const edges = new Map(stack.edges.map((edge) => [edge.child, edge]));
-  const parts: PrPart[] = [];
+  const steps: Step[] = [];
   const issues: StackIssue[] = [];
   const placed: number[] = [];
   // The stack so far, as Strata's own commit. Null once a PR couldn't be placed.
@@ -51,76 +73,60 @@ export async function buildStackDiffs(stack: Stack, gitDir: string): Promise<Sta
   for (const number of stack.selectedPath) {
     const node = nodes.get(number) as StackNode;
     const head = node.pr.headOid;
-    const edge = edges.get(number) ?? null;
     if (!node.anchor) {
-      parts.push({
-        pr: number,
-        how: "unknown",
-        from: null,
-        to: null,
-        files: [],
-        hunks: [],
-        github: null,
-      });
+      steps.push({ pr: number, how: "unknown", from: null, to: null });
       at = null;
       continue;
     }
-
-    let part: Omit<PrPart, "github">;
     if (at === null) {
-      part = await apart(gitDir, number, node.anchor, head);
-    } else {
-      const direct = (await treeOf(gitDir, at)) === (await treeOf(gitDir, node.anchor));
-      const result = direct
-        ? ({ kind: "clean", tree: await treeOf(gitDir, head) } as const)
-        : await replay(gitDir, node.anchor, at, head);
-      if (result.kind === "conflict") {
-        issues.push(conflictIssue(node, edge, placed, result.paths));
-        part = await apart(gitDir, number, node.anchor, head);
-        at = null;
-      } else {
-        const to = await commitTree(gitDir, result.tree, at, `#${number}`);
-        part = {
-          pr: number,
-          how: direct ? "direct" : "replayed",
-          from: at,
-          to,
-          ...(await diffModel(gitDir, at, to)),
-        };
-        placed.push(number);
-        at = to;
-        end = to;
-      }
+      steps.push({ pr: number, how: "apart", from: node.anchor, to: head });
+      continue;
     }
+    const direct = (await treeOf(gitDir, at)) === (await treeOf(gitDir, node.anchor));
+    const result = direct
+      ? ({ kind: "clean", tree: await treeOf(gitDir, head) } as const)
+      : await replay(gitDir, node.anchor, at, head);
+    if (result.kind === "conflict") {
+      issues.push(conflictIssue(node, edges.get(number) ?? null, placed, result.paths));
+      steps.push({ pr: number, how: "apart", from: node.anchor, to: head });
+      at = null;
+      continue;
+    }
+    const to = await commitTree(gitDir, result.tree, at, `#${number}`);
+    steps.push({ pr: number, how: direct ? "direct" : "replayed", from: at, to });
+    placed.push(number);
+    at = to;
+    end = to;
+  }
+
+  // The repo's .gitattributes as the whole stack leaves it, so every diff is
+  // classified the same way however the work was split.
+  const top = end ?? stack.base;
+  const classifier = createClassifier({
+    repoRules: options.repoRules ?? [],
+    gitattributes: top ? await readBlob(gitDir, top, ".gitattributes") : null,
+  });
+
+  const parts: PrPart[] = [];
+  for (const step of steps) {
+    const node = nodes.get(step.pr) as StackNode;
+    const { files, hunks } =
+      step.from && step.to
+        ? buildDiff(await diffText(gitDir, step.from, step.to), { classifier })
+        : { files: [], hunks: [] };
+    const part = { ...step, files, hunks };
+    const edge = edges.get(step.pr) ?? null;
     const github =
       node.pr.state === "open" ? await compareWithGitHub(gitDir, stack, node, edge, part) : null;
     parts.push({ ...part, github });
   }
 
-  const whole =
-    stack.base && end
-      ? { from: stack.base, to: end, ...(await wholeDiff(gitDir, stack.base, end)) }
-      : null;
+  let whole: StackDiffs["whole"] = null;
+  if (stack.base && end) {
+    const diff = await diffText(gitDir, stack.base, end);
+    whole = { from: stack.base, to: end, diff, model: buildDiff(diff, { classifier }) };
+  }
   return { parts, whole, issues, placed };
-}
-
-async function apart(
-  gitDir: string,
-  pr: number,
-  anchor: string,
-  head: string,
-): Promise<Omit<PrPart, "github">> {
-  return { pr, how: "apart", from: anchor, to: head, ...(await diffModel(gitDir, anchor, head)) };
-}
-
-async function diffModel(gitDir: string, from: string, to: string) {
-  const { files, hunks } = buildDiff(await diffText(gitDir, from, to));
-  return { files, hunks };
-}
-
-async function wholeDiff(gitDir: string, from: string, to: string) {
-  const diff = await diffText(gitDir, from, to);
-  return { diff, model: buildDiff(diff) };
 }
 
 function conflictIssue(
