@@ -1,6 +1,6 @@
 # Strata verification map
 
-This directory is the maintained list of Strata's user-facing behaviour and how to prove each piece of it. Read this index before driving the app, then follow the matching feature file as the recipe. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, the CLI's argument handling and `strata stacks`, and stacks in the web app and API. Add a file when a milestone-1 feature lands.
+This directory is the maintained list of Strata's user-facing behaviour and how to prove each piece of it. Read this index before driving the app, then follow the matching feature file as the recipe. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, the CLI (`stacks`, `analyze`, its review page and the stack vs range script), and stacks in the web app and API. Add a file when a milestone-1 feature lands.
 
 ## Baseline preconditions
 

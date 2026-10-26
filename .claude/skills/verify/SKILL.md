@@ -5,7 +5,7 @@ description: Drive the real Strata app (Hono API + React web app + `strata` CLI)
 
 # Verify Strata
 
-Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs, each PR's diff and the whole-stack diff, layers, the layer by PR matrix, the summaries and the Guide) in the web app and API, and the CLI's `stacks` and `analyze` commands. Sources, files and threads answer 501, and `strata analyze` doesn't write its page yet. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
+Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs, each PR's diff and the whole-stack diff, layers, the layer by PR matrix, the summaries and the Guide) in the web app and API, and the CLI's `stacks` and `analyze` commands, with the review page `analyze` writes and the stack vs range script. Sources, files and threads answer 501. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
 
 Everything goes through `scripts/strata-verify`, which lives next to this file. From the repo root:
 
@@ -109,7 +109,7 @@ Stable handles in this app:
 
 There is no Playwright or headless Chrome in this repo. Don't add one just to verify.
 
-**CLI.** `$V cli <run> <name> [args...]` runs `apps/cli/src/main.ts` through tsx under `env -i`, with `HOME` pointed at a throwaway dir, so `~/.strata` and any API keys in the shell are left alone. Exit codes: 0 for help, 2 for a usage error (the message is followed by the usage text), 1 for a runtime failure.
+**CLI.** `$V cli <run> <name> [args...]` runs `apps/cli/src/main.ts` through tsx under `env -i`, with `HOME` pointed at a throwaway dir, so `~/.strata` and any API keys in the shell are left alone. For a run started with `--github fixture` (and `--claude fixture`), it points the CLI at that run's stand-ins with dummy credentials. Exit codes: 0 for help, 2 for a usage error (the message is followed by the usage text), 1 for a runtime failure.
 
 ```bash
 $V cli latest help --help

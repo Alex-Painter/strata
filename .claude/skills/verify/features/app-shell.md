@@ -34,5 +34,5 @@ Preconditions:
 ## Gotchas
 
 - The workspace needs a real Change to show anything more; [stacks.md](./stacks.md) opens one against the fixture GitHub.
-- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its Chat says `This page is a snapshot. Chat needs the Strata server.` The CLI can't write that page until milestone 1, so it isn't verifiable end to end yet. Add a feature file for it when `strata analyze` produces output.
+- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its Chat says `This page is a snapshot. Chat needs the Strata server.` [cli.md](./cli.md) writes one and compares it with the workspace.
 - If the page shows `Couldn't reach the Strata server: ...`, `/api/me` failed with something other than 401. Run `doctor`.

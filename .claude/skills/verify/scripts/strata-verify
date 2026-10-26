@@ -126,6 +126,9 @@ cmd_up() {
     fi
     local graphql remote
     read -r _ graphql remote <<<"$ready"
+    # `cli` points the CLI at the same stand-ins.
+    echo "$graphql" >"$inst/graphql"
+    echo "$remote" >"$inst/remote"
     github_env+=(DEV_GITHUB_TOKEN=verify-fixture-token "DEV_GITHUB_GRAPHQL_URL=$graphql"
       "DEV_GIT_REMOTE=$remote")
     if [ "$claude" = fixture ]; then
@@ -236,8 +239,23 @@ cmd_cli() {
   local dir; dir="$(run_dir "$1")"
   local name="$2"; shift 2
   mkdir -p "$dir/cli-data"
-  local RECORD_LABEL; RECORD_LABEL="strata $(printf "%q " "$@")(clean env, HOME=$dir/cli-data)"
-  record "$dir" "$name" env -i "PATH=$PATH" "HOME=$dir/cli-data" \
+  # With --github fixture, the CLI reads the run's fixture GitHub (and its
+  # stand-in Claude with --claude fixture), with the same dummy credentials.
+  local cli_env=() with="" graphql
+  graphql="$(instance_var "$dir" graphql)"
+  if [ "$(instance_var "$dir" github)" = fixture ] && [ -n "$graphql" ]; then
+    cli_env+=(GITHUB_TOKEN=verify-fixture-token "DEV_GITHUB_GRAPHQL_URL=$graphql"
+      "DEV_GIT_REMOTE=$(instance_var "$dir" remote)")
+    with=", fixture GitHub"
+    if [ "$(instance_var "$dir" claude)" = fixture ]; then
+      cli_env+=(ANTHROPIC_API_KEY=verify-fixture-key "DEV_ANTHROPIC_BASE_URL=${graphql%/graphql}")
+      mkdir -p "$dir/cli-data/.strata/settings/acme"
+      echo '{"sendCodeToAnthropic": true}' >"$dir/cli-data/.strata/settings/acme/app.json"
+      with="$with and Claude"
+    fi
+  fi
+  local RECORD_LABEL; RECORD_LABEL="strata $(printf "%q " "$@")(clean env, HOME=$dir/cli-data$with)"
+  record "$dir" "$name" env -i "PATH=$PATH" "HOME=$dir/cli-data" ${cli_env[@]+"${cli_env[@]}"} \
     "$REPO/node_modules/.bin/tsx" "$REPO/apps/cli/src/main.ts" "$@"
 }
 
