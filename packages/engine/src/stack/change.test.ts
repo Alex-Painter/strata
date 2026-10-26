@@ -89,12 +89,15 @@ describe("engine.analyzeChange for stacks", () => {
       onProgress: (step) => steps.push(step),
     });
 
-    expect(report.schemaVersion).toBe(5);
+    expect(report.schemaVersion).toBe(6);
     expect(report.stack?.selectedPath).toEqual([1, 2, 3]);
     expect(report.change.title).toBe("Add the forecast model");
     expect(report.change.files).toHaveLength(3);
     expect(report.parts.map((part) => part.pr)).toEqual([1, 2, 3]);
     expect(report.verdict).toBeUndefined();
+    expect(report.guide.sections.map((section) => [section.title, section.paths])).toEqual([
+      ["Docs: top level", ["b1-2.txt", "b2-3.txt", "b3-4.txt"]],
+    ]);
     expect(report.notes).toEqual(["Summaries aren't computed yet."]);
     expect(steps).toEqual(["Finding the stack", "Building the diffs"]);
   });

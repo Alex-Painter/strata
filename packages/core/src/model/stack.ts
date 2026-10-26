@@ -11,6 +11,7 @@
  * like `ChangeHint` it must never decide layers, diagrams or findings.
  */
 import type { Evidence, FileChange, Hunk } from "./change.js";
+import type { Claim } from "./report.js";
 
 export type PrState = "open" | "merged" | "closed";
 
@@ -207,6 +208,8 @@ export interface PrPart {
   github: GitHubDiffCheck | null;
   /** Where this PR's lines went. Null for PRs off Strata's chain (`apart`, `unknown`). */
   provenance: PartProvenance | null;
+  /** What this PR's own diff does, each sentence citing its hunks (`pr-hunk` evidence). */
+  summary: Claim[];
 }
 
 /**

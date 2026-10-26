@@ -47,6 +47,7 @@ function report(): Pick<ChangeReport, "change" | "parts"> {
         ],
         revisedLater: [{ hunkId: id(one.hunks, "app/billing.py"), by: 2, lines: 1 }],
       },
+      summary: [],
     },
     {
       pr: 2,
@@ -59,6 +60,7 @@ function report(): Pick<ChangeReport, "change" | "parts"> {
         inWhole: [{ hunkId: id(whole.hunks, "app/billing.py"), added: 1, removed: 0 }],
         revisedLater: [],
       },
+      summary: [],
     },
   ];
   return {

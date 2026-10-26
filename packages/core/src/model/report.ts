@@ -17,8 +17,9 @@ import type { PrPart, Stack } from "./stack.js";
  * 3: each PR's own diff, and the whole-stack diff as the Change's files.
  * 4: layers and mechanical verdicts on every file and hunk.
  * 5: where each PR's lines went (PrPart.provenance).
+ * 6: the Guide, and a summary for the whole stack and for each PR.
  */
-export const REPORT_SCHEMA_VERSION = 5;
+export const REPORT_SCHEMA_VERSION = 6;
 
 export type VerdictStatus =
   /** A gate failed or a blocker finding exists. */
@@ -45,6 +46,30 @@ export interface Claim {
   evidence: Evidence[];
 }
 
+/** A section of the Guide: files and hunks of the whole-stack diff to read together. */
+export interface GuideSection {
+  id: string;
+  title: string;
+  /** What the section does, each sentence citing its hunks. Empty for Strata's own groups. */
+  about: Claim[];
+  /** Every file in the section, including ones with no hunks (a binary, a pure rename). */
+  paths: string[];
+  /** Whole-stack hunk ids, in reading order. */
+  hunkIds: string[];
+}
+
+/**
+ * The order to read the whole stack in, after Linear's Guide. It starts as
+ * Strata's own groups (layer, then mechanical kind, then directory); Claude
+ * may merge, order and label them, but every hunk stays in exactly one
+ * section. Built from the whole-stack diff alone.
+ */
+export interface Guide {
+  /** `rule`: Strata's groups as they are. `llm`: Claude merged, ordered and labelled them. */
+  by: "rule" | "llm";
+  sections: GuideSection[];
+}
+
 export interface LayerSummary {
   layer: LayerId;
   claims: Claim[];
@@ -64,7 +89,9 @@ export interface ChangeReport {
   sources: ContextSource[];
   /** Absent until the steps that decide it exist. */
   verdict?: Verdict;
+  /** Three to six sentences about the whole stack, from its diff alone. */
   summary: Claim[];
+  guide: Guide;
   layerSummaries: LayerSummary[];
   ledger?: IntentLedger;
   findings?: Finding[];

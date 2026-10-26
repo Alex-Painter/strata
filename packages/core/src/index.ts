@@ -9,6 +9,7 @@
  */
 export * from "./change/build.js";
 export * from "./change/canonical.js";
+export * from "./change/guide.js";
 export * from "./diff/parse.js";
 export * from "./layers/index.js";
 export * from "./model/index.js";

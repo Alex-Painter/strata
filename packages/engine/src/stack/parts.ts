@@ -135,7 +135,7 @@ export async function buildStackDiffs(
     whole = { from: stack.base, to: end, diff, model };
   }
 
-  const built: Array<Omit<PrPart, "provenance">> = [];
+  const built: Array<Omit<PrPart, "provenance" | "summary">> = [];
   for (const step of steps) {
     const node = nodes.get(step.pr) as StackNode;
     const { files, hunks } =
@@ -161,6 +161,8 @@ export async function buildStackDiffs(
   const parts: PrPart[] = built.map((part) => ({
     ...part,
     provenance: provenance.get(part.pr) ?? null,
+    // Claude's summary of the part's own diff comes later, when the repo allows it.
+    summary: [],
   }));
   return { parts, whole, issues, placed, layerNotes };
 }
@@ -199,7 +201,7 @@ async function compareWithGitHub(
   stack: Stack,
   node: StackNode,
   edge: StackEdge | null,
-  part: Omit<PrPart, "github" | "provenance">,
+  part: Omit<PrPart, "github" | "provenance" | "summary">,
 ): Promise<GitHubDiffCheck | null> {
   if (part.how === "unknown") return null;
   const { pr } = node;
@@ -249,7 +251,7 @@ function differsBecause(
   stack: Stack,
   node: StackNode,
   edge: StackEdge | null,
-  part: Omit<PrPart, "github" | "provenance">,
+  part: Omit<PrPart, "github" | "provenance" | "summary">,
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;

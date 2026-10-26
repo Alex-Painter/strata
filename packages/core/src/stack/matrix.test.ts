@@ -21,6 +21,7 @@ function part(pr: number, diff: string, revisedLater: PrPart["provenance"] = nul
     hunks,
     github: null,
     provenance: revisedLater,
+    summary: [],
   };
 }
 
