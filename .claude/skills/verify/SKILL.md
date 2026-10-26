@@ -5,7 +5,7 @@ description: Drive the real Strata app (Hono API + React web app + `strata` CLI)
 
 # Verify Strata
 
-Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs) in the web app and API, and the CLI's `stacks` command and argument handling. Diffs, layers and summaries aren't built yet, the other milestone-1 API routes answer 501, and `strata analyze` stops once it has found the stack. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
+Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs, each PR's diff and the whole-stack diff, layers, the layer by PR matrix, the summaries and the Guide) in the web app and API, and the CLI's `stacks` and `analyze` commands. Sources, files and threads answer 501, and `strata analyze` doesn't write its page yet. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
 
 Everything goes through `scripts/strata-verify`, which lives next to this file. From the repo root:
 
@@ -43,14 +43,22 @@ Where GitHub data comes from (`--github`, bypass mode only):
 | `fixture`        | a stand-in GitHub (`apps/server/src/dev/fixture-github.ts`) serving the demo repo `acme/app` | stacks, Changes and the workspace, anywhere, with no token     |
 | `gh`             | real GitHub with the token from `gh auth token`, passed only to the server's environment    | a real repo on the developer's Mac; add `--checkouts owner/name=path` |
 
+Where Claude's answers come from (`--claude`, with `--github fixture` only):
+
+| Option           | Answers                                                                                     | Use for                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `none` (default) | none: the page says there's no summary and shows Strata's own Guide                         | everything else                                               |
+| `fixture`        | a stand-in Claude (`apps/server/src/dev/fixture-claude.ts`) on the fixture GitHub, answering from Strata's own prompts; `acme/app`'s settings turn on `sendCodeToAnthropic` | the summaries, the Guide and Claude's layers, with no key or cost |
+
 ## Launch
 
 ```bash
-$V up                 # bypass mode; or: $V up --mode oauth, or $V up --github fixture
+$V up                 # bypass mode; or: $V up --mode oauth, $V up --github fixture [--claude fixture]
 # RUN_ID=20261025-091902-bypass-24552
 # URL=http://localhost:8790
 # MODE=bypass
 # GITHUB=none
+# CLAUDE=none
 # EVIDENCE=/tmp/strata-verify/runs/<RUN_ID>/evidence
 ```
 

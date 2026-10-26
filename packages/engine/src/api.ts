@@ -38,6 +38,8 @@ export interface EngineConfig {
   now?: () => Date;
   /** Without a key, LLM steps are skipped and the report says so. */
   anthropicApiKey?: string;
+  /** Where the client made from the key sends requests; dev servers point it at a stand-in. */
+  anthropicBaseUrl?: string;
   /** Replaces the Anthropic client made from the key; tests pass a fake. */
   anthropicClient?: Anthropic;
   /**

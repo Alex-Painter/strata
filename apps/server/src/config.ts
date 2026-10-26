@@ -29,6 +29,8 @@ const Env = z.object({
   DEV_GITHUB_GRAPHQL_URL: z.url().optional(),
   /** Where to fetch repos from instead of github.com; `{repo}` becomes `owner/name`. */
   DEV_GIT_REMOTE: z.string().min(1).optional(),
+  /** Where to send Anthropic API requests instead, such as the fixture GitHub's stand-in Claude. */
+  DEV_ANTHROPIC_BASE_URL: z.url().optional(),
   /** Local checkouts Strata may borrow objects from: `owner/name=path,owner/name=path`. */
   STRATA_CHECKOUTS: z.string().default(""),
 });
@@ -56,6 +58,8 @@ export interface ServerConfig {
   devBypass: DevBypass | null;
   /** Stand-ins for GitHub's API and git host, for driving the app offline. Never set in production. */
   devGitHub: { graphqlUrl: string | null; gitRemote: string | null } | null;
+  /** A stand-in for the Anthropic API. Never set in production. */
+  devAnthropicBaseUrl: string | null;
   warnings: string[];
 }
 
@@ -94,6 +98,10 @@ export function loadConfig(
       : null;
   if (production && wantsDevGitHub) {
     warnings.push("DEV_GITHUB_GRAPHQL_URL and DEV_GIT_REMOTE are ignored in production.");
+  }
+  const devAnthropicBaseUrl = production ? null : (env.DEV_ANTHROPIC_BASE_URL ?? null);
+  if (production && env.DEV_ANTHROPIC_BASE_URL) {
+    warnings.push("DEV_ANTHROPIC_BASE_URL is ignored in production.");
   }
 
   let sessionSecret = env.SESSION_SECRET ?? "";
@@ -142,6 +150,7 @@ export function loadConfig(
     checkouts,
     devBypass,
     devGitHub,
+    devAnthropicBaseUrl,
     warnings,
   };
 }

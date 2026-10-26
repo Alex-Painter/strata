@@ -34,6 +34,7 @@ export function engineFactory(
         dataDir: config.dataDir,
         ...(token ? { githubToken: token } : {}),
         ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
+        ...(config.devAnthropicBaseUrl ? { anthropicBaseUrl: config.devAnthropicBaseUrl } : {}),
         ...(config.model ? { model: config.model } : {}),
         checkouts: config.checkouts,
         log: (message) => console.log(`[strata] ${message}`),

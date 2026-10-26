@@ -10,9 +10,14 @@
  *
  * Prints `READY <graphql url> <git remote>` once it's listening, and deletes
  * the repo when stopped.
+ *
+ * It also stands in for Claude at POST /v1/messages (fixture-claude.ts): point
+ * DEV_ANTHROPIC_BASE_URL at its origin, set any ANTHROPIC_API_KEY, and turn on
+ * sendCodeToAnthropic for acme/app in the data folder's settings.
  */
 import { createServer } from "node:http";
 import { demoRepo, prNode, StackRepo } from "@strata/engine/testing";
+import { fixtureClaude } from "./fixture-claude.js";
 
 const remote = await StackRepo.create();
 const demo = await demoRepo(remote);
@@ -148,12 +153,17 @@ const shift = Date.now() - 3_600_000 - newest;
 demo.github.prs = demo.github.prs.map((pr) => shiftTimes(pr, shift));
 
 const server = createServer(async (req, res) => {
-  if (req.method !== "POST" || req.url !== "/graphql") {
+  if (req.method !== "POST" || (req.url !== "/graphql" && req.url !== "/v1/messages")) {
     res.writeHead(404).end();
     return;
   }
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
+  if (req.url === "/v1/messages") {
+    const answer = fixtureClaude(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
+    return;
+  }
   try {
     const { query, variables } = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     const data = await demo.github.graphql(query, variables ?? {});

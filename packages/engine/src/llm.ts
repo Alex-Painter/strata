@@ -16,9 +16,10 @@ export interface LlmSettings {
 }
 
 export function createLlm(config: EngineConfig): LlmSettings | null {
+  const { anthropicApiKey: apiKey, anthropicBaseUrl: baseURL } = config;
   const client =
     config.anthropicClient ??
-    (config.anthropicApiKey ? new Anthropic({ apiKey: config.anthropicApiKey }) : null);
+    (apiKey ? new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) }) : null);
   if (!client) return null;
   return { client, model: config.model ?? DEFAULT_MODEL };
 }
