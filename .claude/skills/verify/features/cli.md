@@ -9,7 +9,7 @@
 - `cli-input-validation`: input that isn't a PR, stack, URL or range prints the accepted forms and exits 1.
 - `cli-needs-token`: `analyze` and `stacks` without `GITHUB_TOKEN` say so and exit 1, writing nothing.
 - `cli-stacks`: `strata stacks <owner/repo>` prints each stack as a tree, bottom PR first, with link states and issues. `--json <file>` also writes `{repo, stacks}`.
-- `cli-analyze`: `strata analyze <input>` prints the path, one line per PR (how Strata built its diff, files, lines, title, and GitHub's reason when its diff differs), the whole-stack files by layer (with `(inspect)` on the layers to inspect and the reason a file is mechanical), issues and notes. `--leaf <n>` picks a fork's path; `--repo-path` lends a checkout's objects; `--json <file>` writes the report.
+- `cli-analyze`: `strata analyze <input>` prints the path, one line per PR (how Strata built its diff, files, lines, title, and GitHub's reason when its diff differs), the whole-stack files by layer (with `(inspect)` on the layers to inspect and the reason a file is mechanical), the `Layers by PR` matrix (`↻N` lines changed again later, `+Nm` mechanical), issues and notes. `--leaf <n>` picks a fork's path; `--repo-path` lends a checkout's objects; `--json <file>` writes the report.
 
 ## How to get to it (user POV)
 

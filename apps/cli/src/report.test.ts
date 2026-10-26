@@ -47,6 +47,9 @@ describe("formatReport", () => {
         "    A b2-3.txt  +1 -0",
         "    A b3-4.txt  +1 -0",
         "",
+        "  Layers by PR     #1   #2   #3  Net",
+        "    Docs            1    1    1    3",
+        "",
         "  - Summaries aren't computed yet.",
         "",
       ].join("\n"),
@@ -71,5 +74,19 @@ describe("formatReport", () => {
       file.layer = { layer: "docs", by: "llm", reason: "A note for #1", confidence: "medium" };
     }
     expect(formatReport(report)).toContain("    A b1-2.txt  +1 -0  (Claude: A note for #1)\n");
+  });
+
+  it("marks revised and mechanical lines in the matrix", async () => {
+    const report = await analyze("acme/app#3");
+    const [one] = report.parts;
+    const hunk = one?.hunks[0];
+    if (one?.provenance && hunk) {
+      one.provenance.revisedLater = [{ hunkId: hunk.id, by: 2, lines: 1 }];
+    }
+    const [file] = report.change.files;
+    if (file) file.mechanical = { kind: "generated", reason: "Generated" };
+    expect(formatReport(report)).toContain(
+      "  Layers by PR       #1     #2     #3    Net\n    Docs           1 ↻1      1      1  2 +1m\n",
+    );
   });
 });

@@ -1,8 +1,16 @@
 /**
  * Prints a report in brief, the way `strata analyze` shows it: the path, each
- * PR's own diff, the whole-stack diff's files by layer, then issues and notes.
+ * PR's own diff, the whole-stack diff's files by layer, the layer by PR
+ * matrix, then issues and notes.
  */
-import { type ChangeReport, type FileChange, LAYERS, type PrPart } from "@strata/core";
+import {
+  type ChangeReport,
+  type FileChange,
+  LAYERS,
+  type LayerMatrix,
+  layerMatrix,
+  type PrPart,
+} from "@strata/core";
 
 /** Longer whole-stack file lists are cut, and say how many were left out. */
 const MAX_FILES = 40;
@@ -61,6 +69,7 @@ export function formatReport(report: ChangeReport): string {
     }
   }
   if (change.files.length > shown) lines.push(`  … and ${change.files.length - shown} more`);
+  if (stack && change.revisions) lines.push("", ...matrixLines(layerMatrix(report)));
 
   const path = stack?.selectedPath ?? [];
   const issues = stack?.issues.filter((issue) => issue.prs.some((n) => path.includes(n))) ?? [];
@@ -68,6 +77,34 @@ export function formatReport(report: ChangeReport): string {
   for (const issue of issues) lines.push(`  ! ${issue.message}`);
   for (const note of report.notes) lines.push(`  - ${note}`);
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The matrix as text: meaningful lines per layer and PR, then Net. "↻N" is
+ * lines a later PR changed again, "+Nm" mechanical lines.
+ */
+function matrixLines(matrix: LayerMatrix): string[] {
+  if (matrix.rows.length === 0) return [];
+  const title = "Layers by PR";
+  // Layer names are indented two under the title.
+  const label =
+    Math.max(title.length, ...matrix.rows.map((r) => LAYERS[r.layer].title.length + 2)) + 2;
+  const cells = matrix.rows.map((row) =>
+    row.cells.map((cell) => {
+      if (cell.files.length === 0) return "";
+      const revised = cell.revised > 0 ? ` ↻${cell.revised}` : "";
+      const mechanical = cell.mechanical > 0 ? ` +${cell.mechanical}m` : "";
+      return `${cell.meaningful}${revised}${mechanical}`;
+    }),
+  );
+  const heads = [...matrix.prs.map((pr) => `#${pr}`), "Net"];
+  const width = Math.max(...heads.map((h) => h.length), ...cells.flat().map((c) => c.length)) + 2;
+  const row = (first: string, rest: string[]) =>
+    `  ${first.padEnd(label)}${rest.map((c) => c.padStart(width)).join("")}`.trimEnd();
+  return [
+    row(title, heads),
+    ...matrix.rows.map((r, i) => row(`  ${LAYERS[r.layer].title}`, cells[i] ?? [])),
+  ];
 }
 
 function partLine(part: PrPart): string {
