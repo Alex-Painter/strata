@@ -1,6 +1,7 @@
 import type {
   ChangeReport,
   GitHubDiffCheck,
+  Hunk,
   PrPart,
   RunInfo,
   Stack,
@@ -38,8 +39,8 @@ export interface RunView {
 
 /**
  * Where context is read: the whole stack and its diff, or one PR of it ("How
- * it arrived") with that PR's own diff. Layers and summaries join these panes
- * in later slices.
+ * it arrived") with that PR's own diff. A commit range has no PRs, so it's
+ * just its diff, read the same way as a whole stack.
  */
 export function PaneArea({
   report,
@@ -87,7 +88,7 @@ export function PaneArea({
               />
             )
           ) : report ? (
-            <h1 className="text-base font-semibold">{report.change.title}</h1>
+            <RangePane report={report} />
           ) : (
             !run && (
               <p className="text-muted">Nothing to show yet: this Change hasn't been analysed.</p>
@@ -203,33 +204,10 @@ function StackPane({
         </p>
       )}
       <Issues repo={stack.repo} issues={issues} />
-      {report.notes.length > 0 && (
-        <ul className="space-y-1 rounded-md border border-dashed border-line px-3 py-2 text-muted">
-          {report.notes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
-      )}
+      <Notes notes={report.notes} />
       {report.change.revisions && (
         <>
-          {report.summary.length > 0 && (
-            <section aria-labelledby="summary-heading" className="space-y-2">
-              <h2 id="summary-heading" className="font-semibold">
-                Summary
-              </h2>
-              <ClaimList claims={report.summary} hunks={hunks} onFile={showFile} />
-              <p className="text-[11px] text-muted">
-                Written by Claude from the whole-stack diff alone. Each sentence opens the hunks it
-                rests on.
-              </p>
-            </section>
-          )}
-          <GuideView
-            guide={report.guide}
-            files={report.change.files}
-            hunks={hunks}
-            onFile={showFile}
-          />
+          <WholeSummary report={report} hunks={hunks} of="stack" />
           <LayerMatrixView
             matrix={matrix}
             titles={titles}
@@ -246,6 +224,86 @@ function StackPane({
           />
         </>
       )}
+    </>
+  );
+}
+
+/** A commit range: its diff, with what's written about it, and no PRs. */
+function RangePane({ report }: { report: ChangeReport }) {
+  const hunks = useMemo(
+    () => new Map(report.change.hunks.map((hunk) => [hunk.id, hunk])),
+    [report],
+  );
+  const { repo, revisions } = report.change;
+  const commit = (oid: string) =>
+    repo.kind === "github" ? (
+      <CommitLink repo={`${repo.owner}/${repo.name}`} oid={oid} />
+    ) : (
+      <span className="font-mono">{shortOid(oid)}</span>
+    );
+  return (
+    <>
+      <header className="space-y-1">
+        <h1 className="text-base font-semibold">{report.change.title}</h1>
+        {revisions && (
+          <p className="text-muted">
+            From {commit(revisions.base)}, where it branched, to {commit(revisions.head)}
+          </p>
+        )}
+      </header>
+      <Notes notes={report.notes} />
+      {revisions && (
+        <>
+          <WholeSummary report={report} hunks={hunks} of="range" />
+          <Files files={report.change.files} hunks={report.change.hunks} />
+        </>
+      )}
+    </>
+  );
+}
+
+function Notes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) return null;
+  return (
+    <ul className="space-y-1 rounded-md border border-dashed border-line px-3 py-2 text-muted">
+      {notes.map((note) => (
+        <li key={note}>{note}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** What's written about the whole diff: Claude's summary, then the Guide. */
+function WholeSummary({
+  report,
+  hunks,
+  of,
+}: {
+  report: ChangeReport;
+  hunks: Map<string, Hunk>;
+  of: "stack" | "range";
+}) {
+  return (
+    <>
+      {report.summary.length > 0 && (
+        <section aria-labelledby="summary-heading" className="space-y-2">
+          <h2 id="summary-heading" className="font-semibold">
+            Summary
+          </h2>
+          <ClaimList claims={report.summary} hunks={hunks} onFile={showFile} />
+          <p className="text-[11px] text-muted">
+            Written by Claude from the {of === "stack" ? "whole-stack diff" : "range's diff"} alone.
+            Each sentence opens the hunks it rests on.
+          </p>
+        </section>
+      )}
+      <GuideView
+        guide={report.guide}
+        files={report.change.files}
+        hunks={hunks}
+        onFile={showFile}
+        of={of === "stack" ? "the whole stack" : "the range"}
+      />
     </>
   );
 }

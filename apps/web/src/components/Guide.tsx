@@ -5,20 +5,23 @@ import { ClaimList } from "./Claims";
 import { fileAnchor, meaningful } from "./Diff";
 
 /**
- * The order to read the whole stack in. Claude's sections say what they're
- * about, each sentence opening its hunks; every section opens to its files,
- * each linking to its diff. Without Claude it's Strata's own groups.
+ * The order to read the whole stack (or a range) in. Claude's sections say
+ * what they're about, each sentence opening its hunks; every section opens to
+ * its files, each linking to its diff. Without Claude it's Strata's own groups.
  */
 export function GuideView({
   guide,
   files,
   hunks,
   onFile,
+  of = "the whole stack",
 }: {
   guide: Guide;
   files: FileChange[];
   hunks: Map<string, Hunk>;
   onFile: (path: string) => void;
+  /** What the guide is to: "the whole stack" or "the range". */
+  of?: string;
 }) {
   if (guide.sections.length === 0) return null;
   const byPath = new Map(files.map((file) => [file.path, file]));
@@ -29,8 +32,8 @@ export function GuideView({
       </h2>
       <p className="text-[11px] text-muted">
         {guide.by === "llm"
-          ? "Claude's reading order for the whole stack: the core of the change first, glue and mechanical changes last."
-          : "Strata's groups of the whole stack: by layer, then mechanical kind, then directory."}
+          ? `Claude's reading order for ${of}: the core of the change first, glue and mechanical changes last.`
+          : `Strata's groups of ${of}: by layer, then mechanical kind, then directory.`}
       </p>
       <ol className="divide-y divide-line rounded-md border border-line bg-surface">
         {guide.sections.map((section, i) => (

@@ -1,4 +1,9 @@
-import type { ChangeDetail, ChangeReport, MeResponse } from "@strata/core/model";
+import {
+  type ChangeDetail,
+  type ChangeReport,
+  describeRepo,
+  type MeResponse,
+} from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -118,7 +123,11 @@ function Workspace({
   // Only PRs in the stack can be a scope; anything else in the URL means the whole stack.
   const pr = scope !== null && stack?.nodes.some((node) => node.pr.number === scope) ? scope : null;
   return (
-    <Shell me={me} title={report?.change.title ?? title ?? "Change"} repo={stack?.repo}>
+    <Shell
+      me={me}
+      title={report?.change.title ?? title ?? "Change"}
+      repo={report ? describeRepo(report.change.repo) : undefined}
+    >
       <Navigator report={report} summary={summary} scope={pr} onScope={onScope} />
       <PaneArea
         report={report}
