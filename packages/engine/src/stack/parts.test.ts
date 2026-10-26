@@ -158,7 +158,8 @@ describe("each PR's diff", () => {
     ]);
     expect(report.notes).toEqual([
       "The whole-stack diff covers #1 only. #2 and #3 aren't in it. The stack's issues say why.",
-      "Summaries aren't computed yet.",
+      "There's no summary, and the Guide shows Strata's own groups. To have Claude write them, " +
+        "turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     ]);
   });
 

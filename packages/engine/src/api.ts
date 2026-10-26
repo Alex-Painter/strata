@@ -3,6 +3,7 @@
  * what this file declares, so treat changes here as API changes: update both
  * callers in the same commit.
  */
+import type Anthropic from "@anthropic-ai/sdk";
 import type {
   Anchor,
   ChangeHint,
@@ -37,6 +38,8 @@ export interface EngineConfig {
   now?: () => Date;
   /** Without a key, LLM steps are skipped and the report says so. */
   anthropicApiKey?: string;
+  /** Replaces the Anthropic client made from the key; tests pass a fake. */
+  anthropicClient?: Anthropic;
   /**
    * Replaces the Anthropic-backed judge of layers for files no rule matched;
    * tests pass a fake. Either way it's only asked for repos whose settings

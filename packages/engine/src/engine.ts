@@ -6,7 +6,7 @@ import { RepoCache } from "./git/cache.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
-import { createLlm, type LlmSettings } from "./llm.js";
+import { type AskJson, cachedAsk, createLlm, type LlmSettings } from "./llm.js";
 import { serialize } from "./lock.js";
 import { loadRepoSettings, type RepoSettings } from "./settings.js";
 import {
@@ -58,11 +58,14 @@ export const createEngine: CreateEngine = (config) => {
         options.signal?.throwIfAborted();
         options.onProgress?.("Building the diffs");
         const settings = await loadRepoSettings(config.dataDir, repoName(stackInput));
+        const ask = settings.sendCodeToAnthropic && llm ? summaryAsk(config, llm) : null;
         return stackReport(resolved, options, {
           engineVersion: ENGINE_VERSION,
           startedAt,
           settings,
           judge: layerJudge(config, llm, settings),
+          ask,
+          ...(llm ? { model: llm.model } : {}),
         });
       });
     },
@@ -88,6 +91,11 @@ function layerJudge(
   if (!settings.sendCodeToAnthropic) return null;
   if (config.layerJudge) return config.layerJudge;
   return llm ? createLlmLayerJudge(llm, join(config.dataDir, "llm-cache", "layers")) : null;
+}
+
+/** Summaries are cached apart from layer answers, so either can be cleared alone. */
+function summaryAsk(config: EngineConfig, llm: LlmSettings): AskJson {
+  return cachedAsk(llm, join(config.dataDir, "llm-cache", "summaries"));
 }
 
 function githubPort(config: EngineConfig): GitHubPort {

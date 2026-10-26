@@ -2,15 +2,11 @@
  * Asks Claude for the layer of files no rule recognised. Only the whole-stack
  * diff is asked about, and each PR's own diff reuses the answers by path, so a
  * file's layer never depends on how the stack was split. Answers are cached by
- * a hash of the exact request: the same diff gets the same answer on every run,
- * and costs nothing the second time.
+ * a hash of the exact request (llm.ts).
  *
  * This runs only for repos whose settings turn on sendCodeToAnthropic, since
  * it sends file paths and changed lines to the Anthropic API.
  */
-import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import {
   type DiffModel,
   type FileChange,
@@ -21,7 +17,7 @@ import {
   type LayerAssignment,
   type LayerId,
 } from "@strata/core";
-import type { LlmSettings } from "../llm.js";
+import { cachedAsk, type LlmSettings } from "../llm.js";
 
 /** One file Claude is asked about, with the start of its change. */
 export interface LayerQuestion {
@@ -45,8 +41,6 @@ export interface LayerAnswer {
 
 /** Returns a layer for some or all of the files asked about. */
 export type LayerJudge = (request: LayerRequest, signal?: AbortSignal) => Promise<LayerAnswer[]>;
-
-export class LayerJudgeError extends Error {}
 
 /** Files per request. More would make one slow answer, and one failure cost more. */
 const FILES_PER_REQUEST = 40;
@@ -178,54 +172,21 @@ function prompt(request: LayerRequest): string {
 
 /** The judge that asks the Anthropic API, with answers cached under `cacheDir`. */
 export function createLlmLayerJudge(llm: LlmSettings, cacheDir: string): LayerJudge {
+  const ask = cachedAsk(llm, cacheDir);
   return async (request, signal) => {
-    const body = {
-      model: llm.model,
-      max_tokens: 16000,
-      system: SYSTEM,
-      messages: [{ role: "user" as const, content: prompt(request) }],
-      output_config: {
-        effort: "low" as const,
-        format: { type: "json_schema" as const, schema: SCHEMA },
+    const answer = await ask(
+      {
+        version: PROMPT_VERSION,
+        system: SYSTEM,
+        prompt: prompt(request),
+        schema: SCHEMA,
+        effort: "low",
+        maxTokens: 16000,
       },
-    };
-    const key = createHash("sha256")
-      .update(JSON.stringify({ version: PROMPT_VERSION, body }))
-      .digest("hex");
-    const path = join(cacheDir, `${key}.json`);
-    const cached = await readCached(path);
-    if (cached) return validAnswers(cached, request);
-
-    const message = await llm.client.messages.create(body, signal ? { signal } : {});
-    if (message.stop_reason === "refusal") {
-      throw new LayerJudgeError("Claude declined to answer.");
-    }
-    if (message.stop_reason === "max_tokens") {
-      throw new LayerJudgeError("Claude's answer was cut off.");
-    }
-    const text = message.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
-    let answer: unknown;
-    try {
-      answer = JSON.parse(text.join(""));
-    } catch {
-      throw new LayerJudgeError("Claude's answer wasn't valid JSON.");
-    }
-    const answers = validAnswers(answer, request);
-    await mkdir(cacheDir, { recursive: true });
-    // Written whole, then renamed, so a crash never leaves half an answer.
-    await writeFile(`${path}.tmp`, JSON.stringify(answer));
-    await rename(`${path}.tmp`, path);
-    return answers;
+      signal,
+    );
+    return validAnswers(answer, request);
   };
-}
-
-/** Null when there's no answer yet, or the file can't be read; either way, Claude is asked. */
-async function readCached(path: string): Promise<unknown> {
-  try {
-    return JSON.parse(await readFile(path, "utf8"));
-  } catch {
-    return null;
-  }
 }
 
 /** Keeps answers for files that were asked about, in a real layer, with a reason. */

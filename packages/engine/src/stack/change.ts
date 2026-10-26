@@ -1,8 +1,9 @@
 /**
  * Turns a stack input into a Change: find the stack, pick the path, build
  * each PR's diff and the whole-stack diff, sort them into layers, and
- * describe it. Summaries come in a later slice, so the report says it doesn't
- * have them yet.
+ * describe it. Claude writes the summaries and orders the Guide when the
+ * repo's settings allow it; otherwise the Guide is Strata's own groups and
+ * the report says why there's no summary.
  */
 import {
   type ChangeHint,
@@ -21,7 +22,9 @@ import {
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
 import type { LayerJudge } from "../layers/judge.js";
+import type { AskJson } from "../llm.js";
 import type { RepoSettings } from "../settings.js";
+import { type Summaries, writeSummaries } from "../summaries/summaries.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
 
@@ -95,6 +98,10 @@ export async function stackReport(
     settings: RepoSettings;
     /** Null unless the repo's settings let its code go to Claude and there's a key. */
     judge: LayerJudge | null;
+    /** Asks Claude for the summaries. Null when the judge would be. */
+    ask: AskJson | null;
+    /** The model `ask` uses. */
+    model?: string;
   },
 ): Promise<ChangeReport> {
   const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir, {
@@ -108,6 +115,14 @@ export async function stackReport(
   };
   const path = stack.selectedPath;
   const whole = diffs.whole;
+  let summaries: Summaries;
+  if (meta.ask) {
+    options.onProgress?.("Writing the summaries");
+    summaries = await writeSummaries(whole?.model ?? null, diffs.parts, meta.ask, options.signal);
+  } else {
+    const groups = whole ? guideGroups(whole.model) : [];
+    summaries = { summary: [], guide: ruleGuide(groups), parts: new Map(), notes: [] };
+  }
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -126,25 +141,44 @@ export async function stackReport(
       hints: resolved.hints,
     },
     stack,
-    parts: diffs.parts,
+    parts: diffs.parts.map((part) => ({ ...part, summary: summaries.parts.get(part.pr) ?? [] })),
     sources: options.sources ?? [],
-    summary: [],
-    guide: ruleGuide(whole ? guideGroups(whole.model) : []),
+    summary: summaries.summary,
+    guide: summaries.guide,
     layerSummaries: [],
     diagrams: [],
     notes: [
       ...diffNotes(stack, diffs),
       ...diffs.layerNotes,
       ...guessNotes(resolved, diffs, meta),
-      "Summaries aren't computed yet.",
+      ...summaryNotes(resolved, diffs, meta),
+      ...summaries.notes,
     ],
     raw: { diff: whole?.diff ?? "" },
     analysis: {
       engineVersion: meta.engineVersion,
+      ...(meta.ask && meta.model ? { model: meta.model } : {}),
       startedAt: meta.startedAt.toISOString(),
       durationMs: Date.now() - meta.startedAt.getTime(),
     },
   };
+}
+
+/** Says why there's no summary, when Claude wasn't asked. */
+function summaryNotes(
+  resolved: ResolvedChange,
+  diffs: StackDiffs,
+  meta: { settings: RepoSettings; ask: AskJson | null },
+): string[] {
+  if (meta.ask || !diffs.whole) return [];
+  const without = "There's no summary, and the Guide shows Strata's own groups";
+  if (meta.settings.sendCodeToAnthropic) {
+    return [`${without}: this repo lets Claude write them, but Strata has no Anthropic API key.`];
+  }
+  return [
+    `${without}. To have Claude write them, turn on sendCodeToAnthropic in ` +
+      `settings/${describeRepo(resolved.repo)}.json in Strata's data folder.`,
+  ];
 }
 
 /** Says when the whole-stack diff doesn't cover the whole path. */

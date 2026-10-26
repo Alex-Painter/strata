@@ -4,13 +4,8 @@ import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildDiff, createClassifier, LAYER_IDS } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  createLlmLayerJudge,
-  judgeLayers,
-  type LayerJudge,
-  LayerJudgeError,
-  type LayerRequest,
-} from "./judge.js";
+import { ClaudeError } from "../llm.js";
+import { createLlmLayerJudge, judgeLayers, type LayerJudge, type LayerRequest } from "./judge.js";
 
 let cacheDir: string;
 beforeEach(async () => {
@@ -117,7 +112,7 @@ describe("the Anthropic layer judge", () => {
     ];
     for (const [reply, message] of cases) {
       const judge = createLlmLayerJudge(fakeClaude(() => reply).llm, cacheDir);
-      await expect(judge(REQUEST)).rejects.toThrow(LayerJudgeError);
+      await expect(judge(REQUEST)).rejects.toThrow(ClaudeError);
       await expect(judge(REQUEST)).rejects.toThrow(message);
     }
     expect(await readdir(cacheDir)).toEqual([]);

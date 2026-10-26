@@ -10,6 +10,7 @@
  */
 import type { DiffModel, FileChange, Hunk, PartProvenance, PrPart } from "@strata/core";
 import { blame } from "../git/diff.js";
+import { runLimited } from "../limit.js";
 
 /** Blames run a few at a time, so a big stack doesn't start hundreds of gits. */
 const CONCURRENCY = 8;
@@ -146,15 +147,4 @@ function lines(hunk: Hunk, kind: "add" | "del"): number[] {
 
 function chainIndex(chain: ChainLink[], pr: number): number {
   return chain.findIndex((link) => link.pr === pr);
-}
-
-async function runLimited(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
-  let next = 0;
-  const worker = async () => {
-    while (next < tasks.length) {
-      const task = tasks[next++] as () => Promise<void>;
-      await task();
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
 }

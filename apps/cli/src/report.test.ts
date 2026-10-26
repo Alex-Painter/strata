@@ -50,7 +50,8 @@ describe("formatReport", () => {
         "  Layers by PR     #1   #2   #3  Net",
         "    Docs            1    1    1    3",
         "",
-        "  - Summaries aren't computed yet.",
+        "  - There's no summary, and the Guide shows Strata's own groups. To have Claude write " +
+          "them, turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
         "",
       ].join("\n"),
     );
@@ -63,7 +64,7 @@ describe("formatReport", () => {
       { kind: "needs-restack", prs: [6], message: "Elsewhere.", evidence: [] },
     );
     const text = formatReport(report);
-    expect(text).toContain("\n  ! On the path.\n  - Summaries");
+    expect(text).toContain("\n  ! On the path.\n  - There's no summary");
     expect(text).not.toContain("Elsewhere.");
   });
 

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import type Anthropic from "@anthropic-ai/sdk";
 import {
   type ChangeReport,
   canonicalReport,
@@ -19,8 +20,9 @@ import { type FeatureShape, featureShape, type ShapeRepo } from "./testing/featu
  * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1): one feature built
  * five ways (see testing/feature-shapes.ts) must give the same whole-stack
  * view, while "How it arrived" shows each split as it is. The repo lets
- * Claude sort files no rule matched, through a fake that records what it's
- * asked, so the questions are held to the same standard.
+ * Claude sort files no rule matched and write the summaries, through fakes
+ * that record what they're asked, so the questions are held to the same
+ * standard.
  */
 const SHAPES: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "fork"];
 
@@ -29,7 +31,44 @@ interface Analysed {
   report: ChangeReport;
   gitDir: string;
   asked: LayerRequest[];
+  /** Every request sent to the fake Anthropic client. */
+  bodies: Array<{ system: string; messages: Array<{ content: string }> }>;
 }
+
+/** Answers the summary questions with sentences citing the first hunks, and records them. */
+function fakeClaude() {
+  const bodies: Analysed["bodies"] = [];
+  const client = {
+    messages: {
+      create: async (body: Analysed["bodies"][number]) => {
+        bodies.push(body);
+        const summary = [
+          { text: "Accounts get forecasts.", hunks: ["h1", "h2"] },
+          { text: "Cites nothing real.", hunks: ["h99"] },
+        ];
+        const answer = body.system.includes("one pull request")
+          ? { summary }
+          : {
+              summary,
+              sections: [
+                {
+                  title: "Forecasts",
+                  groups: ["g3", "g1"],
+                  about: [{ text: "The service and its model.", hunks: ["h3"] }],
+                },
+              ],
+            };
+        return {
+          stop_reason: "end_turn",
+          content: [{ type: "text", text: JSON.stringify(answer), citations: null }],
+        };
+      },
+    },
+  } as unknown as Anthropic;
+  return { client, bodies };
+}
+
+const isWhole = (body: Analysed["bodies"][number]) => !body.system.includes("one pull request");
 
 const analysed = new Map<FeatureShape, Analysed>();
 let dataDir: string;
@@ -50,17 +89,19 @@ beforeAll(async () => {
         reason: `Service code in ${file.path}`,
       }));
     };
+    const { client, bodies } = fakeClaude();
     const engine = createEngine({
       dataDir: join(dataDir, name),
       githubPort: shape.github,
       gitRemote: () => shape.remote.dir,
       now: () => new Date(Date.UTC(2026, 9, 2)),
       layerJudge,
+      anthropicClient: client,
     });
     const input = parseChangeInput(`acme/app#${shape.tip}`);
     const report = await engine.analyzeChange(input);
     const { gitDir } = await engine.resolveChange(input);
-    analysed.set(name, { shape, report, gitDir, asked });
+    analysed.set(name, { shape, report, gitDir, asked, bodies });
   }
 }, 60_000);
 
@@ -131,6 +172,54 @@ describe("shape invariance", () => {
         if (file) expect(file.layer, `${name} #${part.pr}`).toEqual(services("one-pr")?.layer);
       }
     }
+  });
+
+  it("asks for the summary with the same bytes however the feature was split", () => {
+    const whole = (name: FeatureShape) => get(name).bodies.filter(isWhole);
+    expect(whole("one-pr")).toHaveLength(1);
+    for (const name of [...same, "fork" as const]) {
+      expect(JSON.stringify(whole(name)), name).toBe(JSON.stringify(whole("one-pr")));
+    }
+    // Nothing about how the work arrived: no PR numbers, titles, branches or commits.
+    const text = JSON.stringify(whole("stack"));
+    const stack = get("stack").report.stack;
+    const leaks = [
+      ...(stack?.nodes ?? []).flatMap((node) => [
+        `#${node.pr.number}`,
+        node.pr.title,
+        node.pr.headRef,
+        ...(node.pr.baseRef === stack?.trunk.name ? [] : [node.pr.baseRef]),
+        node.pr.headOid,
+        node.pr.headOid.slice(0, 7),
+      ]),
+      get("stack").report.change.title,
+      get("stack").report.change.revisions?.base.slice(0, 7) ?? "",
+      get("stack").report.change.revisions?.head.slice(0, 7) ?? "",
+    ];
+    for (const leak of leaks) expect(text, leak).not.toContain(leak);
+  });
+
+  it("writes the same summary and Guide however the feature was split", () => {
+    const { summary, guide } = get("one-pr").report;
+    expect(summary.map((claim) => [claim.text, claim.evidence.map((e) => e.label)])).toEqual([
+      ["Accounts get forecasts.", ["app/models/account.py:4", "app/routers/forecasts.py:1"]],
+    ]);
+    expect(guide.by).toBe("llm");
+    expect(guide.sections.map((section) => section.title)).toEqual([
+      "Forecasts",
+      "API: app/routers/",
+      "Tests: tests/",
+      "Config & infra: lockfiles",
+      "Docs: docs/",
+    ]);
+    for (const name of same) {
+      expect(get(name).report.summary, name).toEqual(summary);
+      expect(get(name).report.guide, name).toEqual(guide);
+    }
+    // Each PR is summarised from its own diff, so those differ with the split: the
+    // sentence cites h1 and h2, and #2's diff has only one hunk.
+    expect(get("one-pr").report.parts.map((part) => part.summary.length)).toEqual([1]);
+    expect(get("stack").report.parts.map((part) => part.summary.length)).toEqual([1, 0, 1, 1]);
   });
 
   it("gives identical canonical reports", () => {
