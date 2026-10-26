@@ -21,8 +21,10 @@ import {
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
 import { originChips, revisedBy, revisionChips } from "../lib/provenance";
+import { ClaimList } from "./Claims";
 import { Files, fileAnchor } from "./Diff";
 import { EvidenceList } from "./EvidenceList";
+import { GuideView } from "./Guide";
 import { LayerMatrixView } from "./LayerMatrix";
 import { PathPicker } from "./PathPicker";
 import { StateBadge } from "./PrStatus";
@@ -171,6 +173,10 @@ function StackPane({
   const issues = stack.issues.filter((issue) => issue.prs.some((n) => path.includes(n)));
   const matrix = useMemo(() => layerMatrix(report), [report]);
   const chips = useMemo(() => originChips(report.parts), [report]);
+  const hunks = useMemo(
+    () => new Map(report.change.hunks.map((hunk) => [hunk.id, hunk])),
+    [report],
+  );
   const titles = new Map(stack.nodes.map((node) => [node.pr.number, node.pr.title]));
   return (
     <>
@@ -206,6 +212,24 @@ function StackPane({
       )}
       {report.change.revisions && (
         <>
+          {report.summary.length > 0 && (
+            <section aria-labelledby="summary-heading" className="space-y-2">
+              <h2 id="summary-heading" className="font-semibold">
+                Summary
+              </h2>
+              <ClaimList claims={report.summary} hunks={hunks} onFile={showFile} />
+              <p className="text-[11px] text-muted">
+                Written by Claude from the whole-stack diff alone. Each sentence opens the hunks it
+                rests on.
+              </p>
+            </section>
+          )}
+          <GuideView
+            guide={report.guide}
+            files={report.change.files}
+            hunks={hunks}
+            onFile={showFile}
+          />
           <LayerMatrixView
             matrix={matrix}
             titles={titles}
@@ -394,6 +418,19 @@ function PartDiff({
         <GitHubDiffers repo={stack.repo} pr={n} check={part.github} />
       )}
       {how && <p className="text-muted">{how}</p>}
+      {part.summary.length > 0 && (
+        <section aria-labelledby="part-summary-heading" className="space-y-2">
+          <h2 id="part-summary-heading" className="font-semibold">
+            What it changes
+          </h2>
+          <ClaimList
+            claims={part.summary}
+            hunks={new Map(part.hunks.map((hunk) => [hunk.id, hunk]))}
+            onFile={showFile}
+          />
+          <p className="text-[11px] text-muted">Written by Claude from this PR's own diff.</p>
+        </section>
+      )}
       <RevisedLater part={part} path={stack.selectedPath} onScope={onScope} />
       {part.how !== "unknown" && (
         <Files files={part.files} hunks={part.hunks} chips={revisionChips(part)} onPr={onScope} />

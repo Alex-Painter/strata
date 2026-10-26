@@ -276,6 +276,46 @@ function HunkRows({
   );
 }
 
+/**
+ * Hunks shown where a sentence cites them, each under its file's path, which
+ * opens the file in the diff below.
+ */
+export function HunkList({ hunks, onFile }: { hunks: Hunk[]; onFile?: (path: string) => void }) {
+  return (
+    <div className="space-y-2">
+      {hunks.map((hunk) => (
+        <div
+          key={hunk.id}
+          data-cited={hunk.id}
+          className="overflow-hidden rounded-md border border-line bg-surface"
+        >
+          <p className="border-b border-line px-3 py-1 font-mono text-[12px]">
+            {onFile ? (
+              <a
+                href={`#${fileAnchor(hunk.path)}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onFile(hunk.path);
+                }}
+                className="hover:text-accent hover:underline"
+              >
+                {hunk.path}
+              </a>
+            ) : (
+              hunk.path
+            )}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse font-mono text-[12px] leading-5">
+              <HunkRows hunk={hunk} inMechanicalFile={false} chips={[]} onPr={undefined} />
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const MARK: Record<DiffLine["kind"], string> = { add: "+", del: "-", context: " " };
 
 function LineRow({ line }: { line: DiffLine }) {
