@@ -19,7 +19,8 @@ export interface HunkChip {
 /**
  * The files of a diff by layer, in review order, then by directory, then each
  * file's hunks. Mechanical files and hunks start collapsed with their reason,
- * and line counts leave them out.
+ * and line counts leave them out. Layers to inspect, and files an inspect rule
+ * matched in any other layer, are tagged.
  */
 export function Files({
   files,
@@ -85,6 +86,14 @@ export function Files({
                         <span className="min-w-0 flex-1 truncate font-mono">
                           {basename(file.path)}
                         </span>
+                        {file.inspect.length > 0 && (
+                          <span
+                            className="shrink-0 text-[11px] text-warn"
+                            title={file.inspect.map((flag) => flag.title).join(", ")}
+                          >
+                            Inspect
+                          </span>
+                        )}
                         <LineCount file={file} hunks={hunksOf(file)} />
                       </a>
                     ))}
@@ -176,12 +185,22 @@ function FileDiff({
       className="scroll-mt-4 rounded-md border border-line bg-surface"
       data-file={file.path}
       data-mechanical={file.mechanical?.kind}
+      data-inspect={file.inspect.map((flag) => flag.rule).join(" ") || undefined}
     >
       <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2 select-none">
         <span className="min-w-0 flex-1 truncate font-mono">
           {file.oldPath && <span className="text-muted">{file.oldPath} → </span>}
           {file.path}
         </span>
+        {file.inspect.map((flag) => (
+          <span
+            key={flag.rule}
+            className="shrink-0 rounded border border-warn/40 px-1 text-[11px] text-warn"
+            title={`${flag.reason}. Changes here must be right first time, so inspect them closely.`}
+          >
+            {flag.title}
+          </span>
+        ))}
         {file.mechanical && (
           <span className="shrink-0 rounded bg-raised px-1.5 text-[11px] text-muted">
             {file.mechanical.reason}
@@ -192,7 +211,11 @@ function FileDiff({
       {open && (
         <div className="border-t border-line">
           <p className="border-b border-line px-3 py-1.5 text-muted">
-            {[...facts, layerFact(file)].join(" · ")}
+            {[
+              ...facts,
+              layerFact(file),
+              ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
+            ].join(" · ")}
           </p>
           {hunks.length > 0 && (
             <div className="overflow-x-auto">

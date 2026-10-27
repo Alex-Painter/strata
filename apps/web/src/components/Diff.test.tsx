@@ -106,6 +106,31 @@ describe("Files", () => {
     );
   });
 
+  it("tags each file an inspect rule matched, with the glob, in any layer but Tests", () => {
+    const page = render(
+      [
+        adding("app/auth/session.py", "TTL = 60"),
+        adding("app/service.py", "pass"),
+        adding("tests/test_session.py", "def test(): ..."),
+      ].join(""),
+    );
+    const flagged = [...page.querySelectorAll("[data-inspect]")].map((file) => [
+      file.getAttribute("data-file"),
+      file.getAttribute("data-inspect"),
+    ]);
+    expect(flagged).toEqual([["app/auth/session.py", "access"]]);
+    const file = page.querySelector('[data-file="app/auth/session.py"]');
+    expect(file?.querySelector("summary")?.textContent).toContain("Access and permissions");
+    expect(file?.querySelector("p")?.textContent).toBe(
+      "Added · Logic: No rule matched, so it's taken as application code, a guess · " +
+        "Inspect: Access and permissions: matches **/{auth,authn,authz,authentication,authorization}/**",
+    );
+    const listed = [...page.querySelectorAll('nav[aria-label="File list"] a')].map((a) =>
+      a.textContent?.includes("Inspect"),
+    );
+    expect(listed).toEqual([false, true, false]);
+  });
+
   it("says when Claude chose the layer", () => {
     const { files, hunks } = buildDiff(adding("app/jobs/warm.py", "pass"), {
       classifier: createClassifier({
