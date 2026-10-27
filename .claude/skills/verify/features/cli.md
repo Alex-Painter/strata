@@ -13,7 +13,7 @@
 - `cli-page`: `analyze` ends with `Wrote <page>.html` and `Wrote <page>.json` on stderr: `reports/<owner>/<name>/<change id>.{html,json}` in the data folder, or `--out` (with the JSON next to it) and `--json`. The page is the web app's static build with the report embedded, and shows what the workspace shows for the same stack.
 - `cli-no-checkout`: any `--out`, `--json` or data folder inside a git checkout is refused before the analysis: `Strata won't write to <path>: it's inside the git checkout <dir>, where it could be committed by accident. Choose a path outside it.`, exit 1, nothing written. `stacks --json` too.
 - `cli-current-branch`: `analyze` with no input prints `… The stack around <owner/repo>:<branch>, the branch checked out in <dir>` and analyses that.
-- `stack-vs-range`: the script prints `Stack: …`, `Range: …` and `Same: the canonical reports are equal.` (exit 0), or `Different: …` and the places they differ (exit 1).
+- `stack-vs-range`: the script prints `Stack: …`, `Range: …`, any of the stack's notes as `Note: …`, and `Same: the canonical reports are equal.` (exit 0), or `Different: …` and the places they differ (exit 1). When some PRs couldn't be put on the stack, it compares only those in the whole-stack diff and prints, for example, `Same, but only for #1 → #2: #3 isn't in the whole-stack diff.` (exit 1).
 
 ## How to get to it (user POV)
 

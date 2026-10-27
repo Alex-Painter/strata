@@ -6,14 +6,14 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 
 - `new-change`: the "Review a stack" box on the home page reads back what it will look up, then opens the Change.
 - `stack-list`: `/repos/<owner>/<name>` lists the repo's stacks, newest activity first, each with its map and a Review button.
-- `stack-map`: the rail in the workspace. Every PR links to GitHub, merged PRs link to the commit they landed as, and a PR that needs a restack has a dashed edge and says so.
+- `stack-map`: the rail in the workspace. Every PR links to GitHub, merged PRs link to the commit they landed as, and an open PR that needs a restack has a dashed edge and says so (a merged or closed one can't be restacked, so it doesn't).
 - `pr-scope`: choosing a PR on the map shows its branches, how it sits on its parent with commit evidence, where its own changes start, and its issues. The URL gets `?pr=<n>`.
 - `path-picker`: a fork offers one choice per path. Picking another path opens that path's Change.
 - `diffs`: the Files section lists the files by directory, each linking to its diff, and big files start closed. The whole stack shows the whole-stack diff; a PR shows its own, says when Strata replayed it onto the stack below, and shows a `GitHub's diff` banner when GitHub's diff differs.
 - `summaries`: three to six sentences about the whole stack and one to three per PR, each with a button that opens the hunks it rests on in place.
 - `guide`: the whole stack's sections in reading order, each opening to its files; Claude's when the repo allows it, Strata's groups otherwise.
 - `mermaid`: "Copy as Mermaid" puts the map on the clipboard as a flowchart.
-- `changes-api`: `GET /api/repos/:owner/:name/stacks`, `POST /api/changes`, `GET /api/changes`, `GET /api/changes/:id` and `POST /api/changes/:id/runs`. One Change per path: asking again for any PR on a path returns the same Change.
+- `changes-api`: `GET /api/repos/:owner/:name/stacks`, `POST /api/changes`, `GET /api/changes`, `GET /api/changes/:id` and `POST /api/changes/:id/runs`. One Change per path: asking again for any PR on a path returns the same Change. While a repo's first read runs, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}` after 1.5 s; the same request asked again returns the latest step, then the result.
 
 ## How to get to it (user POV)
 
@@ -37,7 +37,7 @@ API (`$B` is the RUN_ID):
 - **Create.** `strata-verify http $B stacks/create POST /api/changes -H 'Content-Type: application/json' -d '{"input":"https://github.com/acme/app/pull/10"}'` returns 201 with `change.title` `"Cache forecasts per account"`.
 - **Same path, same Change.** Repeat with `{"input":"acme/app#11"}`: 200 with the same `change.id`.
 - **A fork's other path.** `{"input":"acme/app#5","leaf":6}` and `{"input":"acme/app#5"}` return two different ids.
-- **Run result.** `strata-verify http $B stacks/detail GET /api/changes/<id>` shows `run.status` `"done"` (it goes from queued to done in about a second), `report.schemaVersion` `6`, `report.stack.selectedPath` `[9,10,11]`, `report.change.files` with `app/forecast_cache.py`, `app/jobs/warm_cache.py`, `migrations/0042_forecast_cache.sql`, `tests/test_warm_cache.py`, `uv.lock` and `web/admin/CacheStats.tsx`, `report.change.layers[].layer` `["data-model","logic","ui","tests","config"]`, `uv.lock`'s `mechanical.kind` `"lockfile"`, and `report.parts[].how` `["direct","replayed","replayed"]`. `POST /api/changes/<id>/runs` with `-d '{}'` returns 202 and a new run.
+- **Run result.** `strata-verify http $B stacks/detail GET /api/changes/<id>` shows `run.status` `"done"` (it goes from queued to done in about a second), `report.schemaVersion` `7`, `report.stack.selectedPath` `[9,10,11]`, `report.change.files` with `app/forecast_cache.py`, `app/jobs/warm_cache.py`, `migrations/0042_forecast_cache.sql`, `tests/test_warm_cache.py`, `uv.lock` and `web/admin/CacheStats.tsx`, `report.change.layers[].layer` `["data-model","logic","ui","tests","config"]`, `uv.lock`'s `mechanical.kind` `"lockfile"`, and `report.parts[].how` `["direct","replayed","replayed"]`. `POST /api/changes/<id>/runs` with `-d '{}'` returns 202 and a new run.
 - **Bad input.** `{"input":"not a pr"}` returns 400 `Can't read "not a pr"...`; `{"input":"acme/app#1,3"}` returns 400 `...isn't a chain of branch links...`; `{"input":"acme/app@main...b4"}` returns 501.
 
 Web (`URL` is the run's URL):
@@ -66,7 +66,7 @@ Save each `read_page` tree with `strata-verify note $B stacks/<step>.aria.txt`, 
 
 ## Gotchas
 
-- The first request for a repo clones it into the instance's data folder, so `POST /api/changes` and the stack list take longer the first time. On a real repo this can be many seconds; pass `--checkouts` so Strata borrows objects from a local checkout.
+- The first request for a repo clones it into the instance's data folder. When that takes over 1.5 s, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}`: repeat the same request until it returns 200 or 201 (the web app does this each second and shows the step). On a real repo the first read can take minutes; pass `--checkouts` so Strata borrows objects from a local checkout.
 - The fixture's timestamps are moved to the last hour at startup, so "updated 1h ago" is expected, and its commit ids change on every `up`. Compare structure, not shas.
 - `?pr=<n>` with a PR outside the stack shows the whole stack rather than an error.
 - The stand-in Claude's sentences are mechanical on purpose ("Changes <path>."). They test the plumbing: labels, dropping bad citations, the Guide's merge and order, and opening hunks. How good real answers are can only be judged with a real key on a real stack.

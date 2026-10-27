@@ -1,8 +1,8 @@
 /**
- * One small feature built five ways, for the shape-invariance tests (SPEC.md,
+ * One small feature built six ways, for the shape-invariance tests (SPEC.md,
  * "Benchmarks", 1). The feature looks like maverick's: a Beanie model field, a
  * service, a router, a test, a lockfile bump and a doc. Every shape starts
- * from the same main, and shapes 1 to 4 end with the same code.
+ * from the same main, and every shape but the fork (5) ends with the same code.
  *
  * 1. `one-pr`: the whole feature in one PR.
  * 2. `stack`: four chained PRs, where #4 fixes a mistake made in #2.
