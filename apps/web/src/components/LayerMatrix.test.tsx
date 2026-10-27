@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { originChips, revisedBy, revisionChips } from "../lib/provenance";
-import { Files } from "./Diff";
+import { FileList } from "./Diff";
 import { LayerMatrixView } from "./LayerMatrix";
 import { StackMap } from "./StackMap";
 
@@ -139,13 +139,31 @@ describe("LayerMatrixView", () => {
   });
 });
 
+function fileList(
+  files: PrPart["files"],
+  hunks: PrPart["hunks"],
+  chips: ReturnType<typeof originChips>,
+) {
+  const byId = new Map(hunks.map((hunk) => [hunk.id, hunk]));
+  return (
+    <FileList
+      files={files}
+      hunksOf={(file) => file.hunkIds.map((id) => byId.get(id)).filter((h) => h !== undefined)}
+      chips={chips}
+      fold
+      selected={null}
+      onFile={() => {}}
+      onHunk={() => {}}
+      onPr={() => {}}
+    />
+  );
+}
+
 describe("provenance chips", () => {
   it("say which PRs a whole-stack hunk came from", () => {
     const { change, parts } = report();
     const chips = originChips(parts);
-    document.body.innerHTML = renderToStaticMarkup(
-      <Files files={change.files} hunks={change.hunks} chips={chips} onPr={() => {}} />,
-    );
+    document.body.innerHTML = renderToStaticMarkup(fileList(change.files, change.hunks, chips));
     const billing = [...document.querySelectorAll('[data-file="app/billing.py"] [data-chip]')];
     expect(billing.map((chip) => [chip.textContent, chip.getAttribute("title")])).toEqual([
       ["from #1", "#1 added 1 line of this hunk."],
@@ -156,7 +174,7 @@ describe("provenance chips", () => {
   it("say which later PR revised a PR's hunk", () => {
     const [one] = report().parts as [PrPart];
     document.body.innerHTML = renderToStaticMarkup(
-      <Files files={one.files} hunks={one.hunks} chips={revisionChips(one)} onPr={() => {}} />,
+      fileList(one.files, one.hunks, revisionChips(one)),
     );
     const chip = document.querySelector('[data-file="app/billing.py"] [data-chip="2"]');
     expect(chip?.textContent).toBe("revised in #2");

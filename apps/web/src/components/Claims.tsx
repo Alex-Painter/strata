@@ -1,70 +1,50 @@
 import type { Claim, Hunk } from "@strata/core/model";
-import { useId, useState } from "react";
-import { HunkList } from "./Diff";
 
 /**
- * Sentences Claude wrote, each with a button that opens the hunks it rests on
- * in place. A sentence none of whose hunks are in this diff isn't shown: no
- * evidence, no claim.
+ * Sentences Claude wrote, each with a button naming how many hunks it rests
+ * on. The button selects the sentence, and the side panel shows those hunks.
+ * A sentence none of whose hunks are in this diff isn't shown: no evidence,
+ * no claim.
  */
 export function ClaimList({
   claims,
   hunks,
-  onFile,
+  selected,
+  onSelect,
 }: {
   claims: Claim[];
   /** The diff's hunks by id: the whole stack's, or one PR's. */
   hunks: Map<string, Hunk>;
-  onFile?: (path: string) => void;
+  selected: Claim | null;
+  onSelect: (claim: Claim) => void;
 }) {
   const shown = claims
     .map((claim) => ({ claim, cited: citedHunks(claim, hunks) }))
     .filter(({ cited }) => cited.length > 0);
   if (shown.length === 0) return null;
   return (
-    <ul className="space-y-1.5">
-      {shown.map(({ claim, cited }) => (
-        <ClaimItem key={claim.text} claim={claim} cited={cited} onFile={onFile} />
-      ))}
+    <ul className="claims">
+      {shown.map(({ claim, cited }) => {
+        const count = cited.length === 1 ? "1 hunk" : `${cited.length} hunks`;
+        const where = claim.evidence.map((item) => item.label).join(", ");
+        return (
+          <li key={claim.text} data-claim>
+            {claim.text}{" "}
+            <button
+              type="button"
+              data-nav={`claim:${claim.text}`}
+              aria-pressed={selected === claim}
+              aria-label={`${count}: ${where}`}
+              title={where}
+              onClick={() => onSelect(claim)}
+              className="chip"
+            >
+              {count}
+            </button>
+          </li>
+        );
+      })}
     </ul>
-  );
-}
-
-function ClaimItem({
-  claim,
-  cited,
-  onFile,
-}: {
-  claim: Claim;
-  cited: Hunk[];
-  onFile: ((path: string) => void) | undefined;
-}) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  const count = cited.length === 1 ? "1 hunk" : `${cited.length} hunks`;
-  const where = claim.evidence.map((item) => item.label).join(", ");
-  return (
-    <li data-claim>
-      <p>
-        {claim.text}{" "}
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={open ? id : undefined}
-          aria-label={`${count}: ${where}`}
-          title={where}
-          onClick={() => setOpen((value) => !value)}
-          className="rounded border border-line px-1 text-[11px] whitespace-nowrap text-accent hover:bg-raised"
-        >
-          {count}
-        </button>
-      </p>
-      {open && (
-        <div id={id} className="mt-1.5 mb-3">
-          <HunkList hunks={cited} {...(onFile ? { onFile } : {})} />
-        </div>
-      )}
-    </li>
   );
 }
 

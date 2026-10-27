@@ -1,49 +1,64 @@
-import type { FileChange, Guide, GuideSection, Hunk } from "@strata/core/model";
+import type { Claim, FileChange, Guide, GuideSection, Hunk } from "@strata/core/model";
 import { useId, useState } from "react";
 import { lineCount } from "../lib/format";
 import { ClaimList } from "./Claims";
-import { fileAnchor, meaningful } from "./Diff";
+import { meaningful } from "./Diff";
 
 /**
  * The order to read the whole stack (or a range) in. Claude's sections say
- * what they're about, each sentence opening its hunks; every section opens to
- * its files, each linking to its diff. Without Claude it's Strata's own groups.
+ * what they're about, each sentence with its evidence; every section opens to
+ * its files, each opening in its layer. Without Claude it's Strata's own groups.
  */
 export function GuideView({
   guide,
   files,
   hunks,
   onFile,
+  selected,
+  onClaim,
   of = "the whole stack",
+  sections = guide.sections,
+  heading = "Guide",
 }: {
   guide: Guide;
   files: FileChange[];
   hunks: Map<string, Hunk>;
   onFile: (path: string) => void;
+  selected: Claim | null;
+  onClaim: (claim: Claim) => void;
   /** What the guide is to: "the whole stack" or "the range". */
   of?: string;
+  /** The sections to show, when it's only some of them. */
+  sections?: GuideSection[];
+  heading?: string;
 }) {
-  if (guide.sections.length === 0) return null;
+  if (sections.length === 0) return null;
   const byPath = new Map(files.map((file) => [file.path, file]));
+  const all = sections.length === guide.sections.length;
   return (
-    <section aria-labelledby="guide-heading" className="space-y-2">
-      <h2 id="guide-heading" className="font-semibold">
-        Guide
-      </h2>
-      <p className="text-[11px] text-muted">
-        {guide.by === "llm"
-          ? `Claude's reading order for ${of}: the core of the change first, glue and mechanical changes last.`
-          : `Strata's groups of ${of}: by layer, then mechanical kind, then directory.`}
-      </p>
-      <ol className="divide-y divide-line rounded-md border border-line bg-surface">
-        {guide.sections.map((section, i) => (
+    <section aria-labelledby="guide-heading" className="grid gap-3">
+      <div className="grid gap-0.5">
+        <h2 id="guide-heading" className="h2">
+          {heading}
+        </h2>
+        <p className="sub">
+          {guide.by === "llm"
+            ? `Claude's reading order for ${of}: the core of the change first, glue and mechanical changes last.`
+            : `Strata's groups of ${of}: by layer, then mechanical kind, then directory.`}
+        </p>
+      </div>
+      <ol className="list">
+        {sections.map((section) => (
           <GuideItem
             key={section.id}
-            n={i + 1}
+            n={guide.sections.indexOf(section) + 1}
             section={section}
             byPath={byPath}
             hunks={hunks}
             onFile={onFile}
+            selected={selected}
+            onClaim={onClaim}
+            startOpen={!all}
           />
         ))}
       </ol>
@@ -57,29 +72,35 @@ function GuideItem({
   byPath,
   hunks,
   onFile,
+  selected,
+  onClaim,
+  startOpen,
 }: {
   n: number;
   section: GuideSection;
   byPath: Map<string, FileChange>;
   hunks: Map<string, Hunk>;
   onFile: (path: string) => void;
+  selected: Claim | null;
+  onClaim: (claim: Claim) => void;
+  startOpen: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const id = useId();
   const files = section.paths.map((path) => byPath.get(path)).filter((file) => file !== undefined);
   const counts = meaningful(files, hunks);
   return (
-    <li data-section={section.id} className="px-3 py-2">
+    <li data-section={section.id} className="grid gap-1 px-3 py-2.5">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-baseline gap-2 text-left hover:text-accent"
+        className="flex w-full items-baseline gap-2 text-left"
       >
-        <span className="w-5 shrink-0 font-mono text-muted">{n}</span>
+        <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{n}</span>
         <span className="min-w-0 flex-1 font-medium">{section.title}</span>
-        <span className="shrink-0 text-[11px] text-muted">
+        <span className="shrink-0 text-[12px] text-faint">
           {files.length === 1 ? "1 file" : `${files.length} files`} ·{" "}
           {files.every((file) => file.mechanical)
             ? "mechanical"
@@ -87,26 +108,23 @@ function GuideItem({
         </span>
       </button>
       {section.about.length > 0 && (
-        <div className="mt-1 pl-7">
-          <ClaimList claims={section.about} hunks={hunks} onFile={onFile} />
+        <div className="pl-7 text-muted">
+          <ClaimList claims={section.about} hunks={hunks} selected={selected} onSelect={onClaim} />
         </div>
       )}
       {open && (
-        <ul id={id} aria-label={`Files in ${section.title}`} className="mt-1 pl-7">
+        <ul id={id} aria-label={`Files in ${section.title}`} className="grid pl-7">
           {files.map((file) => (
-            <li key={file.path}>
-              <a
-                href={`#${fileAnchor(file.path)}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onFile(file.path);
-                }}
-                className="font-mono text-[12px] hover:text-accent hover:underline"
+            <li key={file.path} className="flex items-baseline gap-2">
+              <button
+                type="button"
+                onClick={() => onFile(file.path)}
+                className="truncate text-left font-mono text-[12px] text-muted hover:text-text"
               >
                 {file.path}
-              </a>
+              </button>
               {file.mechanical && (
-                <span className="ml-2 text-[11px] text-muted">{file.mechanical.reason}</span>
+                <span className="shrink-0 text-[12px] text-faint">{file.mechanical.reason}</span>
               )}
             </li>
           ))}

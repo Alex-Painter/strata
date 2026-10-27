@@ -1,24 +1,23 @@
 import {
   type ChangeDetail,
   type ChangeReport,
-  describeRepo,
+  LAYER_IDS,
+  type LayerId,
   type MeResponse,
 } from "@strata/core/model";
-import { summarizeStack } from "@strata/core/stack";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocation, useParams, useSearchParams } from "wouter";
-import { Navigator } from "../components/Navigator";
-import { PaneArea, type RunView } from "../components/PaneArea";
-import { TopBar } from "../components/TopBar";
+import { AppShell, Breadcrumb } from "../components/AppShell";
 import { api } from "../lib/api";
 import { useLatestRequest } from "../lib/latest-request";
+import type { Nav } from "../workspace/model";
+import { Workspace } from "../workspace/Workspace";
 
 /**
- * The review workspace: every kind of context side by side, with chat beside
- * it. Left, the stack map as the navigation rail. Centre, the panes: the
- * whole stack by default, or one PR when it's chosen on the map. Right, chat
- * about whatever the reviewer highlights.
+ * The review workspace for one Change: the server's, with where the reviewer
+ * is kept in the URL (`?pr=N&layer=api`), or a CLI-written page's, with it
+ * kept in memory.
  */
 export function WorkspacePage(
   props: { mode: "static"; report: ChangeReport } | { mode: "server"; me: MeResponse },
@@ -30,10 +29,9 @@ export function WorkspacePage(
   );
 }
 
-/** A CLI-written page: the embedded report, with the scope kept in memory. */
 function StaticWorkspace({ report }: { report: ChangeReport }) {
-  const [scope, setScope] = useState<number | null>(null);
-  return <Workspace report={report} run={null} scope={scope} onScope={setScope} />;
+  const [nav, setNav] = useState<Nav>({ layer: null, pr: null });
+  return <Workspace report={report} run={null} nav={nav} onNav={setNav} />;
 }
 
 function ServerWorkspace({ me }: { me: MeResponse }) {
@@ -70,15 +68,28 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["change", id] }),
   });
 
-  const scope = Number(params.get("pr")) || null;
-  const onScope = (pr: number | null) =>
-    setParams(pr === null ? {} : { pr: String(pr) }, { replace: false });
+  const layer = params.get("layer");
+  const nav: Nav = {
+    pr: Number(params.get("pr")) || null,
+    layer: LAYER_IDS.includes(layer as LayerId) ? (layer as LayerId) : null,
+  };
+  const onNav = (next: Nav) => {
+    const search: Record<string, string> = {};
+    if (next.pr !== null) search.pr = String(next.pr);
+    if (next.layer !== null) search.layer = next.layer;
+    setParams(search);
+  };
 
   if (detail.error) {
     return (
-      <Shell me={me} title="Change">
-        <p className="p-6 text-muted">{detail.error.message}</p>
-      </Shell>
+      <AppShell
+        me={me}
+        navLabel="Change"
+        nav={null}
+        top={<Breadcrumb items={[{ label: "Changes", href: "/" }, { label: "Change" }]} />}
+      >
+        <p className="p-8 text-muted">{detail.error.message}</p>
+      </AppShell>
     );
   }
   const data: ChangeDetail | undefined = detail.data;
@@ -93,79 +104,11 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
         onRunAgain: () => runAgain.mutate(),
         rerunning: runAgain.isPending,
       }}
-      scope={scope}
-      onScope={onScope}
+      nav={nav}
+      onNav={onNav}
       onPickPath={(tip) => pickPath.mutate(tip)}
       pickingPath={pickPath.isPending ? (pickPath.variables ?? null) : null}
       pickError={pickPath.error?.message ?? null}
     />
-  );
-}
-
-function Workspace({
-  me,
-  title,
-  report,
-  run,
-  scope,
-  onScope,
-  onPickPath,
-  pickingPath = null,
-  pickError = null,
-}: {
-  me?: MeResponse;
-  title?: string | undefined;
-  report: ChangeReport | null;
-  run: RunView | null;
-  scope: number | null;
-  onScope: (pr: number | null) => void;
-  onPickPath?: (tip: number) => void;
-  pickingPath?: number | null;
-  pickError?: string | null;
-}) {
-  const stack = report?.stack ?? null;
-  const summary = useMemo(() => (stack ? summarizeStack(stack) : null), [stack]);
-  // Only PRs in the stack can be a scope; anything else in the URL means the whole stack.
-  const pr = scope !== null && stack?.nodes.some((node) => node.pr.number === scope) ? scope : null;
-  return (
-    <Shell
-      me={me}
-      title={report?.change.title ?? title ?? "Change"}
-      repo={report ? describeRepo(report.change.repo) : undefined}
-    >
-      <Navigator report={report} summary={summary} scope={pr} onScope={onScope} />
-      <PaneArea
-        report={report}
-        summary={summary}
-        scope={pr}
-        onScope={onScope}
-        run={run}
-        {...(onPickPath ? { onPickPath } : {})}
-        pickingPath={pickingPath}
-        pickError={pickError}
-      />
-    </Shell>
-  );
-}
-
-function Shell({
-  me,
-  title,
-  repo,
-  children,
-}: {
-  me?: MeResponse | undefined;
-  title: string;
-  repo?: string | undefined;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col">
-      <TopBar {...(me ? { me } : {})}>
-        {repo && <span className="shrink-0 text-muted">{repo}</span>}
-        <span className="truncate font-medium">{title}</span>
-      </TopBar>
-      <div className="flex min-h-0 flex-1">{children}</div>
-    </div>
   );
 }

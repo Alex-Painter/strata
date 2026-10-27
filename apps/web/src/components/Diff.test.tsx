@@ -1,7 +1,7 @@
 import { buildDiff, createClassifier } from "@strata/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { Files, fileFacts, layerAnchor } from "./Diff";
+import { FileList, fileFacts } from "./Diff";
 
 const DIFF = `diff --git a/docs/old.md b/docs/new.md
 similarity index 90%
@@ -41,68 +41,43 @@ index 0000000..5555555
 \\ No newline at end of file
 `;
 
-function render(diff: string) {
+function render(diff: string, options: { fold?: boolean; selected?: string } = {}) {
   const { files, hunks } = buildDiff(diff, { classifier: createClassifier() });
-  document.body.innerHTML = renderToStaticMarkup(<Files files={files} hunks={hunks} />);
+  const byId = new Map(hunks.map((hunk) => [hunk.id, hunk]));
+  document.body.innerHTML = renderToStaticMarkup(
+    <FileList
+      files={files}
+      hunksOf={(file) => file.hunkIds.map((id) => byId.get(id)).filter((h) => h !== undefined)}
+      chips={null}
+      fold={options.fold ?? true}
+      selected={options.selected ?? null}
+      onFile={() => {}}
+      onHunk={() => {}}
+    />,
+  );
   return document.body;
 }
 
-describe("Files", () => {
-  it("lists files by layer in review order, then by directory, and links each to its diff", () => {
-    const page = render(DIFF);
-    const list = page.querySelector('nav[aria-label="File list"]');
-    const layers = [...(list?.querySelectorAll("[data-layer]") ?? [])].map((layer) => [
-      layer.getAttribute("data-layer"),
-      ...[...layer.querySelectorAll(":scope > div > div:first-child")].map(
-        (dir) => dir.textContent,
-      ),
-    ]);
-    expect(layers).toEqual([
-      ["logic", "app/jobs"],
-      ["docs", "docs"],
-      ["other", "/", "bin"],
-    ]);
-    const links = [...(list?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"));
-    expect(links).toEqual([
-      "#file:app/jobs/warm.py",
-      "#file:docs/new.md",
-      "#file:icon.png",
-      "#file:latest",
-      "#file:bin/run",
-    ]);
-    for (const href of links) {
-      expect(page.querySelector(`[id="${href?.slice(1)}"]`)).not.toBeNull();
-    }
-    expect(page.querySelector("header")?.textContent).toContain("5 files · +4 −1");
-  });
+const lines = (element: Element | null | undefined) =>
+  [...(element?.querySelectorAll(".ln") ?? [])].map((row) => [
+    row.getAttribute("data-line"),
+    ...[...row.children].map((cell) => cell.textContent),
+  ]);
 
-  it("gives each layer a section, and flags the layers to inspect", () => {
-    const page = render(
-      [
-        adding("migrations/0001_init.sql", "create table t ();"),
-        adding("app/service.py", "pass"),
-      ].join(""),
-    );
-    const sections = [...page.querySelectorAll('section[id^="layer:"]')];
-    expect(sections.map((section) => section.id)).toEqual([
-      layerAnchor("data-model"),
-      layerAnchor("logic"),
-    ]);
-    expect(sections.map((section) => section.getAttribute("aria-label"))).toEqual([
-      "Data model",
-      "Logic",
-    ]);
-    expect(sections[0]?.querySelector("h3")?.textContent).toContain("Inspect");
-    expect(sections[1]?.querySelector("h3")?.textContent).not.toContain("Inspect");
-  });
-
-  it("says why each file is in its layer, and when that's a guess", () => {
+describe("FileList", () => {
+  it("shows each file with its hunks, and says why it's in its layer", () => {
     const page = render(DIFF);
+    expect(
+      [...page.querySelectorAll("[data-file]")].map((f) => f.getAttribute("data-file")),
+    ).toEqual(["app/jobs/warm.py", "bin/run", "docs/new.md", "icon.png", "latest"]);
     expect(page.querySelector('[data-file="docs/new.md"] p')?.textContent).toContain(
       "Docs: Documentation: matches **/*.{md,mdx,rst,adoc,txt}",
     );
     expect(page.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
       "Added · Logic: No rule matched, so it's taken as application code, a guess",
+    );
+    expect(page.querySelector('[data-file="bin/run"] p')?.textContent).toContain(
+      "Mode 100644 → 100755",
     );
   });
 
@@ -147,17 +122,25 @@ describe("Files", () => {
         ]),
       }),
     });
-    document.body.innerHTML = renderToStaticMarkup(<Files files={files} hunks={hunks} />);
+    document.body.innerHTML = renderToStaticMarkup(
+      <FileList
+        files={files}
+        hunksOf={() => hunks}
+        chips={null}
+        fold
+        selected={null}
+        onFile={() => {}}
+        onHunk={() => {}}
+      />,
+    );
     expect(document.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
       "Added · Logic: A job that warms the cache, Claude's call",
     );
   });
 
-  it("collapses mechanical files with their reason, and leaves them out of the counts", () => {
-    const page = render(
-      [
-        adding("app/service.py", "pass"),
-        `diff --git a/uv.lock b/uv.lock
+  const LOCKED = [
+    adding("app/service.py", "pass"),
+    `diff --git a/uv.lock b/uv.lock
 --- a/uv.lock
 +++ b/uv.lock
 @@ -1,2 +1,2 @@
@@ -166,15 +149,22 @@ describe("Files", () => {
 +version = "2"
 +hash = "b"
 `,
-      ].join(""),
-    );
+  ].join("");
+
+  it("folds mechanical files with their reason, and leaves them out of the counts", () => {
+    const page = render(LOCKED);
     const lock = page.querySelector('[data-file="uv.lock"]');
     expect(lock?.getAttribute("data-mechanical")).toBe("lockfile");
-    expect(lock?.hasAttribute("open")).toBe(false);
-    expect(lock?.querySelector("summary")?.textContent).toContain("Dependency lockfile");
-    const header = page.querySelector("header span");
-    expect(header?.textContent).toBe("2 files · +1 −0");
-    expect(header?.getAttribute("title")).toBe("All lines: +3 −2");
+    expect(lock?.querySelectorAll(".ln")).toHaveLength(0);
+    expect(lock?.textContent).toContain("Dependency lockfile");
+    expect(lock?.textContent).toContain("Folded: dependency lockfile. Show 1 hunk");
+    const count = page.querySelector('[data-file="app/service.py"] .add-n')?.parentElement;
+    expect(count?.textContent).toBe("+1 −0");
+  });
+
+  it("shows mechanical files when folding is off", () => {
+    const page = render(LOCKED, { fold: false });
+    expect(page.querySelectorAll('[data-file="uv.lock"] .ln')).toHaveLength(4);
   });
 
   it("folds whitespace-only hunks in a meaningful file", () => {
@@ -190,30 +180,26 @@ describe("Files", () => {
 -x = 1
 +x = 2
 `);
-    const [space, real] = [...page.querySelectorAll('[data-file="app/a.py"] tbody')];
+    const [space, real] = [...page.querySelectorAll('[data-file="app/a.py"] [data-hunk]')];
     expect(space?.getAttribute("data-mechanical")).toBe("whitespace");
-    expect(space?.querySelectorAll("tr[data-line]")).toHaveLength(0);
+    expect(space?.querySelectorAll(".ln")).toHaveLength(0);
     expect(space?.textContent).toContain("Whitespace-only change, 4 lines. Show");
-    expect(real?.querySelectorAll("tr[data-line]")).toHaveLength(2);
-    const count = page.querySelector('[data-file="app/a.py"] summary > span:last-child');
+    expect(real?.querySelectorAll(".ln")).toHaveLength(2);
+    const count = page.querySelector('[data-file="app/a.py"] .add-n')?.parentElement;
     expect(count?.textContent).toBe("+1 −1");
     expect(count?.getAttribute("title")).toBe("All lines: +3 −3");
   });
 
-  it("renders each line with its numbers and kind", () => {
+  it("renders each line with its number, sign and kind", () => {
     const page = render(DIFF);
     const doc = page.querySelector('[data-file="docs/new.md"]');
-    const rows = [...(doc?.querySelectorAll("tr[data-line]") ?? [])].map((row) => [
-      row.getAttribute("data-line"),
-      ...[...row.querySelectorAll("td")].map((cell) => cell.textContent),
+    expect(lines(doc)).toEqual([
+      ["context", "1", " ", "one"],
+      ["del", "2", "-", "two"],
+      ["add", "2", "+", "TWO"],
+      ["context", "3", " ", "three"],
     ]);
-    expect(rows).toEqual([
-      ["context", "1", "1", " one"],
-      ["del", "2", "", "-two"],
-      ["add", "", "2", "+TWO"],
-      ["context", "3", "3", " three"],
-    ]);
-    expect(doc?.querySelector("tbody tr")?.textContent).toBe("@@ -1,3 +1,3 @@ # Title");
+    expect(doc?.querySelector(".hunk-h")?.textContent).toBe("@@ -1,3 +1,3# Title");
     expect(page.querySelector('[data-file="app/jobs/warm.py"]')?.textContent).toContain(
       "No newline at end of file",
     );
@@ -229,12 +215,22 @@ new file mode 100644
 ${big}
 `);
     const file = page.querySelector('[data-file="big.txt"]');
-    expect(file?.hasAttribute("open")).toBe(false);
-    expect(file?.querySelectorAll("tr")).toHaveLength(0);
+    expect(file?.querySelectorAll(".ln")).toHaveLength(0);
+    expect(file?.textContent).toContain("Show 1 hunk, +500 −0");
   });
 
-  it("says when there are no changes", () => {
-    expect(render("").textContent).toContain("No changes.");
+  it("marks the selected file and hunk, and makes each one a stop for J and K", () => {
+    const { hunks } = buildDiff(DIFF);
+    const doc = hunks.find((hunk) => hunk.path === "docs/new.md");
+    const page = render(DIFF, { selected: doc?.id ?? "" });
+    const stops = [...page.querySelectorAll("[data-nav]")].map((el) => el.getAttribute("data-nav"));
+    expect(stops.slice(2, 5)).toEqual(["file:bin/run", "file:docs/new.md", `hunk:${doc?.id}`]);
+    expect(page.querySelector(`[data-hunk="${doc?.id}"]`)?.getAttribute("data-selected")).toBe(
+      "true",
+    );
+    expect(page.querySelector('[aria-current="true"]')?.getAttribute("data-nav")).toBe(
+      `hunk:${doc?.id}`,
+    );
   });
 });
 
