@@ -204,7 +204,7 @@ function StackPane({
         </p>
       )}
       <Issues repo={stack.repo} issues={issues} />
-      <Notes notes={report.notes} />
+      <Notes notes={[...stack.notes, ...report.notes]} />
       {report.change.revisions && (
         <>
           <WholeSummary report={report} hunks={hunks} of="stack" />

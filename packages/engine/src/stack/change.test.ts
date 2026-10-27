@@ -93,7 +93,7 @@ describe("engine.analyzeChange for stacks", () => {
       onProgress: (step) => steps.push(step),
     });
 
-    expect(report.schemaVersion).toBe(6);
+    expect(report.schemaVersion).toBe(7);
     expect(report.stack?.selectedPath).toEqual([1, 2, 3]);
     expect(report.change.title).toBe("Add the forecast model");
     expect(report.change.files).toHaveLength(3);

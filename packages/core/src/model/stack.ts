@@ -183,6 +183,12 @@ export interface Stack {
   selectedPath: number[];
   seed: number;
   issues: StackIssue[];
+  /**
+   * What the whole-stack diff leaves out because of how the work was split,
+   * such as PRs it couldn't place. They stay with the stack, so the
+   * whole-stack view reads the same however the work was split.
+   */
+  notes: string[];
 }
 
 /**

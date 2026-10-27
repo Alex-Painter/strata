@@ -102,6 +102,7 @@ export async function stackReport(
   const stack: Stack = {
     ...resolved.stack,
     issues: [...resolved.stack.issues, ...diffs.issues],
+    notes: diffNotes(resolved.stack, diffs),
   };
   const path = stack.selectedPath;
   const whole = diffs.whole;
@@ -131,7 +132,6 @@ export async function stackReport(
     layerSummaries: [],
     diagrams: [],
     notes: [
-      ...diffNotes(stack, diffs),
       ...diffs.layerNotes,
       ...wholeNotes(resolved.repo, whole?.model ?? null, meta),
       ...summaries.notes,

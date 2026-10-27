@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { parseChangeInput } from "@strata/core";
+import { canonicalReport, parseChangeInput, stableStringify } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EngineConfig } from "../api.js";
 import { createEngine } from "../engine.js";
@@ -238,11 +238,19 @@ describe("each PR's diff", () => {
       { anchor: { source: { kind: "commit", oid: h1 } }, label: "where #2's changes start" },
       { anchor: { source: { kind: "commit", oid: h2 } }, label: "#2's head" },
     ]);
-    expect(report.notes).toEqual([
+    // What the split left out is a note on the stack, not on the whole-stack view.
+    expect(report.stack?.notes).toEqual([
       "The whole-stack diff covers #1 only. #2 and #3 aren't in it. The stack's issues say why.",
+    ]);
+    expect(report.notes).toEqual([
       "There's no summary, and the Guide shows Strata's own groups. To have Claude write them, " +
         "turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     ]);
+
+    // So the same code as a plain range gives the same canonical report.
+    const { base, head } = report.change.revisions as { base: string; head: string };
+    const range = await analyze(github, `acme/app@${base}...${head}`);
+    expect(stableStringify(canonicalReport(range))).toBe(stableStringify(canonicalReport(report)));
   });
 
   it("sorts every part into layers with the repo's rules and .gitattributes", async () => {

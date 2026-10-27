@@ -222,6 +222,7 @@ class Builder {
       selectedPath,
       seed: seedPr.number,
       issues: this.issues,
+      notes: [],
     };
   }
 

@@ -100,9 +100,10 @@ export function formatReport(report: ChangeReport): string {
 
   const path = stack?.selectedPath ?? [];
   const issues = stack?.issues.filter((issue) => issue.prs.some((n) => path.includes(n))) ?? [];
-  if (issues.length > 0 || report.notes.length > 0) lines.push("");
+  const notes = [...(stack?.notes ?? []), ...report.notes];
+  if (issues.length > 0 || notes.length > 0) lines.push("");
   for (const issue of issues) lines.push(`  ! ${issue.message}`);
-  for (const note of report.notes) lines.push(`  - ${note}`);
+  for (const note of notes) lines.push(`  - ${note}`);
   return `${lines.join("\n")}\n`;
 }
 

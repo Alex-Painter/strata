@@ -72,6 +72,7 @@ const stack: Stack = {
       evidence: [],
     },
   ],
+  notes: [],
 };
 
 describe("formatStacks", () => {
