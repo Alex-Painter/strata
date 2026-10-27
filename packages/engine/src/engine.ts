@@ -120,7 +120,7 @@ function githubPort(config: EngineConfig): GitHubPort {
   return createGitHubPort({ token: config.githubToken });
 }
 
-/** The cache says when it clones or fetches: as progress when the caller follows it, else in the log. */
+/** The cache says when it clones or fetches, in the log and as progress to a caller following it. */
 function openCache(
   config: EngineConfig,
   repo: string,
@@ -128,7 +128,13 @@ function openCache(
 ): Promise<RepoCache> {
   const checkout = config.checkouts?.[repo];
   const remoteUrl = config.gitRemote?.(repo);
-  const log = onProgress ?? config.log;
+  const log =
+    onProgress && config.log
+      ? (message: string) => {
+          config.log?.(message);
+          onProgress(message);
+        }
+      : (onProgress ?? config.log);
   return RepoCache.open(repo, {
     dataDir: config.dataDir,
     ...(checkout ? { checkout } : {}),

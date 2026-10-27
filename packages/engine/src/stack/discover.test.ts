@@ -32,11 +32,13 @@ describe("engine.discoverStacks", () => {
   it("finds every stack in the repo from GitHub metadata and Strata's own clone", async () => {
     const { github, m0, s1, heads } = await demoRepo(remote);
     const { 1: h1, 2: h2, 5: h5 } = heads;
+    const logged: string[] = [];
     const engine = createEngine({
       dataDir,
       githubPort: github,
       gitRemote: () => remote.dir,
       now: () => new Date(Date.UTC(2026, 9, 2)),
+      log: (message) => logged.push(message),
     });
 
     const steps: string[] = [];
@@ -50,6 +52,8 @@ describe("engine.discoverStacks", () => {
       "Finding stacks: 0 of 2 groups of linked PRs done",
       "Finding stacks: 1 of 2 groups of linked PRs done",
     ]);
+    // A server's log keeps the clone and fetch, though a caller follows them too.
+    expect(logged).toContain("Fetching acme/app's branches and 6 PR heads");
     expect(stacks.map(shape)).toEqual([
       {
         root: 1,

@@ -53,7 +53,8 @@ function setup(options: { jobs?: Jobs; wrap?: (engine: Engine) => Engine } = {})
     oauth: null,
     engineFor,
     runs,
-    ...(options.jobs ? { jobs: options.jobs } : {}),
+    // A long wait, so only the tests about a slow first read see a 202.
+    jobs: options.jobs ?? new Jobs(60_000),
   });
   const post = (url: string, body: unknown) =>
     app.request(url, {
