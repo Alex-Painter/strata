@@ -122,10 +122,13 @@ export interface InspectRule {
   title: string;
   /**
    * Words looked for in the path's folder and file names, ignoring case:
-   * `login`, `permission*` (a word starting so), `sign in` (words in a row),
-   * `file:role` (in the file's name only), `name:policy` (a whole name).
+   * `login`, `permission*` (a word starting so), `*password*` (a word with it
+   * anywhere), `sign in` (words in a row), `file:role` (in the file's name
+   * only), `name:policy` (a whole name).
    */
   words: string[];
+  /** Words that never count on their own, though a word above would find them: `author` for `auth*`. */
+  except: string[];
   /** Globs matched against the repo-relative path, ignoring case. */
   paths: string[];
 }
@@ -135,6 +138,6 @@ export interface InspectFlag {
   /** The rule's id. */
   rule: string;
   title: string;
-  /** The rule and the glob that matched, so a reviewer can check it. */
+  /** The rule, then the word found and the name it was in, or the glob that matched, so a reviewer can check it. */
   reason: string;
 }

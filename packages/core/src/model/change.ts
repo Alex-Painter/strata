@@ -70,9 +70,9 @@ export interface FileChange {
   /** Layer of the file as a whole; hunks may refine it in future. */
   layer: LayerAssignment;
   /**
-   * The inspect rules the file's path matched, in rule order. Always empty in
-   * Tests and Docs, for mechanical files, and for a diff built without a
-   * classifier.
+   * The inspect rules the file's path, or a rename's old path, matched, in
+   * rule order. Always empty in Tests and Docs, for translation catalogs and
+   * mechanical files, and for a diff built without a classifier.
    */
   inspect: InspectFlag[];
 }

@@ -145,6 +145,40 @@ const INSPECT_CASES: [path: string, rules: string[]][] = [
   [".github/CODEOWNERS", ["access"]],
   ["firestore.rules", ["access"]],
   ["maverick/utils/access.py", ["access"]],
+  // Joined names, and plural acronyms.
+  ["app/middleware/authmiddleware.py", ["access"]],
+  ["internal/authhandler.go", ["access"]],
+  ["app/reauth.py", ["access"]],
+  ["src/basicauth.go", ["access"]],
+  ["app/services/resetpassword.py", ["access"]],
+  ["src/UnauthorisedPage.tsx", ["access"]],
+  ["app/multitenant/scope.py", ["access"]],
+  ["src/ACLsTable.tsx", ["access"]],
+  ["src/OTPsForm.tsx", ["access"]],
+  // Tokens, routes, admin checks and the like.
+  ["app/api_tokens.py", ["access"]],
+  ["app/services/access_token_store.py", ["access"]],
+  ["app/jwks.py", ["access"]],
+  ["app/csrf.py", ["access"]],
+  ["src/routes/ProtectedRoute.tsx", ["access"]],
+  ["app/decorators/admin_only.py", ["access"]],
+  ["src/hooks/isAdmin.ts", ["access"]],
+  ["app/privileges.py", ["access"]],
+  ["app/superuser.py", ["access"]],
+  ["etc/sudoers", ["access"]],
+  ["app/services/revoke_invite.py", ["access"]],
+  ["migrations/0007_enable_rls.sql", ["access"]],
+  ["app/twofa/setup.py", ["access"]],
+  ["src/MultiFactorSetup.tsx", ["access"]],
+  ["src/BiometricPrompt.tsx", ["access"]],
+  ["app/ldap_sync.py", ["access"]],
+  ["app/scim/users.py", ["access"]],
+  ["src/MagicLink.tsx", ["access"]],
+  ["infra/keyvault.bicep", ["access"]],
+  ["infra/kms.tf", ["access"]],
+  ["certs/server.pem", ["access"]],
+  ["deploy/id_ed25519", ["access"]],
+  ["database.rules.json", ["access"]],
   // Deletion and retention.
   ["app/jobs/retention.py", ["deletion"]],
   ["scripts/purge_old_rows.py", ["deletion"]],
@@ -156,6 +190,11 @@ const INSPECT_CASES: [path: string, rules: string[]][] = [
   ["scripts/pg_restore.sh", ["deletion"]],
   ["app/backups/run.sh", ["deletion"]],
   ["bin/anonymize_users", ["deletion"]],
+  ["app/models/concerns/softdelete.rb", ["deletion"]],
+  ["app/dataretention.py", ["deletion"]],
+  ["app/services/forget_user.py", ["deletion"]],
+  ["app/rtbf/handler.py", ["deletion"]],
+  ["app/data_subject_requests.py", ["deletion"]],
   ["migrations/0043_archive_sessions.sql", ["access", "deletion"]],
   // Near misses: a keyword inside another word, or a word used another way.
   ["app/author.py", []],
@@ -181,6 +220,16 @@ const INSPECT_CASES: [path: string, rules: string[]][] = [
   ["app/middleware/logging.py", []],
   ["app/services/export.py", []],
   ["web/admin/CacheStats.tsx", []],
+  ["src/AuthorsList.tsx", []],
+  ["src/coauthor.ts", []],
+  ["app/lieutenant.py", []],
+  ["app/logging/loginfo.py", []],
+  ["app/logoutput.py", []],
+  // Translation catalogs are words about logins and deletion, not code.
+  ["config/locales/devise.en.yml", []],
+  ["src/locales/en/auth.json", []],
+  ["resources/lang/en/passwords.php", []],
+  ["app/po/permissions.po", []],
 ];
 
 describe("inspect rules", () => {
@@ -189,9 +238,14 @@ describe("inspect rules", () => {
   it("are all words Strata can read", () => {
     for (const rule of DEFAULT_INSPECT_RULES) {
       for (const word of rule.words) expect(() => parseInspectWord(word)).not.toThrow();
+      // A name is split into words like these, so an exception of any other form never applies.
+      for (const word of rule.except) expect(word).toMatch(/^[a-z0-9]+$/);
     }
     expect(() => parseInspectWord("Login")).toThrow();
     expect(() => parseInspectWord("sign*in")).toThrow();
+    expect(() => parseInspectWord("*sign in*")).toThrow();
+    expect(() => parseInspectWord("file:*role*")).toThrow();
+    expect(parseInspectWord("*password*")).toEqual({ kind: "infix", text: "password" });
   });
 
   it("split names into words at punctuation, case changes and digits", () => {
@@ -200,6 +254,9 @@ describe("inspect rules", () => {
     expect(nameWords("APIKeyForm")).toEqual(["api", "key", "form"]);
     expect(nameWords("[[...sign-in]]")).toEqual(["sign", "in"]);
     expect(nameWords(".htpasswd")).toEqual(["htpasswd"]);
+    expect(nameWords("ACLsTable.tsx")).toEqual(["acl", "table", "tsx"]);
+    expect(nameWords("userIDs")).toEqual(["user", "id"]);
+    expect(nameWords("URLsafe")).toEqual(["ur", "lsafe"]);
   });
 
   it.each(INSPECT_CASES)("%s → %j", (path, rules) => {
@@ -228,7 +285,7 @@ describe("inspect rules", () => {
       'Access and permissions: the name "policies" in policies/',
     );
     expect(reason("firestore.rules")).toBe(
-      "Access and permissions: matches **/{firestore,storage,database}.rules",
+      "Access and permissions: matches **/{firestore,storage,database}.rules{,.json}",
     );
   });
 
@@ -238,7 +295,20 @@ describe("inspect rules", () => {
       'Access and permissions: a word starting "permission" in permissions.py',
     );
     expect(reason("app/(auth)/login/page.tsx")).toBe(
-      'Access and permissions: a word starting "login" in login/',
+      'Access and permissions: the word "login" in login/',
+    );
+  });
+
+  it("say when the word was inside a longer one", () => {
+    const reason = (path: string) => inspect({ path }, "logic")[0]?.reason;
+    expect(reason("app/services/resetpassword.py")).toBe(
+      'Access and permissions: a word containing "password" in resetpassword.py',
+    );
+    expect(reason("app/passwords.py")).toBe(
+      'Access and permissions: a word starting "password" in passwords.py',
+    );
+    expect(reason("app/middleware/authmiddleware.py")).toBe(
+      'Access and permissions: a word starting "auth" in authmiddleware.py',
     );
   });
 
