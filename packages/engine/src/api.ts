@@ -51,6 +51,11 @@ export interface EngineConfig {
   /** Defaults to DEFAULT_MODEL. */
   model?: string;
   log?: (message: string) => void;
+  /**
+   * Also sends clone and fetch steps to `log` when a caller follows progress.
+   * A server sets it so its log keeps them; a CLI that prints progress doesn't.
+   */
+  logProgress?: boolean;
 }
 
 export interface ProgressOptions {

@@ -129,7 +129,7 @@ function openCache(
   const checkout = config.checkouts?.[repo];
   const remoteUrl = config.gitRemote?.(repo);
   const log =
-    onProgress && config.log
+    onProgress && config.log && config.logProgress
       ? (message: string) => {
           config.log?.(message);
           onProgress(message);

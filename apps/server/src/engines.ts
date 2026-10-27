@@ -38,6 +38,7 @@ export function engineFactory(
         ...(config.model ? { model: config.model } : {}),
         checkouts: config.checkouts,
         log: (message) => console.log(`[strata] ${message}`),
+        logProgress: true,
         ...devGitHub(config, token),
         ...overrides,
       });

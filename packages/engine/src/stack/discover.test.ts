@@ -39,6 +39,7 @@ describe("engine.discoverStacks", () => {
       gitRemote: () => remote.dir,
       now: () => new Date(Date.UTC(2026, 9, 2)),
       log: (message) => logged.push(message),
+      logProgress: true,
     });
 
     const steps: string[] = [];
@@ -97,6 +98,28 @@ describe("engine.discoverStacks", () => {
       "refs/pull",
     ]);
     expect(pulls.trim().split("\n")).toEqual([1, 2, 3, 5, 6, 7].map((n) => `refs/pull/${n}/head`));
+  });
+
+  it("sends clone and fetch steps to the log or the caller, not both, by default", async () => {
+    const { github } = await demoRepo(remote);
+    const logged: string[] = [];
+    const engine = createEngine({
+      dataDir,
+      githubPort: github,
+      gitRemote: () => remote.dir,
+      now: () => new Date(Date.UTC(2026, 9, 2)),
+      log: (message) => logged.push(message),
+    });
+
+    const fetching = "Fetching acme/app's branches and 6 PR heads";
+    // The CLI prints progress and logs to the same place.
+    const steps: string[] = [];
+    await engine.discoverStacks("acme/app", { onProgress: (step) => steps.push(step) });
+    expect(steps).toContain(fetching);
+    expect(logged).not.toContain(fetching);
+
+    await engine.discoverStacks("acme/app");
+    expect(logged.filter((message) => message === fetching)).toHaveLength(1);
   });
 
   it("needs a GitHub token or port", async () => {
