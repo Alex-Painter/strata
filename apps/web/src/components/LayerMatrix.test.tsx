@@ -186,6 +186,7 @@ describe("layer bars", () => {
         baseRef: number === 1 ? "main" : "b1",
         headRef: `b${number}`,
         mergeCommitOid: null,
+        baseOid: null,
         parent: number === 1 ? null : 1,
         link: number === 1 ? null : ("intact" as const),
         linkEvidence: [],

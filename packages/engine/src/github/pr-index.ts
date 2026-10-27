@@ -23,7 +23,8 @@ import {
 } from "./graphql.js";
 import { GitHubError, type GitHubPort } from "./port.js";
 
-const CACHE_VERSION = 1;
+/** 2: PRs carry baseOid. */
+const CACHE_VERSION = 2;
 const DAY = 24 * 60 * 60 * 1000;
 /** Overlap with the last fetch, for PRs that changed while it ran. */
 const SLACK = 10 * 60 * 1000;

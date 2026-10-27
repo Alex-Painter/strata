@@ -31,6 +31,12 @@ export interface StackPr {
   closedAt: string | null;
   /** The branch the PR targets now. */
   baseRef: string;
+  /**
+   * The base branch's commit as GitHub last recorded it for the PR, kept after
+   * the branch is deleted. For a merged or closed PR it's where the base was
+   * then, so GitHub's diff of the PR starts where this meets its head.
+   */
+  baseOid: string | null;
   headRef: string;
   /** The head commit; for a merged or closed PR, its last head. */
   headOid: string;
@@ -208,7 +214,7 @@ export interface PrPart {
   to: string | null;
   files: FileChange[];
   hunks: Hunk[];
-  /** For open PRs: how GitHub's diff of the PR compares. Null when it can't be told. */
+  /** How GitHub's diff of the PR compares. Null when it can't be told. */
   github: GitHubDiffCheck | null;
   /** Where this PR's lines went. Null for PRs off Strata's chain (`apart`, `unknown`). */
   provenance: PartProvenance | null;
@@ -241,7 +247,10 @@ export interface PartProvenance {
  * don't, and the reason says why.
  */
 export interface GitHubDiffCheck {
-  /** Where GitHub's diff starts: the merge base of the head and the base branch's tip. */
+  /**
+   * Where GitHub's diff starts: where the head meets the base branch's tip,
+   * or for a merged or closed PR, the base as it was then (`StackPr.baseOid`).
+   */
   base: string;
   same: boolean;
   /** Paths only in GitHub's diff, and only in Strata's. */

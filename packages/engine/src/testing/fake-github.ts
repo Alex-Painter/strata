@@ -98,6 +98,7 @@ export function prNode(number: number, headRefOid: string, fields: Partial<PrNod
     mergedAt: null,
     closedAt: null,
     baseRefName: "main",
+    baseRefOid: null,
     headRefName: `b${number}`,
     headRefOid,
     isCrossRepository: false,

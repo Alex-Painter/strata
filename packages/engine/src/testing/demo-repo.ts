@@ -41,6 +41,7 @@ export async function demoRepo(remote: StackRepo, repo = "acme/app"): Promise<De
       closedAt: ghTime(30),
       updatedAt: ghTime(30),
       mergeCommit: { oid: s1 },
+      baseRefOid: m0,
     }),
     prNode(2, h2, {
       title: "Add the forecast service",

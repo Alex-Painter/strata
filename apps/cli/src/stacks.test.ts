@@ -25,6 +25,7 @@ function node(
       headOid: `${number}`.repeat(40).slice(0, 40),
       crossRepository: false,
       mergeCommitOid: null,
+      baseOid: null,
       baseChanges: [],
       forcePushes: [],
       review: null,

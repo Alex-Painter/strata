@@ -107,8 +107,7 @@ export async function buildStackDiffs(
         : { files: [], hunks: [] };
     const part = { ...step, files, hunks };
     const edge = edges.get(step.pr) ?? null;
-    const github =
-      node.pr.state === "open" ? await compareWithGitHub(gitDir, stack, node, edge, part) : null;
+    const github = await compareWithGitHub(gitDir, stack, node, edge, part);
     built.push({ ...part, github });
   }
 
@@ -168,8 +167,10 @@ async function compareWithGitHub(
 ): Promise<GitHubDiffCheck | null> {
   if (part.how === "unknown") return null;
   const { pr } = node;
-  const tip = await branchTip(gitDir, pr.baseRef);
-  const base = tip ? await mergeBase(gitDir, tip, pr.headOid) : null;
+  // GitHub diffs an open PR from its base branch now, and a merged or closed one
+  // from where that branch was when it merged or closed.
+  const from = pr.state === "open" ? await branchTip(gitDir, pr.baseRef) : pr.baseOid;
+  const base = from ? await mergeBase(gitDir, from, pr.headOid) : null;
   if (!base) return null;
 
   const theirs = buildDiff(await diffText(gitDir, base, pr.headOid)).files;
@@ -218,6 +219,8 @@ function differsBecause(
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;
+  const open = node.pr.state === "open";
+  const ended = node.pr.state === "merged" ? "merged" : "closed";
   if (part.how === "apart") {
     return `${n} couldn't be put on the stack below it, so Strata shows its changes since it branched, and GitHub diffs it from ${baseRef}.`;
   }
@@ -226,15 +229,18 @@ function differsBecause(
   switch (edge?.link) {
     case "intact":
       if (parent?.pr.state === "merged") {
-        return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} hasn't been rebased since, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+        const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
+        return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
       }
       break;
     case "behind":
-      return `${n} is behind ${p}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`;
+      return open
+        ? `${n} is behind ${p}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`
+        : `${n} was behind ${p} when it ${ended}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`;
     case "stale":
       return `${p} was force-pushed after ${n} branched from it, so GitHub diffs ${n} from the old ${p}, and Strata from ${p}'s head now.`;
     case "re-anchored":
-      return `${n} now sits on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
+      return `${n} ${open ? "now sits" : "sat"} on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
   }
   if (part.how === "replayed") {
     return `A PR below ${n} was replayed onto newer code, so Strata diffs ${n} from that, and GitHub from ${baseRef}.`;

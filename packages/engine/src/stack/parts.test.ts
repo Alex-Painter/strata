@@ -9,7 +9,7 @@ import type { GitHubPort } from "../github/port.js";
 import type { LayerJudge, LayerRequest } from "../layers/judge.js";
 import { settingsPath } from "../settings.js";
 import { demoRepo } from "../testing/demo-repo.js";
-import { fakeGitHub, ghTime, prNode } from "../testing/fake-github.js";
+import { fakeGitHub, ghTime, prNode, retargeted } from "../testing/fake-github.js";
 import { StackRepo } from "../testing/stack-repo.js";
 
 let remote: StackRepo;
@@ -58,8 +58,8 @@ describe("each PR's diff", () => {
     expect(report.raw.diff).toContain("diff --git a/b1-2.txt b/b1-2.txt");
 
     const [one, two, three] = report.parts;
-    // Merged PRs aren't compared.
-    expect(one?.github).toBeNull();
+    // A merged PR is compared from where main was when it merged.
+    expect(one?.github).toMatchObject({ base: demo.m0, same: true, reason: null });
     expect(two?.github).toMatchObject({
       base: demo.m0,
       same: false,
@@ -118,6 +118,7 @@ describe("each PR's diff", () => {
   it("keeps each PR's own changes when the whole stack landed on main at once", async () => {
     // Each PR is squashed onto main in turn, while GitHub keeps the branch
     // below as the base of each PR above the bottom one.
+    const m0 = await remote.tip("main");
     const heads = [
       await remote.write("b1", { "a.txt": lines("one") }, "main"),
       await remote.write("b2", { "b.txt": lines("two") }, "b1"),
@@ -137,6 +138,7 @@ describe("each PR's diff", () => {
           mergedAt: ghTime(30 + i),
           closedAt: ghTime(30 + i),
           baseRefName: i === 0 ? "main" : `b${i}`,
+          baseRefOid: i === 0 ? m0 : heads[i - 1],
           mergeCommit: { oid: squashes[i] as string },
         }),
       ),
@@ -151,6 +153,48 @@ describe("each PR's diff", () => {
     ]);
     expect(report.change.files.map((file) => file.path)).toEqual(["a.txt", "b.txt", "c.txt"]);
     expect(report.stack?.issues).toEqual([]);
+    // GitHub diffed each one from the head below too.
+    expect(report.parts.map((part) => part.github?.same)).toEqual([true, true, true]);
+  });
+
+  it("says why GitHub's diff of a merged PR differs, as of when it merged", async () => {
+    // #1 is squashed onto main, then #2 is retargeted to main and squashed
+    // without a rebase, so GitHub's diff of #2 still holds #1's changes.
+    const m0 = await remote.tip("main");
+    const h1 = await remote.write("b1", { "a.txt": lines("one") }, "main");
+    const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+    const s1 = await remote.squashMerge("b1", "main");
+    const s2 = await remote.land("b2", h1, "main");
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2);
+    const merged = { state: "MERGED" as const, closedAt: ghTime(31) };
+    const github = fakeGitHub("acme/app", [
+      prNode(1, h1, { ...merged, mergedAt: ghTime(30), mergeCommit: { oid: s1 }, baseRefOid: m0 }),
+      prNode(2, h2, {
+        ...merged,
+        mergedAt: ghTime(31),
+        mergeCommit: { oid: s2 },
+        baseRefOid: s1,
+        timelineItems: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [retargeted("b1", "main", 30)],
+        },
+      }),
+    ]);
+    const report = await analyze(github, "acme/app#2");
+
+    expect(report.parts.map((part) => [part.pr, part.how])).toEqual([
+      [1, "direct"],
+      [2, "direct"],
+    ]);
+    expect(report.parts[1]?.github).toMatchObject({
+      base: m0,
+      same: false,
+      onlyOnGitHub: ["a.txt"],
+      reason:
+        "#1 landed on main as a new commit, and #2 wasn't rebased before it merged, " +
+        "so GitHub's diff of #2 repeats #1's changes.",
+    });
   });
 
   it("stops the whole-stack diff at a replay conflict", async () => {

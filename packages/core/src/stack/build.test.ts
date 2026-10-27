@@ -32,6 +32,7 @@ function pr(number: number, fields: Partial<StackPr> = {}): StackPr {
     headOid: `h${number}`,
     crossRepository: false,
     mergeCommitOid: null,
+    baseOid: null,
     baseChanges: [],
     forcePushes: [],
     review: null,

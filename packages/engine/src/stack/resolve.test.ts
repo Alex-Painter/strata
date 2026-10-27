@@ -30,6 +30,7 @@ function pr(number: number, headOid: string, fields: Partial<StackPr> = {}): Sta
     headOid,
     crossRepository: false,
     mergeCommitOid: null,
+    baseOid: null,
     baseChanges: [],
     forcePushes: [],
     review: null,

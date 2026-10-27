@@ -172,6 +172,7 @@ export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
   }
 
   if (shape === "squash-merged" || shape === "restacked") {
+    const before = await remote.tip("main");
     const s1 = await remote.squashMerge("b1", "main");
     await remote.write("main", ELSEWHERE);
     await remote.deleteBranch("b1");
@@ -182,6 +183,7 @@ export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
       closedAt: ghTime(20),
       updatedAt: ghTime(20),
       mergeCommit: { oid: s1 },
+      baseRefOid: before,
     });
     prs[2] = prNode(2, h2, {
       title: TITLES[2] as string,
@@ -209,6 +211,8 @@ export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
   if (shape === "landed") {
     await remote.write("main", ELSEWHERE);
     for (const n of [1, 2, 3, 4]) {
+      // GitHub diffs #1 from main and each PR above from the head below.
+      const base = n === 1 ? await remote.tip("main") : (heads[n - 1] as string);
       const landed = await remote.land(`b${n}`, n === 1 ? m : (heads[n - 1] as string), "main");
       prs[n] = prNode(n, heads[n] as string, {
         title: TITLES[n] as string,
@@ -218,6 +222,7 @@ export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
         closedAt: ghTime(30 + n),
         updatedAt: ghTime(30 + n),
         mergeCommit: { oid: landed },
+        baseRefOid: base,
       });
     }
     for (const n of [1, 2, 3, 4]) await remote.deleteBranch(`b${n}`);

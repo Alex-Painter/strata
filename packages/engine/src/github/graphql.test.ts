@@ -25,6 +25,7 @@ describe("toStackPr", () => {
       mergedAt: null,
       closedAt: null,
       baseRef: "main",
+      baseOid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       headRef: "forecast/service",
       headOid: "2222222222222222222222222222222222222222",
       crossRepository: false,
@@ -49,6 +50,8 @@ describe("toStackPr", () => {
       state: "merged",
       mergedAt: "2026-10-22T09:59:58Z",
       mergeCommitOid: "5555555555555555555555555555555555555555",
+      // Where main was when it merged.
+      baseOid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       review: "approved",
       checks: "success",
       baseChanges: [],

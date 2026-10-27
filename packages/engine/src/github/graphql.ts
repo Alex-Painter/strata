@@ -26,7 +26,7 @@ query StrataPrPage($owner: String!, $name: String!, $cursor: String) {
         number title url
         author { login }
         state isDraft createdAt updatedAt mergedAt closedAt
-        baseRefName headRefName headRefOid isCrossRepository
+        baseRefName baseRefOid headRefName headRefOid isCrossRepository
         mergeCommit { oid }
         reviewDecision
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -84,6 +84,7 @@ export interface PrNode {
   mergedAt: string | null;
   closedAt: string | null;
   baseRefName: string;
+  baseRefOid: string | null;
   headRefName: string;
   headRefOid: string;
   isCrossRepository: boolean;
@@ -157,6 +158,7 @@ export function toStackPr(node: PrNode, events: (TimelineNode | null)[]): StackP
     mergedAt: node.mergedAt,
     closedAt: node.closedAt,
     baseRef: node.baseRefName,
+    baseOid: node.baseRefOid,
     headRef: node.headRefName,
     headOid: node.headRefOid,
     crossRepository: node.isCrossRepository,
