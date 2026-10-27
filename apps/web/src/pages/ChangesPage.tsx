@@ -2,7 +2,7 @@ import type { ChangeSummary, MeResponse, RunStatus } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { TopBar } from "../components/TopBar";
+import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { api } from "../lib/api";
 import { ago } from "../lib/format";
 import { inputHint } from "../lib/input";
@@ -15,19 +15,23 @@ export function ChangesPage({ me }: { me: MeResponse }) {
   const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
   const repos = [...new Set((changes.data ?? []).map((change) => change.repo))];
   return (
-    <div className="flex h-full flex-col">
-      <TopBar me={me} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl space-y-8 p-6">
+    <AppShell
+      me={me}
+      navLabel="Strata"
+      nav={<HomeNav current={null} />}
+      top={<Breadcrumb items={[{ label: "Changes" }]} />}
+    >
+      <main className="page">
+        <div className="page-in">
           <NewChange />
           <BrowseStacks repos={repos} />
-          <section>
-            <h2 className="mb-2 text-base font-semibold">Changes</h2>
+          <section className="grid gap-3">
+            <h2 className="h2">Changes</h2>
             <ChangeList changes={changes.data} error={changes.error?.message ?? null} />
           </section>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -61,8 +65,8 @@ function NewChange() {
     },
   });
   return (
-    <section>
-      <h1 className="mb-2 text-base font-semibold">Review a stack</h1>
+    <section className="grid gap-3">
+      <h1 className="h1">Review a stack</h1>
       <form
         className="flex gap-2"
         onSubmit={(event) => {
@@ -81,20 +85,16 @@ function NewChange() {
           }}
           placeholder="PR URL, owner/repo#123 or owner/repo:branch"
           spellCheck={false}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-1.5 font-mono outline-none focus:border-accent"
+          className="field flex-1 font-mono text-[12.5px]"
         />
-        <button
-          type="submit"
-          disabled={!hint?.ok || create.isPending}
-          className="rounded-md bg-accent px-3 py-1.5 font-medium text-on-accent disabled:opacity-50"
-        >
+        <button type="submit" disabled={!hint?.ok || create.isPending} className="btn primary h-8">
           {create.isPending ? "Finding the stack…" : "Review"}
         </button>
       </form>
       <p
         id="new-change-hint"
         role={create.error ? "alert" : undefined}
-        className={`mt-1.5 min-h-5 ${create.error || hint?.ok === false ? "text-closed" : "text-muted"}`}
+        className={`-mt-1 min-h-5 text-[12px] ${create.error || hint?.ok === false ? "text-text" : "text-muted"}`}
       >
         {create.error
           ? create.error.message
@@ -112,8 +112,8 @@ function BrowseStacks({ repos }: { repos: string[] }) {
   const [, navigate] = useLocation();
   const valid = REPO.test(repo.trim());
   return (
-    <section>
-      <h2 className="mb-2 text-base font-semibold">Browse a repo's stacks</h2>
+    <section className="grid gap-3">
+      <h2 className="h2">Browse a repo's stacks</h2>
       <form
         className="flex gap-2"
         onSubmit={(event) => {
@@ -127,24 +127,16 @@ function BrowseStacks({ repos }: { repos: string[] }) {
           onChange={(event) => setRepo(event.target.value)}
           placeholder="owner/repo"
           spellCheck={false}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-1.5 font-mono outline-none focus:border-accent"
+          className="field flex-1 font-mono text-[12.5px]"
         />
-        <button
-          type="submit"
-          disabled={!valid}
-          className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-raised disabled:opacity-50"
-        >
+        <button type="submit" disabled={!valid} className="btn h-8">
           Show stacks
         </button>
       </form>
       {repos.length > 0 && (
-        <p className="mt-2 flex flex-wrap gap-2 text-muted">
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-muted">
           {repos.map((name) => (
-            <Link
-              key={name}
-              href={`/repos/${name}`}
-              className="font-mono text-accent hover:underline"
-            >
+            <Link key={name} href={`/repos/${name}`} className="lnk font-mono text-[12px]">
               {name}
             </Link>
           ))}
@@ -157,7 +149,7 @@ function BrowseStacks({ repos }: { repos: string[] }) {
 const STATUS: Record<RunStatus, string> = {
   queued: "Queued",
   running: "Running",
-  done: "Ready",
+  done: "Analysed",
   failed: "Failed",
 };
 
@@ -168,31 +160,26 @@ function ChangeList({
   changes: ChangeSummary[] | undefined;
   error: string | null;
 }) {
-  if (error) return <p className="text-closed">{error}</p>;
+  if (error) return <p className="alert">{error}</p>;
   if (!changes) return null;
   if (changes.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-line p-6 text-center text-muted">
+      <div className="empty">
         No Changes yet. Give Strata a PR above, or pick a stack from a repo.
       </div>
     );
   }
   return (
-    <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+    <ul className="list">
       {changes.map((change) => (
         <li key={change.id}>
-          <Link
-            href={`/changes/${change.id}`}
-            className="flex items-baseline gap-3 px-3 py-2 hover:bg-raised"
-          >
+          <Link href={`/changes/${change.id}`} className="lrow">
             <span className="min-w-0 flex-1 truncate font-medium">{change.title}</span>
-            <span className="shrink-0 font-mono text-muted">{change.input}</span>
-            <span
-              className={`shrink-0 ${change.status === "failed" ? "text-closed" : "text-muted"}`}
-            >
-              {change.status ? STATUS[change.status] : ""}
+            <span className="shrink-0 font-mono text-[12px] text-faint">{change.input}</span>
+            {change.status && <span className="pill">{STATUS[change.status]}</span>}
+            <span className="w-16 shrink-0 text-right text-[12px] text-faint">
+              {ago(change.updatedAt)}
             </span>
-            <span className="w-16 shrink-0 text-right text-muted">{ago(change.updatedAt)}</span>
           </Link>
         </li>
       ))}

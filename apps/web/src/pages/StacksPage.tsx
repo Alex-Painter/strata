@@ -2,10 +2,10 @@ import type { MeResponse, StackSummary } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
+import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { EvidenceList } from "../components/EvidenceList";
 import { PathPicker } from "../components/PathPicker";
 import { CopyMermaid, StackMap } from "../components/StackMap";
-import { TopBar } from "../components/TopBar";
 import { api, isPending, pollWhilePending } from "../lib/api";
 import { ago, countPrs, prCount } from "../lib/format";
 import { useLatestRequest } from "../lib/latest-request";
@@ -25,14 +25,16 @@ export function StacksPage({ me }: { me: MeResponse }) {
   const found = stacks.data && !isPending(stacks.data) ? stacks.data : null;
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
   return (
-    <div className="flex h-full flex-col">
-      <TopBar me={me}>
-        <span className="font-mono text-muted">{repo}</span>
-      </TopBar>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl space-y-4 p-6">
-          <header>
-            <h1 className="text-base font-semibold">Stacks in {repo}</h1>
+    <AppShell
+      me={me}
+      navLabel="Strata"
+      nav={<HomeNav current={repo} />}
+      top={<Breadcrumb items={[{ label: "Changes", href: "/" }, { label: repo }]} />}
+    >
+      <main className="page">
+        <div className="page-in gap-4">
+          <header className="grid gap-1">
+            <h1 className="h1">Stacks in {repo}</h1>
             <p className="text-muted">
               PRs whose branches feed into each other, from PRs updated in the last 90 days.
             </p>
@@ -44,29 +46,27 @@ export function StacksPage({ me }: { me: MeResponse }) {
             </p>
           )}
           {stacks.error && (
-            <div role="alert" className="space-y-2">
-              <p className="text-closed">{stacks.error.message}</p>
+            <div role="alert" className="alert grid justify-items-start gap-2">
+              <p>{stacks.error.message}</p>
               <button
                 type="button"
                 onClick={() => stacks.refetch()}
                 disabled={stacks.isFetching}
-                className="rounded-md border border-line bg-surface px-2 py-1 hover:bg-raised"
+                className="btn"
               >
                 Try again
               </button>
             </div>
           )}
           {found?.stacks.length === 0 && (
-            <div className="rounded-lg border border-dashed border-line p-6 text-center text-muted">
-              No stacks here: no recent PR targets another PR's branch.
-            </div>
+            <div className="empty">No stacks here: no recent PR targets another PR's branch.</div>
           )}
           {found?.stacks.map((stack) => (
             <StackCard key={stack.id} stack={stack} />
           ))}
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -96,14 +96,11 @@ function StackCard({ stack }: { stack: StackSummary }) {
   };
 
   return (
-    <article
-      aria-label={`Stack from #${stack.root}`}
-      className="rounded-lg border border-line bg-surface"
-    >
+    <article aria-label={`Stack from #${stack.root}`} className="rounded-lg border border-line">
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{root?.title}</h2>
-          <p className="text-muted">
+          <p className="text-[12px] text-muted">
             {countPrs(stack.prs)} · updated {ago(stack.updatedAt)}
           </p>
         </div>
@@ -124,7 +121,7 @@ function StackCard({ stack }: { stack: StackSummary }) {
       <footer className="space-y-2 border-t border-line px-4 py-3">
         <PathPicker stack={stack} current={path} onPick={choose} />
         {stack.issues.map((issue) => (
-          <div key={`${issue.kind} ${issue.prs.join(",")}`} className="text-warn">
+          <div key={`${issue.kind} ${issue.prs.join(",")}`} className="note text-text">
             {issue.message}
             <EvidenceList repo={stack.repo} evidence={issue.evidence} />
           </div>
@@ -134,12 +131,12 @@ function StackCard({ stack }: { stack: StackSummary }) {
             type="button"
             onClick={() => open.mutate(path[path.length - 1] as number)}
             disabled={open.isPending}
-            className="rounded-md bg-accent px-3 py-1.5 font-medium text-on-accent disabled:opacity-50"
+            className="btn primary"
           >
             {open.isPending ? "Opening…" : `Review ${prCount(path.length)}`}
           </button>
           {open.error && (
-            <span role="alert" className="text-closed">
+            <span role="alert" className="text-text">
               {open.error.message}
             </span>
           )}

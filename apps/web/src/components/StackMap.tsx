@@ -63,13 +63,11 @@ export function StackMap({
           <EdgeLine key={edge.child} edge={edge} dim={!onPath(edge.child)} row={row} />
         ))}
         {layout.nodes.map((node) => {
-          const pr = prs.get(node.pr) as StackPrSummary;
           return (
             <Dot
               key={node.pr}
               cx={x(node.lane)}
               cy={y(node.row, row)}
-              pr={pr}
               active={node.pr === active}
               dim={!onPath(node.pr)}
             />
@@ -116,7 +114,7 @@ export function StackMap({
                 href={commitUrl(stack.repo, stack.base)}
                 target="_blank"
                 rel="noreferrer"
-                className="font-mono hover:text-accent"
+                className="font-mono hover:text-text"
               >
                 {shortOid(stack.base)}
               </a>
@@ -151,7 +149,7 @@ function PrRow({
   return (
     <div
       className={`relative flex h-full min-w-0 flex-col justify-center gap-0.5 rounded-md px-2 ${
-        active ? "bg-raised ring-1 ring-accent/50" : onSelect ? "hover:bg-raised" : ""
+        active ? "bg-active" : onSelect ? "hover:bg-hover" : ""
       } ${dim ? "opacity-50" : ""}`}
     >
       {onSelect && (
@@ -160,7 +158,7 @@ function PrRow({
           aria-label={`Show #${pr.number} ${pr.title}`}
           aria-current={active ? "true" : undefined}
           onClick={() => onSelect(pr.number)}
-          className="absolute inset-0 rounded-md focus-visible:outline-2 focus-visible:outline-accent"
+          className="absolute inset-0 rounded-md"
         />
       )}
       <div className="flex min-w-0 items-baseline gap-1.5">
@@ -169,7 +167,7 @@ function PrRow({
           target="_blank"
           rel="noreferrer"
           title={`#${pr.number} on GitHub`}
-          className="relative shrink-0 font-mono text-muted hover:text-accent"
+          className="relative shrink-0 font-mono text-faint hover:text-text"
         >
           #{pr.number}
         </a>
@@ -180,7 +178,7 @@ function PrRow({
           {pr.title}
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted">
+      <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-faint">
         <StateBadge pr={pr} />
         <ReviewMarks pr={pr} />
         {pr.state === "merged" && pr.mergeCommitOid && (
@@ -188,13 +186,13 @@ function PrRow({
             href={commitUrl(repo, pr.mergeCommitOid)}
             target="_blank"
             rel="noreferrer"
-            className="relative font-mono hover:text-accent"
+            className="relative font-mono hover:text-text"
             title="The commit it landed as"
           >
             as {shortOid(pr.mergeCommitOid)}
           </a>
         )}
-        {link && <span className={`truncate ${restack ? "text-warn" : ""}`}>{link}</span>}
+        {link && <span className={`truncate ${restack ? "text-text" : ""}`}>{link}</span>}
       </div>
       {bar !== undefined && <LayerBar bar={bar} widest={widest} />}
     </div>
@@ -228,7 +226,7 @@ function LayerBar({ bar, widest }: { bar: PrLayerBar | null; widest: number }) {
             className="h-full rounded-full"
             style={{
               flexGrow: segment.lines,
-              background: `var(--color-layer-${segment.layer})`,
+              background: "var(--fg-3)",
             }}
             data-layer={segment.layer}
           />
@@ -237,7 +235,7 @@ function LayerBar({ bar, widest }: { bar: PrLayerBar | null; widest: number }) {
           <span
             title={`Mechanical: ${bar.mechanical} lines`}
             className="h-full rounded-full"
-            style={{ flexGrow: bar.mechanical, background: "var(--color-mechanical)" }}
+            style={{ flexGrow: bar.mechanical, background: "var(--line-2)" }}
             data-layer="mechanical"
           />
         )}
@@ -268,41 +266,21 @@ function EdgeLine({ edge, dim, row }: { edge: StackMapEdge; dim: boolean; row: n
       strokeDasharray={
         edge.line === "dashed" ? "4 3" : edge.line === "dotted" ? "0.5 3.5" : undefined
       }
-      className={edge.line === "solid" ? (dim ? "stroke-line" : "stroke-muted") : "stroke-warn"}
+      className={edge.line === "solid" && !dim ? "stroke-muted" : "stroke-line-2"}
       data-edge={`${edge.parent ?? "trunk"}-${edge.child}`}
       data-line={edge.line}
     />
   );
 }
 
-function Dot({
-  cx,
-  cy,
-  pr,
-  active,
-  dim,
-}: {
-  cx: number;
-  cy: number;
-  pr: StackPrSummary;
-  active: boolean;
-  dim: boolean;
-}) {
-  // Open PRs are solid; drafts, landed and closed ones are rings, so the live work stands out.
-  const look =
-    pr.state === "merged"
-      ? "stroke-merged fill-surface"
-      : pr.state === "closed"
-        ? "stroke-closed fill-surface"
-        : pr.draft
-          ? "stroke-muted fill-surface"
-          : "stroke-open fill-open";
+function Dot({ cx, cy, active, dim }: { cx: number; cy: number; active: boolean; dim: boolean }) {
+  // Every PR is the same node; its state is a word on its row, never a colour.
   return (
     <g opacity={dim ? 0.5 : 1}>
       {active && (
         <circle cx={cx} cy={cy} r={8} className="fill-none stroke-accent" strokeWidth={1.5} />
       )}
-      <circle cx={cx} cy={cy} r={4.5} strokeWidth={1.75} className={look} />
+      <circle cx={cx} cy={cy} r={4} strokeWidth={1.5} className="fill-surface stroke-muted" />
     </g>
   );
 }
@@ -313,7 +291,7 @@ export function CopyMermaid({ stack }: { stack: StackSummary }) {
   return (
     <button
       type="button"
-      className="rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-raised hover:text-text"
+      className="btn ghost sm"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(stackMermaid(stack));

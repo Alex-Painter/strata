@@ -6,6 +6,8 @@ import { fileAnchor } from "./Diff";
 
 /** Shading steps for meaningful lines, against the busiest PR cell. */
 const STEPS = 5;
+/** How much of the text colour each step mixes in: one grey ramp, no hue. */
+const HEAT = [0, 6, 11, 18, 27, 38];
 
 /**
  * The layer by PR matrix: which PR touches which layer, and how much. A cell
@@ -29,14 +31,14 @@ export function LayerMatrixView({
   if (matrix.rows.length === 0) return null;
 
   return (
-    <section aria-labelledby="matrix-heading" className="space-y-2">
-      <h2 id="matrix-heading" className="font-semibold">
+    <section aria-labelledby="matrix-heading" className="grid gap-2">
+      <h2 id="matrix-heading" className="h2">
         Layers by PR
       </h2>
-      <div className="overflow-x-auto rounded-md border border-line bg-surface">
+      <div className="overflow-x-auto rounded-md border border-line">
         <table aria-labelledby="matrix-heading" className="border-collapse text-[12px]">
           <thead>
-            <tr className="text-muted">
+            <tr className="text-faint">
               <th scope="col" className="px-3 py-1.5 text-left font-normal">
                 <span className="sr-only">Layer</span>
               </th>
@@ -50,7 +52,7 @@ export function LayerMatrixView({
                   #{pr}
                 </th>
               ))}
-              <th scope="col" className="border-l border-line px-2 py-1.5 font-medium text-text">
+              <th scope="col" className="border-l border-line px-2 py-1.5 font-medium text-muted">
                 Net
               </th>
             </tr>
@@ -60,15 +62,10 @@ export function LayerMatrixView({
               <tr key={row.layer} data-layer={row.layer}>
                 <th scope="row" className="px-3 py-0.5 text-left font-normal whitespace-nowrap">
                   <span className="flex items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ background: `var(--color-layer-${row.layer})` }}
-                    />
                     {LAYERS[row.layer].title}
                     {LAYERS[row.layer].inspect && (
                       <span
-                        className="text-[10px] text-warn"
+                        className="text-[11px] text-faint"
                         title="Inspect these changes closely."
                       >
                         Inspect
@@ -100,7 +97,7 @@ export function LayerMatrixView({
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted">
+      <p className="sub">
         Lines in meaningful hunks; +Nm counts mechanical lines apart.
         {revised &&
           " ↻ marks lines a later PR changed again, which is why the PR columns don't add up to Net."}
@@ -146,11 +143,11 @@ function Cell({
       onClick={onToggle}
       data-step={step}
       className={`flex h-8 w-14 flex-col items-center justify-center rounded leading-tight ${
-        pressed ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-muted"
+        pressed ? "ring-2 ring-accent" : "hover:ring-1 hover:ring-line-2"
       } ${step === 0 ? "border border-dashed border-line text-muted" : ""}`}
       style={
         step > 0
-          ? { background: `var(--color-heat-${step})`, color: `var(--color-heat-ink-${step})` }
+          ? { background: `color-mix(in srgb, var(--fg) ${HEAT[step]}%, transparent)` }
           : undefined
       }
     >
@@ -179,7 +176,7 @@ function CellFiles({
   return (
     <section
       aria-label={`${LAYERS[cell.layer].title} in ${cell.pr === null ? "the whole stack" : `#${cell.pr}`}`}
-      className="rounded-md border border-line bg-surface"
+      className="rounded-md border border-line"
     >
       <p className="border-b border-line px-3 py-1.5">
         <span className="font-medium">{LAYERS[cell.layer].title}</span>{" "}
@@ -194,10 +191,10 @@ function CellFiles({
                 event.preventDefault();
                 onOpen(cell.pr, file.path);
               }}
-              className="flex items-baseline gap-2 px-3 py-0.5 hover:bg-raised"
+              className="flex items-baseline gap-2 px-3 py-1 hover:bg-hover"
             >
-              <span className="min-w-0 flex-1 truncate font-mono">{file.path}</span>
-              <span className="shrink-0 text-[11px] text-muted">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{file.path}</span>
+              <span className="shrink-0 text-[12px] text-faint">
                 {[
                   lines(file.meaningful),
                   file.mechanical > 0 ? `${file.mechanical} mechanical` : null,

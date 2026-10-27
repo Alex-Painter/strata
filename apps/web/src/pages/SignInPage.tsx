@@ -1,3 +1,5 @@
+import { Logo } from "../components/Icon";
+
 const AUTH_ERRORS: Record<string, string> = {
   not_allowed: "That GitHub account isn't on this Strata's allowlist.",
   invalid_state: "Sign-in expired or was interrupted. Try again.",
@@ -7,19 +9,17 @@ const AUTH_ERRORS: Record<string, string> = {
 export function SignInPage() {
   const error = new URLSearchParams(window.location.search).get("auth_error");
   return (
-    <main className="flex h-full items-center justify-center">
-      <div className="w-80 rounded-lg border border-line bg-surface p-6 text-center">
-        <h1 className="mb-1 text-lg font-semibold">Strata</h1>
-        <p className="mb-5 text-muted">Review the system change, not just the diff.</p>
+    <main className="flex h-full items-center justify-center p-4">
+      <div className="grid w-80 justify-items-center gap-5 rounded-lg border border-line bg-surface px-6 pt-8 pb-6 text-center">
+        <Logo />
+        <div className="grid gap-1">
+          <h1 className="h1">Strata</h1>
+          <p className="text-muted">Review the system change, not just the diff.</p>
+        </div>
         {error && (
-          <p className="mb-4 rounded bg-del px-3 py-2 text-left">
-            {AUTH_ERRORS[error] ?? "Sign-in failed."}
-          </p>
+          <p className="alert w-full text-left">{AUTH_ERRORS[error] ?? "Sign-in failed."}</p>
         )}
-        <a
-          href="/auth/login"
-          className="inline-block w-full rounded-md bg-accent px-3 py-2 font-medium text-on-accent hover:opacity-90"
-        >
+        <a href="/auth/login" className="btn primary h-8 w-full justify-center">
           Sign in with GitHub
         </a>
       </div>

@@ -23,7 +23,7 @@ export function PathPicker({
   const same = (path: number[]) => path.join(",") === current.join(",");
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1 text-xs text-muted">
+      <legend className="mb-2 text-[12px] text-muted">
         This stack forks into {stack.paths.length} paths. Each one is its own Change.
       </legend>
       <div className="flex flex-wrap gap-1.5">
@@ -38,13 +38,11 @@ export function PathPicker({
               disabled={!onPick || selected || pending !== null}
               onClick={() => onPick?.(tip)}
               title={path.map((n) => `#${n} ${titles.get(n) ?? ""}`).join("\n")}
-              className={`flex max-w-full min-w-0 items-baseline gap-1.5 rounded-md border px-2 py-1 text-left ${
-                selected
-                  ? "border-accent/60 bg-raised"
-                  : "border-line hover:bg-raised disabled:hover:bg-transparent"
+              className={`flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-md border px-2 text-left text-[12px] ${
+                selected ? "border-accent-line bg-active" : "border-line hover:bg-hover"
               } disabled:cursor-default`}
             >
-              <span className="shrink-0 font-mono text-muted">{describePath(path)}</span>
+              <span className="shrink-0 font-mono text-faint">{describePath(path)}</span>
               <span className="truncate">{titles.get(tip)}</span>
               {pending === tip && <span className="shrink-0 text-muted">Opening…</span>}
             </button>
