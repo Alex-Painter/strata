@@ -89,6 +89,12 @@ function StackCard({ stack }: { stack: StackSummary }) {
     },
   });
   const root = stack.prs.find((pr) => pr.number === stack.root);
+  // Opening a path the card no longer shows would take the user to the wrong Change.
+  const choose = (next: number) => {
+    request.stop();
+    open.reset();
+    setTip(next);
+  };
 
   return (
     <article
@@ -112,12 +118,12 @@ function StackCard({ stack }: { stack: StackSummary }) {
           onSelect={(pr) => {
             if (path.includes(pr)) return;
             const through = stack.paths.find((p) => p.includes(pr));
-            if (through) setTip(through[through.length - 1] as number);
+            if (through) choose(through[through.length - 1] as number);
           }}
         />
       </div>
       <footer className="space-y-2 border-t border-line px-4 py-3">
-        <PathPicker stack={stack} current={path} onPick={setTip} />
+        <PathPicker stack={stack} current={path} onPick={choose} />
         {stack.issues.map((issue) => (
           <div key={`${issue.kind} ${issue.prs.join(",")}`} className="text-warn">
             {issue.message}
