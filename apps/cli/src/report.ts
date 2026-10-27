@@ -102,8 +102,10 @@ export function formatReport(report: ChangeReport): string {
           : "";
       const mechanical = file.mechanical ? `  (${file.mechanical.reason})` : "";
       const judged = file.layer.by === "llm" ? `  (Claude: ${file.layer.reason})` : "";
+      // A rename says where it came from, which an inspect reason may rest on.
+      const path = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
       lines.push(
-        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${inspect}${mechanical}${judged}`,
+        `${indent}${file.status.charAt(0).toUpperCase()} ${path}  ${totals([file])}${inspect}${mechanical}${judged}`,
       );
     }
   }

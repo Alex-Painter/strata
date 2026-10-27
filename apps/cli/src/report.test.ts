@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type FileChange, parseChangeInput } from "@strata/core";
+import { type FileChange, type LayerId, parseChangeInput } from "@strata/core";
 import { createEngine } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -177,27 +177,37 @@ describe("formatReport", () => {
     const report = await analyze("acme/app#3");
     const [file] = report.change.files;
     if (!file) throw new Error("no file");
-    const files: FileChange[] = Array.from({ length: 45 }, (_, i) => ({
+    const make = (path: string, flagged = false): FileChange => ({
       ...file,
-      path: `f${String(i).padStart(2, "0")}.txt`,
-      inspect: [],
-    }));
-    const last = files[44];
-    if (last) last.inspect = [{ rule: "access", title: "Access", reason: "Access: matches f44*" }];
-    report.change.files = files;
-    report.change.layers = [
-      {
-        layer: "docs",
-        files: files.map((f) => ({ path: f.path, hunkIds: [] })),
-        meaningfulHunks: 0,
-        mechanicalHunks: 0,
-      },
-    ];
+      path,
+      inspect: flagged ? [{ rule: "access", title: "Access", reason: `Access: in ${path}` }] : [],
+    });
+    // 40 Logic files fill the list; of the later layers, only Config has a flagged file.
+    const logic = Array.from({ length: 41 }, (_, i) => make(`f${String(i).padStart(2, "0")}.py`));
+    const tests = [make("test_a.py")];
+    const config = [make("a.toml"), make("auth.toml", true)];
+    report.change.files = [...logic, ...tests, ...config];
+    const group = (layer: LayerId, files: FileChange[]) => ({
+      layer,
+      files: files.map((f) => ({ path: f.path, hunkIds: [] })),
+      meaningfulHunks: 0,
+      mechanicalHunks: 0,
+    });
+    report.change.layers = [group("logic", logic), group("tests", tests), group("config", config)];
     const text = formatReport(report);
     expect(text).toContain(
-      "    A f39.txt  +1 -0\n    A f44.txt  +1 -0  (inspect: Access: matches f44*)\n  … and 4 more\n",
+      "    A f39.py  +1 -0\n  Config & infra (inspect)\n    A auth.toml  +1 -0  (inspect: Access: in auth.toml)\n  … and 3 more\n",
     );
-    expect(text).not.toContain("f40.txt");
+    expect(text).not.toContain("f40.py");
+    expect(text).not.toContain("  Tests\n");
+  });
+
+  it("names a renamed file's old path", async () => {
+    const report = await analyze("acme/app#3");
+    const [file] = report.change.files;
+    if (!file) throw new Error("no file");
+    report.change.files = [{ ...file, status: "renamed", oldPath: "auth/b1-2.txt" }];
+    expect(formatReport(report)).toContain("    R auth/b1-2.txt → b1-2.txt  +1 -0\n");
   });
 
   it("marks revised and mechanical lines in the matrix", async () => {
