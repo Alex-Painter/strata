@@ -110,8 +110,9 @@ export type FactRequest =
  * - `re-anchored`: the PR sits on its base branch now rather than on the
  *   parent: rebased onto it or updated from it after the parent landed, or
  *   moved somewhere else. Its diff starts where it last met that base.
- * - `merged-into-parent`: the PR was merged into the parent's branch, so the
- *   parent's head already holds it.
+ * - `merged-into-parent`: the PR was merged into the parent's branch. The
+ *   parent's head then holds it, unless it merged after the parent landed,
+ *   which raises `base-already-merged`.
  * - `unknown`: git couldn't answer, usually because a commit is missing.
  *
  * A PR that merged onto the trunk while still targeting the parent's branch,
@@ -184,9 +185,9 @@ export interface Stack {
   seed: number;
   issues: StackIssue[];
   /**
-   * What the whole-stack diff leaves out because of how the work was split,
-   * such as PRs it couldn't place. They stay with the stack, so the
-   * whole-stack view reads the same however the work was split.
+   * Notes that depend on how the work was split: PRs the whole-stack diff
+   * couldn't place, and PR summaries Claude couldn't write. They stay with
+   * the stack, so the whole-stack view reads the same however it was split.
    */
   notes: string[];
 }

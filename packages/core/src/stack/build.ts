@@ -481,12 +481,13 @@ class Builder {
   }
 
   /**
-   * Where a merged child landed, if on the trunk rather than on its parent's
-   * branch: its merge commit is on the trunk, and not in the parent's head
-   * (where a child merged into the parent's branch would be). A trunk that was
-   * deleted, say after merging into the default branch, is checked through the
-   * default branch. Returns the branch it's on, false when it didn't land
-   * there, null when git can't tell, and undefined while facts are pending.
+   * Where a merged child landed, if not on its parent's branch: on the trunk,
+   * or on the branch of a PR further down (a stack that landed on a branch with
+   * a PR of its own). Its merge commit is there and not in the parent's head,
+   * where a child merged into the parent's branch would be. A trunk that was
+   * deleted is checked through the default branch, which can only show that it
+   * landed. Returns the branch, false when it was merged into the parent's
+   * branch, null when git can't tell, and undefined while facts are pending.
    */
   private landedOnTrunk(
     parent: StackPr,
@@ -494,8 +495,9 @@ class Builder {
     trunk: string,
   ): string | false | null | undefined {
     if (child.state !== "merged") return false;
-    if (!child.mergeCommitOid) return null;
-    const inParent = this.isAncestor(child.mergeCommitOid, parent.headOid);
+    const merge = child.mergeCommitOid;
+    if (!merge) return null;
+    const inParent = this.isAncestor(merge, parent.headOid);
     if (inParent === true) return false;
     let branch = trunk;
     let tip = this.tip(trunk);
@@ -503,10 +505,26 @@ class Builder {
       branch = this.index.defaultBranch;
       tip = this.tip(branch);
     }
-    const onTrunk = tip ? this.isAncestor(child.mergeCommitOid, tip) : tip;
+    const onTrunk = tip ? this.isAncestor(merge, tip) : tip;
     if (inParent === undefined || onTrunk === undefined) return undefined;
-    if (inParent === null || onTrunk === null) return null;
-    return onTrunk ? branch : false;
+    if (onTrunk === true) return branch;
+    if (inParent === null || onTrunk === null) {
+      // Strata's clone fetched the trunk just now, so a merge commit missing
+      // from it isn't on the trunk: it went to a branch that's gone since.
+      if (branch !== trunk || !tip) return null;
+      const present = this.firstParent(merge);
+      return present === undefined ? undefined : present === null ? false : null;
+    }
+    const seen = new Set([child.number, parent.number]);
+    for (let below = this.parentOf(parent)?.pr; below; below = this.parentOf(below)?.pr) {
+      if (seen.has(below.number)) break;
+      seen.add(below.number);
+      const holds = this.isAncestor(merge, below.headOid);
+      if (holds === undefined) return undefined;
+      if (holds === true) return below.headRef;
+    }
+    // Not being on the default branch says nothing about a deleted trunk.
+    return branch === trunk ? false : null;
   }
 
   /** Whether `oid` holds the parent's work: its head, or the commit it landed as. */

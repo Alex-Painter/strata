@@ -54,7 +54,7 @@ export const LINK_MEANING: Record<LinkState, string> = {
     "Its parent was force-pushed after it branched, so its own changes start at the old parent commit it sits on.",
   "re-anchored":
     "It sits on its base branch now rather than on its parent, so its own changes start where it last met that branch.",
-  "merged-into-parent": "It was merged into its parent's branch, so its parent's head holds it.",
+  "merged-into-parent": "It was merged into its parent's branch rather than the trunk.",
   unknown: "Git couldn't tell where its own changes start, usually because a commit is missing.",
 };
 
