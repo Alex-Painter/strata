@@ -5,11 +5,12 @@ import { canonicalReport, parseChangeInput, stableStringify } from "@strata/core
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EngineConfig } from "../api.js";
 import { createEngine } from "../engine.js";
+import type { TimelineNode } from "../github/graphql.js";
 import type { GitHubPort } from "../github/port.js";
 import type { LayerJudge, LayerRequest } from "../layers/judge.js";
 import { settingsPath } from "../settings.js";
 import { demoRepo } from "../testing/demo-repo.js";
-import { fakeGitHub, ghTime, prNode, retargeted } from "../testing/fake-github.js";
+import { fakeGitHub, forcePushed, ghTime, prNode, retargeted } from "../testing/fake-github.js";
 import { StackRepo } from "../testing/stack-repo.js";
 
 let remote: StackRepo;
@@ -194,6 +195,128 @@ describe("each PR's diff", () => {
       reason:
         "#1 landed on main as a new commit, and #2 wasn't rebased before it merged, " +
         "so GitHub's diff of #2 repeats #1's changes.",
+    });
+  });
+
+  describe("says why GitHub's diff differs", () => {
+    const merged = (minute: number, mergeCommit: string, baseRefOid: string) => ({
+      state: "MERGED" as const,
+      mergedAt: ghTime(minute),
+      closedAt: ghTime(minute),
+      mergeCommit: { oid: mergeCommit },
+      baseRefOid,
+    });
+    const timeline = (...nodes: TimelineNode[]) => ({
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes,
+    });
+
+    it("for a PR merged into its parent's branch", async () => {
+      const h1 = await remote.write("b1", { "a.txt": lines("one") }, "main");
+      const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const mm = await remote.mergeCommit("b2", "b1");
+      await remote.holdPr(1, mm);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, mm),
+        prNode(2, h2, { baseRefName: "b1", ...merged(30, mm, h1) }),
+      ]);
+      const report = await analyze(github, "acme/app#1");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link])).toEqual([
+        [2, "merged-into-parent"],
+      ]);
+      expect(report.parts[1]?.github).toMatchObject({
+        same: false,
+        onlyOnGitHub: ["b.txt"],
+        reason:
+          "#2 was merged into b1, so its changes are in #1's diff here, " +
+          "and GitHub's diff of #2 shows them as its own.",
+      });
+    });
+
+    it("for a retargeted PR that was behind its parent when it merged", async () => {
+      // #2 branched before #1's last commit, then both landed without a restack.
+      const m0 = await remote.tip("main");
+      const h1a = await remote.write("b1", { "a.txt": lines("one") }, "main");
+      const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const h1 = await remote.write("b1", { "c.txt": lines("fix") });
+      const s1 = await remote.squashMerge("b1", "main");
+      const s2 = await remote.land("b2", h1a, "main");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, merged(30, s1, m0)),
+        prNode(2, h2, {
+          ...merged(31, s2, s1),
+          timelineItems: timeline(retargeted("b1", "main", 30)),
+        }),
+      ]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link, e.via])).toEqual([
+        [2, "behind", "retarget"],
+      ]);
+      expect(report.stack?.issues).toEqual([]);
+      expect(report.parts[1]?.github).toMatchObject({
+        base: m0,
+        same: false,
+        onlyOnGitHub: ["a.txt"],
+        reason:
+          "#1 landed on main as a new commit, and #2 wasn't rebased before it merged, " +
+          "so GitHub's diff of #2 repeats #1's changes.",
+      });
+    });
+
+    it("for a PR on a head its parent force-pushed away", async () => {
+      const h1old = await remote.write("b1", { "a.txt": lines("one") }, "main");
+      const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const h1 = await remote.amend("b1");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, { timelineItems: timeline(forcePushed(h1old, h1, 20)) }),
+        prNode(2, h2, { baseRefName: "b1" }),
+      ]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link])).toEqual([[2, "stale"]]);
+      expect(report.parts[1]?.github).toMatchObject({
+        same: false,
+        onlyOnGitHub: ["a.txt"],
+        reason:
+          "#1 was force-pushed after #2 branched from it, so GitHub's diff of #2 " +
+          "repeats the old #1 commits it sits on, and Strata's starts at #1's head now.",
+      });
+    });
+
+    it("for a PR rebased onto main that still targets its parent's branch", async () => {
+      // The stack landed at once, after #2 was rebased onto #1's landed commit.
+      const m0 = await remote.tip("main");
+      const h1 = await remote.write("b1", { "a.txt": lines("one") }, "main");
+      await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const s1 = await remote.squashMerge("b1", "main");
+      const h2 = await remote.rebase("b2", s1, h1);
+      const s2 = await remote.land("b2", s1, "main");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, merged(30, s1, m0)),
+        prNode(2, h2, { baseRefName: "b1", ...merged(31, s2, h1) }),
+      ]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link, e.via])).toEqual([
+        [2, "re-anchored", "base-ref"],
+      ]);
+      expect(report.parts[1]?.github).toMatchObject({
+        base: m0,
+        same: false,
+        onlyOnGitHub: ["a.txt"],
+        reason:
+          "#2 was rebased onto main before it merged but still targets b1, " +
+          "so GitHub's diff of #2 repeats the changes below it.",
+      });
     });
   });
 

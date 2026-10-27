@@ -226,21 +226,32 @@ function differsBecause(
   }
   const parent = edge ? stack.nodes.find((other) => other.pr.number === edge.parent) : undefined;
   const p = parent ? `#${parent.pr.number}` : null;
-  switch (edge?.link) {
-    case "intact":
-      if (parent?.pr.state === "merged") {
-        const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
-        return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
-      }
-      break;
+  const link = edge?.link;
+  // Retargeted after its parent landed as a new commit, so GitHub diffs it from
+  // the trunk, which doesn't hold the parent's commits it sits on.
+  if (
+    edge?.via === "retarget" &&
+    parent?.pr.state === "merged" &&
+    (link === "intact" || link === "behind" || link === "stale")
+  ) {
+    const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
+    return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+  }
+  switch (link) {
     case "behind":
       return open
         ? `${n} is behind ${p}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`
         : `${n} was behind ${p} when it ${ended}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`;
     case "stale":
-      return `${p} was force-pushed after ${n} branched from it, so GitHub diffs ${n} from the old ${p}, and Strata from ${p}'s head now.`;
+      return `${p} was force-pushed after ${n} branched from it, so GitHub's diff of ${n} repeats the old ${p} commits it sits on, and Strata's starts at ${p}'s head now.`;
     case "re-anchored":
+      if (node.pr.baseRef === edge?.ref) {
+        // It still targets the parent's branch, but sits on the trunk.
+        return `${n} was rebased onto ${stack.trunk.name}${open ? "" : ` before it ${ended}`} but still targets ${baseRef}, so GitHub's diff of ${n} repeats the changes below it.`;
+      }
       return `${n} ${open ? "now sits" : "sat"} on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
+    case "merged-into-parent":
+      return `${n} was merged into ${baseRef}, so its changes are in ${p}'s diff here, and GitHub's diff of ${n} shows them as its own.`;
   }
   if (part.how === "replayed") {
     return `A PR below ${n} was replayed onto newer code, so Strata diffs ${n} from that, and GitHub from ${baseRef}.`;
