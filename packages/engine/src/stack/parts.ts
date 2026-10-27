@@ -196,12 +196,41 @@ async function compareWithGitHub(
     onlyHere: [...ourPaths].filter((path) => !theirPaths.has(path)),
     reason: same
       ? null
-      : differsBecause(stack, node, edge, part, {
-          // GitHub's diff starts below where the PR's own changes start, so it
-          // repeats commits the PR sits on.
-          repeats: base !== anchor && (await mergeBase(gitDir, base, anchor)) === base,
-        }),
+      : differsBecause(stack, node, edge, part, await gitHubStart(gitDir, stack, node, edge, base)),
     evidence,
+  };
+}
+
+/** What git shows about where GitHub's diff of a PR starts, for saying why it differs. */
+interface GitHubStart {
+  /** Where GitHub's diff starts. */
+  base: string;
+  /**
+   * GitHub's base doesn't hold where the PR's own changes start, so GitHub's
+   * diff also shows commits the PR sits on.
+   */
+  repeats: boolean;
+  /** The parent's head holds the merge commit of a PR merged into its branch. */
+  inParent: boolean;
+}
+
+async function gitHubStart(
+  gitDir: string,
+  stack: Stack,
+  node: StackNode,
+  edge: StackEdge | null,
+  base: string,
+): Promise<GitHubStart> {
+  const anchor = node.anchor as string;
+  const parent = edge ? stack.nodes.find((other) => other.pr.number === edge.parent) : undefined;
+  const merge = node.pr.mergeCommitOid;
+  return {
+    base,
+    repeats: (await mergeBase(gitDir, base, anchor)) !== anchor,
+    inParent:
+      edge?.link === "merged-into-parent" && parent && merge
+        ? (await mergeBase(gitDir, merge, parent.pr.headOid)) === merge
+        : false,
   };
 }
 
@@ -222,7 +251,7 @@ function differsBecause(
   node: StackNode,
   edge: StackEdge | null,
   part: Omit<PrPart, "github" | "provenance" | "summary">,
-  { repeats }: { repeats: boolean },
+  { base, repeats, inParent }: GitHubStart,
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;
@@ -234,39 +263,46 @@ function differsBecause(
   const parent = edge ? stack.nodes.find((other) => other.pr.number === edge.parent) : undefined;
   const p = parent ? `#${parent.pr.number}` : null;
   const link = edge?.link;
-  // Retargeted to a branch that doesn't hold the parent's commits it sits on,
-  // such as the trunk after the parent landed as a new commit.
+  // Retargeted to a branch that doesn't hold the parent's commits it sits on.
   if (edge?.via === "retarget" && repeats && (link === "intact" || link === "behind")) {
-    if (parent?.pr.state === "merged") {
+    // The parent landed on that same branch as a new commit, such as a squash.
+    if (parent?.pr.state === "merged" && parent.pr.baseRef === baseRef) {
       const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
-      return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+      return `${p} landed on ${baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
     }
-    return `${n} was retargeted to ${baseRef}, which doesn't have ${p}'s commits, so GitHub's diff of ${n} repeats the ones it sits on.`;
+    return `${n} was retargeted to ${baseRef}, which doesn't have all of ${p}'s commits, so GitHub's diff of ${n} repeats the ones it sits on.`;
   }
   switch (link) {
     case "behind":
+      // GitHub diffs it from where it left the parent only while its base holds that.
+      if (base !== node.anchor) break;
       return open
         ? `${n} is behind ${p}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`
         : `${n} was behind ${p} when it ${ended}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`;
     case "stale":
+      if (!repeats) break;
       return `${p} was force-pushed after ${n} branched from it, so GitHub's diff of ${n} repeats the old ${p} commits it sits on, and Strata's starts at ${p}'s head now.`;
     case "re-anchored":
       if (node.pr.baseRef === edge?.ref) {
         // It still targets the parent's branch, but sits somewhere else.
         const moved = `${n} ${open ? "no longer sits" : "didn't sit"} on ${p}'s head but ${open ? "still targets" : "targeted"} ${baseRef}`;
         return repeats
-          ? `${moved}, so GitHub's diff of ${n} starts further back and repeats the commits up to where its own changes start.`
+          ? `${moved}, so GitHub's diff of ${n} also shows the commits it sits on that ${baseRef} doesn't have.`
           : `${moved}, so GitHub diffs it from where it meets ${baseRef}, and Strata from the stack below it.`;
       }
       return `${n} ${open ? "now sits" : "sat"} on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
     case "merged-into-parent": {
+      if (inParent) {
+        return `${n} was merged into ${baseRef}, so its changes are in ${p}'s diff here, and GitHub's diff of ${n} shows them as its own.`;
+      }
+      // Merged after the parent landed, onto a branch that had moved on since.
       const late = stack.issues.some(
         (issue) => issue.kind === "base-already-merged" && issue.prs[0] === node.pr.number,
       );
-      if (late) {
-        return `${n} was merged into ${baseRef} after ${p} landed, so GitHub diffs it from ${baseRef} as it was then, and Strata from ${p}'s head.`;
+      if (late && base !== parent?.pr.headOid) {
+        return `${n} was merged into ${baseRef} after ${p} landed, so GitHub diffs it from ${baseRef} as it was then, and Strata from the stack below it.`;
       }
-      return `${n} was merged into ${baseRef}, so its changes are in ${p}'s diff here, and GitHub's diff of ${n} shows them as its own.`;
+      break;
     }
   }
   if (part.how === "replayed") {
