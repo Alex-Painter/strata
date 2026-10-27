@@ -3,7 +3,8 @@
  * PR's own diff and summary, the whole stack's summary and Guide, its files by
  * layer, the layer by PR matrix, then issues and notes. A range has no PRs,
  * so it's the whole diff alone. Each sentence ends with the hunks it rests
- * on, as path:line.
+ * on, as path:line. Layers to inspect end "(inspect)", and a file an inspect
+ * rule matched says which glob it matched.
  */
 import {
   type ChangeReport,
@@ -15,7 +16,10 @@ import {
   type PrPart,
 } from "@strata/core";
 
-/** Longer whole-stack file lists are cut, and say how many were left out. */
+/**
+ * Longer whole-stack file lists are cut, and say how many were left out. Files
+ * an inspect rule matched are printed past the cut too.
+ */
 const MAX_FILES = 40;
 /** Paths named per Guide section. */
 const SECTION_PATHS = 4;
@@ -83,16 +87,24 @@ export function formatReport(report: ChangeReport): string {
       : [{ title: null, files: change.files }];
   let shown = 0;
   for (const group of groups) {
-    if (shown >= MAX_FILES) break;
+    const files = group.files.filter((file) => {
+      const show = shown < MAX_FILES || file.inspect.length > 0;
+      if (show) shown++;
+      return show;
+    });
+    if (files.length === 0) continue;
     if (group.title) lines.push(`  ${group.title}`);
     const indent = group.title ? "    " : "  ";
-    for (const file of group.files.slice(0, MAX_FILES - shown)) {
+    for (const file of files) {
+      const inspect =
+        file.inspect.length > 0
+          ? `  (inspect: ${file.inspect.map((flag) => flag.reason).join("; ")})`
+          : "";
       const mechanical = file.mechanical ? `  (${file.mechanical.reason})` : "";
       const judged = file.layer.by === "llm" ? `  (Claude: ${file.layer.reason})` : "";
       lines.push(
-        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${mechanical}${judged}`,
+        `${indent}${file.status.charAt(0).toUpperCase()} ${file.path}  ${totals([file])}${inspect}${mechanical}${judged}`,
       );
-      shown++;
     }
   }
   if (change.files.length > shown) lines.push(`  … and ${change.files.length - shown} more`);
