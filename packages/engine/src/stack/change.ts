@@ -99,14 +99,15 @@ export async function stackReport(
     judge: meta.judge,
     ...(options.signal ? { signal: options.signal } : {}),
   });
+  const whole = diffs.whole;
+  const summaries = await summarise(whole?.model ?? null, diffs.parts, meta, options);
+  // Notes that depend on how the work was split go on the stack, out of the whole-stack view.
   const stack: Stack = {
     ...resolved.stack,
     issues: [...resolved.stack.issues, ...diffs.issues],
-    notes: diffNotes(resolved.stack, diffs),
+    notes: [...diffNotes(resolved.stack, diffs), ...summaries.partNotes],
   };
   const path = stack.selectedPath;
-  const whole = diffs.whole;
-  const summaries = await summarise(whole?.model ?? null, diffs.parts, meta, options);
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {

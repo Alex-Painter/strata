@@ -95,7 +95,7 @@ export async function summarise(
     return writeSummaries(whole, parts, steps.ask, options.signal);
   }
   const groups = whole ? guideGroups(whole) : [];
-  return { summary: [], guide: ruleGuide(groups), parts: new Map(), notes: [] };
+  return { summary: [], guide: ruleGuide(groups), parts: new Map(), notes: [], partNotes: [] };
 }
 
 /** Says what Strata guessed or skipped about the whole diff, and how to change that. */

@@ -37,7 +37,10 @@ export interface Summaries {
   guide: Guide;
   /** By PR number. A PR Claude wasn't asked about, or couldn't answer for, has none. */
   parts: Map<number, Claim[]>;
+  /** About the whole-stack summary. */
   notes: string[];
+  /** About the PRs' summaries, which depend on how the stack was split. */
+  partNotes: string[];
 }
 
 /** Bump when a prompt or schema changes, so cached answers aren't reused. */
@@ -150,12 +153,13 @@ export async function writeSummaries(
     }),
     CONCURRENCY,
   );
+  const partNotes: string[] = [];
   if (failures.length > 0) {
     const prs = failures.length === 1 ? "1 PR" : `${failures.length} PRs`;
-    notes.push(`Strata couldn't ask Claude to summarise ${prs}: ${failures[0]}`);
+    partNotes.push(`Strata couldn't ask Claude to summarise ${prs}: ${failures[0]}`);
   }
 
-  return { summary, guide, parts: byPr, notes };
+  return { summary, guide, parts: byPr, notes, partNotes };
 }
 
 /** Labels for a diff's hunks, in diff order: h1, h2, ... */

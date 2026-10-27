@@ -87,6 +87,14 @@ describe("formatReport", () => {
     expect(text).not.toContain("Elsewhere.");
   });
 
+  it("prints the stack's notes before the report's", async () => {
+    const report = await analyze("acme/app#3");
+    report.stack?.notes.push("The whole-stack diff covers #1 only.");
+    expect(formatReport(report)).toContain(
+      "\n  - The whole-stack diff covers #1 only.\n  - There's no summary",
+    );
+  });
+
   it("prints each summary sentence with the hunks it rests on, and Claude's Guide", async () => {
     const report = await analyze("acme/app#3");
     const evidence = (path: string) => [

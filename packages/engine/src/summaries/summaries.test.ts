@@ -222,8 +222,9 @@ describe("writeSummaries", () => {
     expect(result.parts.get(1)?.map((claim) => claim.text)).toEqual(["Adds the model."]);
     expect(result.notes).toEqual([
       "Strata couldn't ask Claude for the summary, so the Guide shows Strata's own groups: Claude declined to answer.",
-      "Strata couldn't ask Claude to summarise 2 PRs: Overloaded",
     ]);
+    // How many PRs failed depends on the split, so it's kept apart from the whole-stack notes.
+    expect(result.partNotes).toEqual(["Strata couldn't ask Claude to summarise 2 PRs: Overloaded"]);
   });
 
   it("stops when the run is cancelled", async () => {
@@ -244,6 +245,7 @@ describe("writeSummaries", () => {
       guide: { by: "rule", sections: [] },
       parts: new Map(),
       notes: [],
+      partNotes: [],
     });
   });
 });

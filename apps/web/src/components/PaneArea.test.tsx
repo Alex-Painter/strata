@@ -4,8 +4,9 @@ import {
   guideGroups,
   REPORT_SCHEMA_VERSION,
   ruleGuide,
+  summarizeStack,
 } from "@strata/core";
-import type { ChangeReport, Hunk } from "@strata/core/model";
+import type { ChangeReport, Hunk, Stack, StackPr, StackSummary } from "@strata/core/model";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
@@ -62,7 +63,45 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function mount(report: ChangeReport) {
+const pr: StackPr = {
+  number: 1,
+  title: "Add the forecast flag",
+  url: "https://github.com/acme/app/pull/1",
+  author: "dev",
+  state: "open",
+  draft: false,
+  createdAt: "2026-10-01T00:00:00Z",
+  updatedAt: "2026-10-01T00:00:00Z",
+  mergedAt: null,
+  closedAt: null,
+  baseRef: "main",
+  headRef: "b1",
+  headOid: head,
+  crossRepository: false,
+  mergeCommitOid: null,
+  baseOid: null,
+  baseChanges: [],
+  forcePushes: [],
+  review: null,
+  checks: null,
+};
+
+const stack: Stack = {
+  id: "stk_1",
+  repo: "acme/app",
+  trunk: { name: "main", isDefault: true },
+  root: 1,
+  base,
+  nodes: [{ pr, parent: null, children: [], depth: 0, anchor: base }],
+  edges: [],
+  paths: [[1]],
+  selectedPath: [1],
+  seed: 1,
+  issues: [],
+  notes: ["The whole-stack diff covers #1 only."],
+};
+
+function mount(report: ChangeReport, summary: StackSummary | null = null) {
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -70,7 +109,7 @@ function mount(report: ChangeReport) {
     root?.render(
       <PaneArea
         report={report}
-        summary={null}
+        summary={summary}
         scope={null}
         onScope={() => {}}
         run={null}
@@ -102,5 +141,15 @@ describe("PaneArea", () => {
     expect(page.textContent).toContain("app/models/account.py");
     expect(page.textContent).not.toContain("Layers by PR");
     expect(page.textContent).not.toContain("How it arrived");
+  });
+
+  it("shows the stack's notes before the report's", () => {
+    const report = { ...range, change: { ...range.change, hints: [] }, stack };
+    const page = mount(report, summarizeStack(stack));
+    const text = page.textContent ?? "";
+    expect(text).toContain("The whole-stack diff covers #1 only.");
+    expect(text.indexOf("The whole-stack diff covers #1 only.")).toBeLessThan(
+      text.indexOf("Strata guessed nothing."),
+    );
   });
 });

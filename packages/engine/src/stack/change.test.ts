@@ -227,4 +227,27 @@ describe("engine.analyzeChange summaries", () => {
     expect(bodies).toHaveLength(4);
     expect(again.summary).toEqual(report.summary);
   });
+
+  it("keeps a PR summary that failed out of the whole-stack notes", async () => {
+    await allowClaude();
+    const { client } = fakeClaude();
+    const create = client.messages.create.bind(client.messages);
+    const failing = {
+      messages: {
+        create: async (body: { system: string }) => {
+          if (body.system.includes("one pull request")) throw new Error("Overloaded");
+          return create(body as never);
+        },
+      },
+    } as unknown as Anthropic;
+    const report = await engine({ anthropicClient: failing, model: "claude-test" }).analyzeChange(
+      parseChangeInput("acme/app#3"),
+    );
+    expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);
+    // How many PRs failed depends on the split, so a range of the same code never says it.
+    expect(report.notes).toEqual([]);
+    expect(report.stack?.notes).toEqual([
+      expect.stringMatching(/^Strata couldn't ask Claude to summarise 3 PRs: /),
+    ]);
+  });
 });
