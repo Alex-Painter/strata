@@ -5,14 +5,21 @@
 import { linkedGroups, type PrIndex, type Stack } from "@strata/core";
 import { type ResolveStackOptions, resolveStack } from "./resolve.js";
 
+export interface DiscoverOptions extends ResolveStackOptions {
+  /** Told how many groups of linked PRs are done, before each one. */
+  onProgress?: (step: string) => void;
+}
+
 export async function discoverStacks(
   index: PrIndex,
   gitDir: string,
-  options: ResolveStackOptions = {},
+  options: DiscoverOptions = {},
 ): Promise<Stack[]> {
   const stacks = new Map<string, Stack>();
   const covered = new Set<number>();
-  for (const group of linkedGroups(index)) {
+  const groups = linkedGroups(index);
+  for (const [i, group] of groups.entries()) {
+    options.onProgress?.(`Finding stacks: ${i} of ${groups.length} groups of linked PRs done`);
     for (const number of group) {
       if (covered.has(number)) continue;
       let stack = await resolveStack(index, { pr: number }, gitDir, options);

@@ -39,8 +39,17 @@ describe("engine.discoverStacks", () => {
       now: () => new Date(Date.UTC(2026, 9, 2)),
     });
 
-    const stacks = await engine.discoverStacks("acme/app");
+    const steps: string[] = [];
+    const stacks = await engine.discoverStacks("acme/app", {
+      onProgress: (step) => steps.push(step),
+    });
 
+    expect(steps).toEqual([
+      "Cloning acme/app into Strata's cache (only the first time)",
+      "Fetching acme/app's branches and 6 PR heads",
+      "Finding stacks: 0 of 2 groups of linked PRs done",
+      "Finding stacks: 1 of 2 groups of linked PRs done",
+    ]);
     expect(stacks.map(shape)).toEqual([
       {
         root: 1,

@@ -28,7 +28,13 @@ describe("loadPrIndex", () => {
       { pageSize: 2 },
     );
 
-    const index = await loadPrIndex("acme/app", { port: github, dataDir, now: clock(30) });
+    const steps: string[] = [];
+    const index = await loadPrIndex("acme/app", {
+      port: github,
+      dataDir,
+      now: clock(30),
+      onProgress: (step) => steps.push(step),
+    });
 
     expect(index.repo).toBe("acme/app");
     expect(index.defaultBranch).toBe("main");
@@ -38,6 +44,8 @@ describe("loadPrIndex", () => {
       [3, "closed"],
     ]);
     expect(github.calls.filter((call) => call.query === "page")).toHaveLength(2);
+    // Said after each page that has another after it.
+    expect(steps).toEqual(["Reading PRs from GitHub: 2 so far"]);
   });
 
   it("stops paging at the edge of the window and drops PRs that fall out of it", async () => {

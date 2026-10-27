@@ -45,7 +45,12 @@ describe("ranges", () => {
     const range = await engine().analyzeChange(parseChangeInput("acme/app@main...b3"), {
       onProgress: (step) => steps.push(step),
     });
-    expect(steps).toEqual(["Finding the range", "Building the diff"]);
+    expect(steps).toEqual([
+      "Finding the range",
+      "Cloning acme/app into Strata's cache (only the first time)",
+      "Fetching acme/app's branches",
+      "Building the diff",
+    ]);
     expect(range.stack).toBeNull();
     expect(range.parts).toEqual([]);
     expect(range.change.files.map((file) => file.path)).toEqual([

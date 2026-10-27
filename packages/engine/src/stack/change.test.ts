@@ -110,7 +110,12 @@ describe("engine.analyzeChange for stacks", () => {
         "turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     ]);
     expect(report.analysis.model).toBeUndefined();
-    expect(steps).toEqual(["Finding the stack", "Building the diffs"]);
+    expect(steps).toEqual([
+      "Finding the stack",
+      "Cloning acme/app into Strata's cache (only the first time)",
+      "Fetching acme/app's branches and 3 PR heads",
+      "Building the diffs",
+    ]);
   });
 
   it("lets callers share one repo's caches at the same time", async () => {
@@ -191,7 +196,13 @@ describe("engine.analyzeChange summaries", () => {
       parseChangeInput("acme/app#3"),
       { onProgress: (step) => steps.push(step) },
     );
-    expect(steps).toEqual(["Finding the stack", "Building the diffs", "Writing the summaries"]);
+    expect(steps).toEqual([
+      "Finding the stack",
+      "Cloning acme/app into Strata's cache (only the first time)",
+      "Fetching acme/app's branches and 3 PR heads",
+      "Building the diffs",
+      "Writing the summaries",
+    ]);
     expect(bodies).toHaveLength(4);
     expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);
     expect(report.summary[0]?.evidence[0]?.anchor.source).toEqual({

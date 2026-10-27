@@ -76,6 +76,16 @@ export interface StacksResponse {
   stacks: StackSummary[];
 }
 
+/**
+ * A 202 from a request that's still working, such as the first read of a big
+ * repo: send the same request again for newer progress or the result.
+ */
+export interface PendingResponse {
+  pending: true;
+  /** The latest step, such as "Reading PRs from GitHub: 350 so far". */
+  progress: string | null;
+}
+
 export type RunStatus = "queued" | "running" | "done" | "failed";
 
 export interface RunInfo {

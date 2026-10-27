@@ -44,6 +44,8 @@ export interface PrIndexOptions {
   windowDays?: number;
   now?: () => Date;
   log?: (message: string) => void;
+  /** Told how many PRs have been read after each page, while more pages follow. */
+  onProgress?: (step: string) => void;
 }
 
 export async function loadPrIndex(repo: string, options: PrIndexOptions): Promise<PrIndex> {
@@ -74,6 +76,7 @@ export async function loadPrIndex(repo: string, options: PrIndexOptions): Promis
       fetched.push(toStackPr(node, await allEvents(options.port, owner, name, node)));
     }
     if (reachedOld || !pageInfo.hasNextPage) break;
+    options.onProgress?.(`Reading PRs from GitHub: ${fetched.length} so far`);
     cursor = pageInfo.endCursor;
   }
   if (!defaultBranch) throw new GitHubError(`${repo} has no default branch.`);

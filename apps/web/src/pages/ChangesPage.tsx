@@ -35,8 +35,12 @@ function NewChange() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const hint = inputHint(text);
+  const [progress, setProgress] = useState<string | null>(null);
   const create = useMutation({
-    mutationFn: (input: string) => api.createChange({ input }),
+    mutationFn: (input: string) => {
+      setProgress(null);
+      return api.createChange({ input }, setProgress);
+    },
     onSuccess: (detail) => {
       queryClient.setQueryData(["change", detail.change.id], detail);
       queryClient.invalidateQueries({ queryKey: ["changes"] });
@@ -81,7 +85,8 @@ function NewChange() {
         {create.error
           ? create.error.message
           : create.isPending
-            ? "Reading the repo's PRs and fetching their branches. The first time for a repo takes longest."
+            ? (progress ??
+              "Reading the repo's PRs and fetching their branches. The first time for a repo takes longest.")
             : (hint?.text ?? "Strata finds the whole stack around it, merged PRs included.")}
       </p>
     </section>

@@ -31,22 +31,23 @@ export const createEngine: CreateEngine = (config) => {
   );
 
   return {
-    discoverStacks(repo, signal) {
+    discoverStacks(repo, options = {}) {
+      const { signal, onProgress } = options;
       return serialize(lockKey(config, repo), async () => {
-        const index = await loadIndex(config, repo);
+        const index = await loadIndex(config, repo, onProgress);
         signal?.throwIfAborted();
-        const cache = await openCache(config, repo);
+        const cache = await openCache(config, repo, onProgress);
         await cache.fetch({ pulls: linkedGroups(index).flat() });
         signal?.throwIfAborted();
-        return discoverStacks(index, cache.gitDir);
+        return discoverStacks(index, cache.gitDir, onProgress ? { onProgress } : {});
       });
     },
-    async resolveChange(input) {
+    async resolveChange(input, options = {}) {
       const gh = githubInput(input);
       return serialize(lockKey(config, repoName(gh)), async () =>
         gh.kind === "range"
-          ? resolveRangeChange(gh, await openCache(config, repoName(gh)))
-          : resolveStackInput(config, gh),
+          ? resolveRangeChange(gh, await openCache(config, repoName(gh), options.onProgress))
+          : resolveStackInput(config, gh, options.onProgress),
       );
     },
     async analyzeChange(input, options = {}) {
@@ -68,13 +69,16 @@ export const createEngine: CreateEngine = (config) => {
         };
         if (gh.kind === "range") {
           options.onProgress?.("Finding the range");
-          const resolved = await resolveRangeChange(gh, await openCache(config, repo));
+          const resolved = await resolveRangeChange(
+            gh,
+            await openCache(config, repo, options.onProgress),
+          );
           options.signal?.throwIfAborted();
           options.onProgress?.("Building the diff");
           return rangeReport(resolved, options, meta);
         }
         options.onProgress?.("Finding the stack");
-        const resolved = await resolveStackInput(config, gh);
+        const resolved = await resolveStackInput(config, gh, options.onProgress);
         options.signal?.throwIfAborted();
         options.onProgress?.("Building the diffs");
         return stackReport(resolved, options, meta);
@@ -116,15 +120,21 @@ function githubPort(config: EngineConfig): GitHubPort {
   return createGitHubPort({ token: config.githubToken });
 }
 
-function openCache(config: EngineConfig, repo: string): Promise<RepoCache> {
+/** The cache says when it clones or fetches: as progress when the caller follows it, else in the log. */
+function openCache(
+  config: EngineConfig,
+  repo: string,
+  onProgress?: (step: string) => void,
+): Promise<RepoCache> {
   const checkout = config.checkouts?.[repo];
   const remoteUrl = config.gitRemote?.(repo);
+  const log = onProgress ?? config.log;
   return RepoCache.open(repo, {
     dataDir: config.dataDir,
     ...(checkout ? { checkout } : {}),
     ...(config.githubToken ? { token: config.githubToken } : {}),
     ...(remoteUrl ? { remoteUrl } : {}),
-    ...(config.log ? { log: config.log } : {}),
+    ...(log ? { log } : {}),
   });
 }
 
@@ -133,13 +143,18 @@ function lockKey(config: EngineConfig, repo: string): string {
   return `${config.dataDir}\0${repo}`;
 }
 
-function loadIndex(config: EngineConfig, repo: string): Promise<PrIndex> {
+function loadIndex(
+  config: EngineConfig,
+  repo: string,
+  onProgress?: (step: string) => void,
+): Promise<PrIndex> {
   splitRepo(repo);
   return loadPrIndex(repo, {
     port: githubPort(config),
     dataDir: config.dataDir,
     ...(config.now ? { now: config.now } : {}),
     ...(config.log ? { log: config.log } : {}),
+    ...(onProgress ? { onProgress } : {}),
   });
 }
 
@@ -150,10 +165,14 @@ function repoName(input: GitHubInput): string {
 }
 
 /** Call with the repo's lock held. */
-async function resolveStackInput(config: EngineConfig, input: StackInput & GitHubInput) {
+async function resolveStackInput(
+  config: EngineConfig,
+  input: StackInput & GitHubInput,
+  onProgress?: (step: string) => void,
+) {
   const repo = repoName(input);
-  const index = await loadIndex(config, repo);
-  return resolveStackChange(input, index, await openCache(config, repo));
+  const index = await loadIndex(config, repo, onProgress);
+  return resolveStackChange(input, index, await openCache(config, repo, onProgress));
 }
 
 function githubInput(input: ChangeInput): GitHubInput {

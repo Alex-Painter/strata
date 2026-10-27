@@ -14,6 +14,7 @@ import {
   type ChangeSummary,
   describeInput,
   describeRepo,
+  type PendingResponse,
   parseChangeInput,
   type StacksResponse,
 } from "@strata/core/model";
@@ -24,6 +25,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { newId } from "../auth/crypto.js";
 import { type ChangeRow, changes, reports } from "../db/schema.js";
+import { Jobs } from "../jobs.js";
 import { latestRun, runInfo } from "../runs.js";
 import type { AppDeps, AppEnv } from "../types.js";
 
@@ -35,15 +37,23 @@ const CreateChange = z.object({
 
 export function changeRoutes(deps: AppDeps) {
   const { db } = deps;
+  const jobs = deps.jobs ?? new Jobs();
   const app = new Hono<AppEnv>();
+  const pending = (c: Context<AppEnv>, progress: string | null) =>
+    c.json<PendingResponse>({ pending: true, progress }, 202);
 
+  // The first read of a big repo takes minutes, so it runs as a job the client
+  // asks after until it's done; the job carries on if the client goes away.
   app.get("/repos/:owner/:name/stacks", async (c) => {
     const repo = `${c.req.param("owner")}/${c.req.param("name")}`;
-    const engine = deps.engineFor(c.get("user").id);
-    const stacks = await engine.discoverStacks(repo, c.req.raw.signal);
+    const user = c.get("user");
+    const found = await jobs.run(`stacks\0${user.id}\0${repo}`, (onProgress) =>
+      deps.engineFor(user.id).discoverStacks(repo, { onProgress }),
+    );
+    if (!found.done) return pending(c, found.progress);
     return c.json<StacksResponse>({
       repo,
-      stacks: stacks.map(summarizeStack).sort(byRecentActivity),
+      stacks: found.value.map(summarizeStack).sort(byRecentActivity),
     });
   });
 
@@ -73,7 +83,11 @@ export function changeRoutes(deps: AppDeps) {
     }
 
     const user = c.get("user");
-    const resolved = await deps.engineFor(user.id).resolveChange(input, c.req.raw.signal);
+    const found = await jobs.run(`resolve\0${user.id}\0${JSON.stringify(input)}`, (onProgress) =>
+      deps.engineFor(user.id).resolveChange(input, { onProgress }),
+    );
+    if (!found.done) return pending(c, found.progress);
+    const resolved = found.value;
     const path = resolved.stack?.selectedPath ?? [];
     const rootPr = path[0];
     const tipPr = path[path.length - 1];

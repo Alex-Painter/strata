@@ -53,12 +53,18 @@ export interface EngineConfig {
   log?: (message: string) => void;
 }
 
-export interface AnalyzeOptions {
-  /** Intent sources linked to the Change (spec, ticket, design, notes). */
-  sources?: ContextSource[];
-  /** Called with a short, human-readable step name as the run progresses. */
+export interface ProgressOptions {
+  /**
+   * Called with a short, human-readable step as the work progresses. The first
+   * read of a big repo takes minutes, so some steps repeat with new counts.
+   */
   onProgress?: (step: string) => void;
   signal?: AbortSignal;
+}
+
+export interface AnalyzeOptions extends ProgressOptions {
+  /** Intent sources linked to the Change (spec, ticket, design, notes). */
+  sources?: ContextSource[];
 }
 
 /** Where a ChangeInput points, once PR numbers and refs are resolved to SHAs. */
@@ -100,8 +106,8 @@ export type ChatChunk = { type: "text"; text: string } | { type: "status"; text:
 
 export interface Engine {
   /** Every stack among the PRs updated in the last 90 days, bottom PR first. */
-  discoverStacks(repo: string, signal?: AbortSignal): Promise<Stack[]>;
-  resolveChange(input: ChangeInput, signal?: AbortSignal): Promise<ResolvedChange>;
+  discoverStacks(repo: string, options?: ProgressOptions): Promise<Stack[]>;
+  resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */
   readFile(repo: RepoRef, revision: string, path: string): Promise<string | null>;

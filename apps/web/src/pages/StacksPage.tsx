@@ -6,14 +6,21 @@ import { EvidenceList } from "../components/EvidenceList";
 import { PathPicker } from "../components/PathPicker";
 import { CopyMermaid, StackMap } from "../components/StackMap";
 import { TopBar } from "../components/TopBar";
-import { api } from "../lib/api";
+import { api, isPending } from "../lib/api";
 import { ago, countPrs, prCount } from "../lib/format";
 
 /** Every stack in a repo, newest activity first, each ready to open as a Change. */
 export function StacksPage({ me }: { me: MeResponse }) {
   const { owner, name } = useParams<{ owner: string; name: string }>();
   const repo = `${owner}/${name}`;
-  const stacks = useQuery({ queryKey: ["stacks", repo], queryFn: () => api.stacks(repo) });
+  const stacks = useQuery({
+    queryKey: ["stacks", repo],
+    queryFn: () => api.stacks(repo),
+    // The server answers "still reading" until the repo's first read is done.
+    refetchInterval: (query) => (isPending(query.state.data) ? 1000 : false),
+  });
+  const found = stacks.data && !isPending(stacks.data) ? stacks.data : null;
+  const progress = isPending(stacks.data) ? stacks.data.progress : null;
   return (
     <div className="flex h-full flex-col">
       <TopBar me={me}>
@@ -27,9 +34,10 @@ export function StacksPage({ me }: { me: MeResponse }) {
               PRs whose branches feed into each other, from PRs updated in the last 90 days.
             </p>
           </header>
-          {stacks.isPending && (
+          {(stacks.isPending || isPending(stacks.data)) && (
             <p role="status" className="text-muted">
               Reading {repo}'s PRs and fetching their branches…
+              {progress && <span className="block">{progress}.</span>}
             </p>
           )}
           {stacks.error && (
@@ -37,12 +45,12 @@ export function StacksPage({ me }: { me: MeResponse }) {
               {stacks.error.message}
             </p>
           )}
-          {stacks.data?.stacks.length === 0 && (
+          {found?.stacks.length === 0 && (
             <div className="rounded-lg border border-dashed border-line p-6 text-center text-muted">
               No stacks here: no recent PR targets another PR's branch.
             </div>
           )}
-          {stacks.data?.stacks.map((stack) => (
+          {found?.stacks.map((stack) => (
             <StackCard key={stack.id} stack={stack} />
           ))}
         </div>

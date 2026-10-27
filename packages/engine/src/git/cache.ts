@@ -69,7 +69,10 @@ export class RepoCache {
         .sort((a, b) => a - b)
         .map((n) => `+refs/pull/${n}/head:refs/pull/${n}/head`),
     ];
-    this.options.log?.(`Fetching ${this.repo} (${refs.pulls.length} PR heads)`);
+    const pulls = new Set(refs.pulls).size;
+    this.options.log?.(
+      `Fetching ${this.repo}'s branches${pulls > 0 ? ` and ${pulls} PR heads` : ""}`,
+    );
     await gitOk(
       this.gitDir,
       [
@@ -94,8 +97,8 @@ export class RepoCache {
     const { checkout } = this.options;
     this.options.log?.(
       checkout
-        ? `Cloning ${this.repo}, borrowing objects from ${checkout}`
-        : `Cloning ${this.repo}`,
+        ? `Cloning ${this.repo} into Strata's cache, borrowing objects from ${checkout}`
+        : `Cloning ${this.repo} into Strata's cache (only the first time)`,
     );
     await mkdir(dirname(this.gitDir), { recursive: true });
     await gitOk(

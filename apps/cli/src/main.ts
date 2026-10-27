@@ -16,6 +16,7 @@ import {
   reportsDir,
   writeOutput,
 } from "./html.js";
+import { progressPrinter } from "./progress.js";
 import { formatReport } from "./report.js";
 import { formatStacks } from "./stacks.js";
 
@@ -26,7 +27,7 @@ async function stacks(command: Extract<Command, { kind: "stacks" }>): Promise<vo
     dataDir: dataDirOf(command.dataDir),
     ...(checkouts ? { checkouts } : {}),
   });
-  const found = await engine.discoverStacks(command.repo);
+  const found = await engine.discoverStacks(command.repo, { onProgress: progressPrinter() });
   process.stdout.write(formatStacks(command.repo, found));
   if (command.json) {
     const json = `${JSON.stringify({ repo: command.repo, stacks: found }, null, 2)}\n`;
@@ -71,9 +72,7 @@ async function run(command: Extract<Command, { kind: "analyze" }>, cwd: string):
       : undefined;
   // TODO(milestone 1): read command.sources into redacted context sources.
   const engine = cliEngine({ dataDir, ...(checkouts ? { checkouts } : {}) });
-  const report = await engine.analyzeChange(input, {
-    onProgress: (step) => console.error(`… ${step}`),
-  });
+  const report = await engine.analyzeChange(input, { onProgress: progressPrinter() });
   process.stdout.write(formatReport(report));
 
   const paths = reportPaths(dataDir, report, {

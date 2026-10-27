@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ChangeDetail, ChangeSummary, StacksResponse } from "@strata/core/model";
+import type { Engine } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
@@ -10,6 +11,7 @@ import { loadConfig } from "../config.js";
 import { openDatabase } from "../db/client.js";
 import { changes as changesTable, runs as runsTable } from "../db/schema.js";
 import { engineFactory } from "../engines.js";
+import { Jobs } from "../jobs.js";
 import { RunQueue } from "../runs.js";
 
 const migrations = fileURLToPath(new URL("../../drizzle", import.meta.url));
@@ -29,21 +31,30 @@ afterEach(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 
-function setup() {
+function setup(options: { jobs?: Jobs; wrap?: (engine: Engine) => Engine } = {}) {
   const config = loadConfig({ NODE_ENV: "test", DEV_AUTH_BYPASS: "1", DATA_DIR: dataDir });
   const { db, close } = openDatabase(":memory:", migrations);
-  const engineFor = engineFactory(config, db, {
+  const real = engineFactory(config, db, {
     githubPort: demo.github,
     gitRemote: () => remote.dir,
     now: () => new Date(Date.UTC(2026, 9, 2)),
     log: () => {},
   });
+  const { wrap } = options;
+  const engineFor = wrap ? (userId: string) => wrap(real(userId)) : real;
   const runs = new RunQueue(db, engineFor);
   closers.push(async () => {
     await runs.idle();
     close();
   });
-  const app = createApp({ config, db, oauth: null, engineFor, runs });
+  const app = createApp({
+    config,
+    db,
+    oauth: null,
+    engineFor,
+    runs,
+    ...(options.jobs ? { jobs: options.jobs } : {}),
+  });
   const post = (url: string, body: unknown) =>
     app.request(url, {
       method: "POST",
@@ -97,6 +108,66 @@ describe("GET /api/repos/:owner/:name/stacks", () => {
     expect(await res.json()).toEqual({
       error: "GitHub has no repo acme/other, or the token can't see it.",
     });
+  });
+});
+
+describe("a slow first read of a repo", () => {
+  /** An engine whose reads wait for the test, after saying how far they've got. */
+  function held() {
+    let open!: () => void;
+    const opened = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const wrap = (engine: Engine): Engine => ({
+      ...engine,
+      async discoverStacks(repo, options) {
+        options?.onProgress?.("Reading PRs from GitHub: 50 so far");
+        await opened;
+        return engine.discoverStacks(repo, options);
+      },
+      async resolveChange(input, options) {
+        options?.onProgress?.("Reading PRs from GitHub: 50 so far");
+        await opened;
+        return engine.resolveChange(input, options);
+      },
+    });
+    return { wrap, open };
+  }
+
+  /** Asks again, as the web app does, until the answer isn't a 202. */
+  async function until(send: () => Promise<Response> | Response) {
+    for (let i = 0; i < 500; i++) {
+      const res = await send();
+      if (res.status !== 202) return res;
+    }
+    throw new Error("Still pending.");
+  }
+
+  it("answers the stack list with 202 and the latest step, then the stacks", async () => {
+    const { wrap, open } = held();
+    const { app } = setup({ jobs: new Jobs(20), wrap });
+    const first = await app.request("/api/repos/acme/app/stacks");
+    expect(first.status).toBe(202);
+    expect(await first.json()).toEqual({
+      pending: true,
+      progress: "Reading PRs from GitHub: 50 so far",
+    });
+    open();
+    const done = await until(() => app.request("/api/repos/acme/app/stacks"));
+    expect(done.status).toBe(200);
+    expect(((await done.json()) as StacksResponse).stacks).toHaveLength(2);
+  });
+
+  it("answers a new Change with 202 and the latest step, then creates it once", async () => {
+    const { wrap, open } = held();
+    const { post, db } = setup({ jobs: new Jobs(20), wrap });
+    const first = await post("/api/changes", { input: "acme/app#2" });
+    expect(first.status).toBe(202);
+    expect(await first.json()).toMatchObject({ pending: true });
+    open();
+    const done = await until(() => post("/api/changes", { input: "acme/app#2" }));
+    expect(done.status).toBe(201);
+    expect(db.select().from(changesTable).all()).toHaveLength(1);
   });
 });
 
