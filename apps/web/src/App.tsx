@@ -28,7 +28,10 @@ function ServerApp() {
     <Switch>
       <Route path="/" component={() => <ChangesPage me={me.data} />} />
       <Route path="/repos/:owner/:name">{() => <StacksPage me={me.data} />}</Route>
-      <Route path="/changes/:id">{() => <WorkspacePage mode="server" me={me.data} />}</Route>
+      {/* A new id is a new page, so a path picked on the old one stops asking. */}
+      <Route path="/changes/:id">
+        {(params) => <WorkspacePage key={params.id} mode="server" me={me.data} />}
+      </Route>
       <Route>
         <p className="p-6 text-muted">Page not found.</p>
       </Route>
