@@ -157,18 +157,18 @@ describe("formatReport", () => {
     expect(formatReport(report)).toContain("    A b1-2.txt  +1 -0  (Claude: A note for #1)\n");
   });
 
-  it("says which glob flagged a file to inspect", async () => {
+  it("prints why each rule flagged a file to inspect", async () => {
     const report = await analyze("acme/app#3");
     const [file] = report.change.files;
     if (file) {
       file.inspect = [
-        { rule: "access", title: "Access", reason: "Access: matches b1-*" },
+        { rule: "access", title: "Access", reason: 'Access: the word "b1" in b1-2.txt' },
         { rule: "deletion", title: "Deletion", reason: "Deletion: matches *-2.txt" },
       ];
       file.layer = { layer: "docs", by: "llm", reason: "A note for #1", confidence: "medium" };
     }
     expect(formatReport(report)).toContain(
-      "    A b1-2.txt  +1 -0  (inspect: Access: matches b1-*; Deletion: matches *-2.txt)" +
+      '    A b1-2.txt  +1 -0  (inspect: Access: the word "b1" in b1-2.txt; Deletion: matches *-2.txt)' +
         "  (Claude: A note for #1)\n",
     );
   });

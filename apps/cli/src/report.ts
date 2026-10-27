@@ -4,7 +4,7 @@
  * layer, the layer by PR matrix, then issues and notes. A range has no PRs,
  * so it's the whole diff alone. Each sentence ends with the hunks it rests
  * on, as path:line. Layers to inspect end "(inspect)", and a file an inspect
- * rule matched says which glob it matched.
+ * rule matched says which word was found and where.
  */
 import {
   type ChangeReport,
