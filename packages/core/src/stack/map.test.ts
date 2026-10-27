@@ -107,6 +107,17 @@ describe("layoutStackMap", () => {
     expect(layout.edges.every((edge) => edge.line === "solid")).toBe(true);
   });
 
+  it("draws a merged or closed PR's restack link as solid, since it can't be restacked", () => {
+    const layout = layoutStackMap({
+      prs: [
+        pr(1, null, { state: "merged" }),
+        pr(2, 1, { link: "behind", state: "merged" }),
+        pr(3, 2, { link: "stale", state: "closed" }),
+      ],
+    });
+    expect(layout.edges.every((edge) => edge.line === "solid")).toBe(true);
+  });
+
   it("hangs a PR whose parent isn't listed off the trunk, in its own lane", () => {
     const layout = layoutStackMap({ prs: [pr(1, null), pr(2, 1), pr(9, 4)] });
     expect(layout.edges.find((edge) => edge.child === 9)).toMatchObject({

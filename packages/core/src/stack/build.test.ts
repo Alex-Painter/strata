@@ -369,6 +369,49 @@ describe("buildStack", () => {
       expect(kinds(stack)).toEqual([]);
     });
 
+    it("asks no restack of a PR that landed behind its parent", () => {
+      // PR 1 got a fixup (h1b) after PR 2 branched from h1; both landed as they were.
+      const behind = index(merged(1, { headOid: "h1b" }), merged(2, { baseRef: "b1" }));
+      const { stack } = resolve(behind, { pr: 2 }, { ...graph, h1b: ["h1"] }, { main: "s2" });
+      expect(edge(stack, 2)?.link).toBe("behind");
+      expect(anchor(stack, 2)).toBe("h1");
+      expect(kinds(stack)).toEqual([]);
+    });
+
+    it("asks no restack of a PR that landed on an old push of its parent", () => {
+      // PR 1 was force-pushed from h1 to h1x after PR 2 branched from h1.
+      const stale = index(
+        merged(1, { headOid: "h1x", forcePushes: [{ before: "h1", after: "h1x", at: at(30) }] }),
+        merged(2, { baseRef: "b1" }),
+      );
+      const { stack } = resolve(stale, { pr: 2 }, { ...graph, h1x: ["m0"] }, { main: "s2" });
+      expect(edge(stack, 2)?.link).toBe("stale");
+      expect(anchor(stack, 2)).toBe("h1");
+      expect(kinds(stack)).toEqual([]);
+    });
+
+    it("checks a deleted trunk through the default branch", () => {
+      // The stack landed on feat, which was merged into main as mf and deleted.
+      const viaFeat = index(
+        merged(1, { baseRef: "feat" }),
+        merged(2, { baseRef: "b1" }),
+        merged(3, { baseRef: "b2" }),
+      );
+      const { stack } = resolve(viaFeat, { pr: 3 }, { ...graph, mf: ["m0", "s3"] }, { main: "mf" });
+      expect(edge(stack, 2)?.link).toBe("intact");
+      expect(edge(stack, 3)?.link).toBe("intact");
+      expect(anchor(stack, 3)).toBe("h2");
+      expect(kinds(stack)).toEqual(["non-default-trunk"]);
+      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain("#3 landed on main");
+    });
+
+    it("claims nothing when it can't tell where a PR landed", () => {
+      const noCommit = index(merged(1), merged(2, { baseRef: "b1", mergeCommitOid: null }));
+      const { stack } = resolve(noCommit, { pr: 2 }, graph, { main: "s2" });
+      expect(edge(stack, 2)?.link).toBe("unknown");
+      expect(kinds(stack)).toEqual(["missing-commit"]);
+    });
+
     it("still flags a PR merged into a branch whose PR had already landed", () => {
       // PR 2's merge commit went onto b1 after PR 1 landed, so main never got it.
       const late = index(merged(1, { mergedAt: at(50) }), merged(2, { baseRef: "b1" }));

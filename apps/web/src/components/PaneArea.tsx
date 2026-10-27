@@ -18,6 +18,7 @@ import {
   formatDate,
   LINK_MEANING,
   linkLabel,
+  needsRestack,
   REVIEW_LABEL,
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
@@ -334,7 +335,8 @@ function PrPane({
   const issues = stack.issues.filter(
     (issue) => issue.prs.includes(pr.number) && issue.kind !== "needs-restack",
   );
-  const restack = edge?.link === "behind" || edge?.link === "stale";
+  const link = edge ? { link: edge.link, state: pr.state, baseRef: pr.baseRef } : null;
+  const restack = link ? needsRestack(link) : false;
   const retarget =
     edge?.via === "retarget" ? pr.baseChanges.find((c) => c.from === edge.ref) : null;
   const lastPush = pr.forcePushes[pr.forcePushes.length - 1];
@@ -378,7 +380,7 @@ function PrPane({
           <Fact term={`On #${edge.parent}`}>
             <p>
               <span className={restack ? "font-medium text-warn" : ""}>
-                {linkLabel(edge.link, edge.parent, pr.baseRef) ?? `Stacked on #${edge.parent}`}.
+                {(link && linkLabel(link, edge.parent)) ?? `Stacked on #${edge.parent}`}.
               </span>{" "}
               <span className="text-muted">{LINK_MEANING[edge.link]}</span>
             </p>

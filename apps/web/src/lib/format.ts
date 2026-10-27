@@ -18,19 +18,24 @@ export const CHECKS_LABEL: Record<NonNullable<StackPr["checks"]>, string> = {
   pending: "Checks running",
 };
 
+/** Whether the PR is open and behind or off its parent, so it needs a restack. */
+export function needsRestack(pr: { link: LinkState | null; state: PrState }): boolean {
+  return pr.state === "open" && (pr.link === "behind" || pr.link === "stale");
+}
+
 /** How a PR sits on the one below, in a few words. Null when there's nothing to say. */
 export function linkLabel(
-  link: LinkState | null,
+  pr: { link: LinkState | null; state: PrState; baseRef: string },
   parent: number | null,
-  baseRef: string,
 ): string | null {
-  switch (link) {
+  const restack = needsRestack(pr) ? ": needs a restack" : "";
+  switch (pr.link) {
     case "behind":
-      return `Behind #${parent}: needs a restack`;
+      return `Behind #${parent}${restack}`;
     case "stale":
-      return `On an old push of #${parent}: needs a restack`;
+      return `On an old push of #${parent}${restack}`;
     case "re-anchored":
-      return `Now on ${baseRef}`;
+      return `Now on ${pr.baseRef}`;
     case "merged-into-parent":
       return `Merged into #${parent}`;
     case "unknown":

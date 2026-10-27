@@ -7,7 +7,7 @@ import {
   stackMermaid,
 } from "@strata/core/stack";
 import { useMemo, useState } from "react";
-import { linkLabel } from "../lib/format";
+import { linkLabel, needsRestack } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
 import { ReviewMarks, StateBadge } from "./PrStatus";
 
@@ -146,8 +146,8 @@ function PrRow({
   bar?: PrLayerBar | null;
   widest?: number;
 }) {
-  const link = linkLabel(pr.link, pr.parent, pr.baseRef);
-  const restack = pr.link === "behind" || pr.link === "stale";
+  const link = linkLabel(pr, pr.parent);
+  const restack = needsRestack(pr);
   return (
     <div
       className={`relative flex h-full min-w-0 flex-col justify-center gap-0.5 rounded-md px-2 ${

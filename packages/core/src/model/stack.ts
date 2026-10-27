@@ -104,9 +104,9 @@ export type FactRequest =
  * - `intact`: the parent's head is in the PR. Its diff starts at that head.
  * - `behind`: the parent got new commits after the PR branched (more work, or
  *   the trunk merged in). Its diff starts at the last of the parent's own
- *   commits it has, and it needs a restack.
+ *   commits it has, and an open one needs a restack.
  * - `stale`: the PR sits on parent commits that were force-pushed away. Its
- *   diff starts at the last of those it has, and it needs a restack.
+ *   diff starts at the last of those it has, and an open one needs a restack.
  * - `re-anchored`: the PR sits on its base branch now rather than on the
  *   parent: rebased onto it or updated from it after the parent landed, or
  *   moved somewhere else. Its diff starts where it last met that base.

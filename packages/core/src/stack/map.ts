@@ -10,7 +10,6 @@
  * another PR.
  */
 import type { StackPrSummary, StackSummary } from "../model/api.js";
-import type { LinkState } from "../model/stack.js";
 
 export interface StackMapNode {
   pr: number;
@@ -26,7 +25,7 @@ export interface StackMapEdge {
   child: number;
   from: { row: number; lane: number };
   to: { row: number; lane: number };
-  /** `dashed`: the child needs a restack. `dotted`: git couldn't tell how they link. */
+  /** `dashed`: the child is open and needs a restack. `dotted`: git couldn't tell how they link. */
   line: "solid" | "dashed" | "dotted";
 }
 
@@ -75,14 +74,15 @@ export function layoutStackMap(stack: Pick<StackSummary, "prs">): StackMapLayout
       child: pr.number,
       from: from ? { row: from.row, lane: from.lane } : { row: trunkRow, lane: 0 },
       to: { row: to.row, lane: to.lane },
-      line: lineFor(pr.link),
+      line: lineFor(pr),
     };
   });
   return { nodes, edges, trunkRow, lanes: Math.max(lanes, 1) };
 }
 
-function lineFor(link: LinkState | null): StackMapEdge["line"] {
-  if (link === "behind" || link === "stale") return "dashed";
+function lineFor({ link, state }: Pick<StackPrSummary, "link" | "state">): StackMapEdge["line"] {
+  // A merged or closed PR can't be restacked.
+  if ((link === "behind" || link === "stale") && state === "open") return "dashed";
   if (link === "unknown") return "dotted";
   return "solid";
 }
@@ -100,7 +100,7 @@ export function stackMermaid(stack: Pick<StackSummary, "prs" | "trunk">): string
   }
   for (const pr of stack.prs) {
     const from = pr.parent === null ? "trunk" : id(pr.parent);
-    const line = lineFor(pr.link);
+    const line = lineFor(pr);
     const arrow =
       line === "dashed" ? "-.->|needs restack|" : line === "dotted" ? "-.->|unknown|" : "-->";
     lines.push(`  ${from} ${arrow} ${id(pr.number)}`);

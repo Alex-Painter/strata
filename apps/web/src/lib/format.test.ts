@@ -1,5 +1,6 @@
+import type { LinkState } from "@strata/core/model";
 import { describe, expect, it } from "vitest";
-import { ago, countPrs, describePath, linkLabel, stateLabel } from "./format";
+import { ago, countPrs, describePath, linkLabel, needsRestack, stateLabel } from "./format";
 
 describe("format", () => {
   it("counts PRs by state, leaving out states with none", () => {
@@ -21,10 +22,25 @@ describe("format", () => {
   });
 
   it("only labels links worth a reader's attention", () => {
-    expect(linkLabel("intact", 9, "b9")).toBeNull();
-    expect(linkLabel(null, null, "main")).toBeNull();
-    expect(linkLabel("behind", 9, "b9")).toBe("Behind #9: needs a restack");
-    expect(linkLabel("re-anchored", 1, "main")).toBe("Now on main");
+    const pr = (link: LinkState | null, baseRef = "b9") => ({
+      link,
+      state: "open" as const,
+      baseRef,
+    });
+    expect(linkLabel(pr("intact"), 9)).toBeNull();
+    expect(linkLabel(pr(null, "main"), null)).toBeNull();
+    expect(linkLabel(pr("behind"), 9)).toBe("Behind #9: needs a restack");
+    expect(linkLabel(pr("re-anchored", "main"), 1)).toBe("Now on main");
+  });
+
+  it("asks only an open PR for a restack", () => {
+    const behind = { link: "behind" as const, baseRef: "b9" };
+    expect(linkLabel({ ...behind, state: "merged" }, 9)).toBe("Behind #9");
+    expect(linkLabel({ ...behind, link: "stale", state: "closed" }, 9)).toBe(
+      "On an old push of #9",
+    );
+    expect(needsRestack({ ...behind, state: "open" })).toBe(true);
+    expect(needsRestack({ ...behind, state: "merged" })).toBe(false);
   });
 
   it("says how long ago, then the date once it's old", () => {

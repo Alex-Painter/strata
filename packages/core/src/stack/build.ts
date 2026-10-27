@@ -383,26 +383,28 @@ class Builder {
     // A stack merged all at once lands each PR on the trunk, while GitHub keeps
     // the parent's branch as its base. Its head then links it like an open PR's.
     const landed = this.landedOnTrunk(parent, child, trunk);
-    if (landed === true) {
+    if (typeof landed === "string") {
       evidence.push(
-        commitEvidence(child.mergeCommitOid as string, `#${child.number} landed on ${trunk}`),
+        commitEvidence(child.mergeCommitOid as string, `#${child.number} landed on ${landed}`),
       );
     }
-    if (child.state === "merged" && child.baseRef === ref && landed === false) {
-      link = "merged-into-parent";
-      const into = child.mergeCommitOid ? this.firstParent(child.mergeCommitOid) : null;
-      anchor = into ? (this.mergeBase(into, child.headOid) ?? null) : null;
-      if (child.mergeCommitOid) {
-        evidence.push(commitEvidence(child.mergeCommitOid, `#${child.number} merged into ${ref}`));
-      }
-      if (parent.mergedAt && child.mergedAt && child.mergedAt > parent.mergedAt) {
-        this.issue(
-          "base-already-merged",
-          [child.number, parent.number],
-          `#${child.number} was merged into ${ref} after #${parent.number} had merged, ` +
-            "so its changes never reached the trunk.",
-          evidence,
-        );
+    if (child.state === "merged" && child.baseRef === ref && typeof landed !== "string") {
+      // Null: git can't tell where it landed, so the link stays unknown and nothing is claimed.
+      if (landed === false) {
+        link = "merged-into-parent";
+        const mergeCommit = child.mergeCommitOid as string;
+        const into = this.firstParent(mergeCommit);
+        anchor = into ? (this.mergeBase(into, child.headOid) ?? null) : null;
+        evidence.push(commitEvidence(mergeCommit, `#${child.number} merged into ${ref}`));
+        if (parent.mergedAt && child.mergedAt && child.mergedAt > parent.mergedAt) {
+          this.issue(
+            "base-already-merged",
+            [child.number, parent.number],
+            `#${child.number} was merged into ${ref} after #${parent.number} had merged, ` +
+              "so its changes never reached the trunk.",
+            evidence,
+          );
+        }
       }
     } else {
       const onBase = this.baseMeet(child);
@@ -441,7 +443,8 @@ class Builder {
           }
         }
       }
-      if (link === "behind" || link === "stale") {
+      // A merged or closed PR can't be restacked; its link still places its changes.
+      if (child.state === "open" && (link === "behind" || link === "stale")) {
         this.issue(
           "needs-restack",
           [child.number],
@@ -478,20 +481,32 @@ class Builder {
   }
 
   /**
-   * Whether a merged child landed on the trunk rather than on its parent's
+   * Where a merged child landed, if on the trunk rather than on its parent's
    * branch: its merge commit is on the trunk, and not in the parent's head
-   * (where a child merged into the parent's branch would be). Undefined while
-   * git facts are pending.
+   * (where a child merged into the parent's branch would be). A trunk that was
+   * deleted, say after merging into the default branch, is checked through the
+   * default branch. Returns the branch it's on, false when it didn't land
+   * there, null when git can't tell, and undefined while facts are pending.
    */
-  private landedOnTrunk(parent: StackPr, child: StackPr, trunk: string): boolean | undefined {
-    if (child.state !== "merged" || !child.mergeCommitOid) return false;
+  private landedOnTrunk(
+    parent: StackPr,
+    child: StackPr,
+    trunk: string,
+  ): string | false | null | undefined {
+    if (child.state !== "merged") return false;
+    if (!child.mergeCommitOid) return null;
     const inParent = this.isAncestor(child.mergeCommitOid, parent.headOid);
     if (inParent === true) return false;
-    const tip = this.tip(trunk);
-    if (tip === null) return false;
-    const onTrunk = tip === undefined ? undefined : this.isAncestor(child.mergeCommitOid, tip);
+    let branch = trunk;
+    let tip = this.tip(trunk);
+    if (tip === null && trunk !== this.index.defaultBranch) {
+      branch = this.index.defaultBranch;
+      tip = this.tip(branch);
+    }
+    const onTrunk = tip ? this.isAncestor(child.mergeCommitOid, tip) : tip;
     if (inParent === undefined || onTrunk === undefined) return undefined;
-    return onTrunk === true;
+    if (inParent === null || onTrunk === null) return null;
+    return onTrunk ? branch : false;
   }
 
   /** Whether `oid` holds the parent's work: its head, or the commit it landed as. */
