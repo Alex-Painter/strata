@@ -18,14 +18,14 @@ import { type FeatureShape, featureShape, type ShapeRepo } from "./testing/featu
 
 /**
  * The shape-invariance benchmark (SPEC.md, "Benchmarks", 1): one feature built
- * five ways (see testing/feature-shapes.ts) must give the same whole-stack
+ * six ways (see testing/feature-shapes.ts) must give the same whole-stack
  * view, and so must the same code given as a plain range with no PRs at all,
  * while "How it arrived" shows each split as it is. The repo lets
  * Claude sort files no rule matched and write the summaries, through fakes
  * that record what they're asked, so the questions are held to the same
  * standard.
  */
-const SHAPES: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "fork"];
+const SHAPES: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "fork", "landed"];
 
 interface Analysed {
   shape: ShapeRepo;
@@ -127,7 +127,7 @@ async function patchId({ report, gitDir }: Analysed): Promise<string> {
 }
 
 describe("shape invariance", () => {
-  const same: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked"];
+  const same: FeatureShape[] = ["one-pr", "stack", "squash-merged", "restacked", "landed"];
 
   it("gives the same whole-stack diff however the feature was split", async () => {
     const one = get("one-pr");
@@ -264,6 +264,13 @@ describe("shape invariance", () => {
       [3, "direct"],
       [4, "direct"],
     ]);
+    // Merged all at once, each PR still starts at the head below it.
+    expect(get("landed").report.parts.map((part) => [part.pr, part.how])).toEqual([
+      [1, "direct"],
+      [2, "direct"],
+      [3, "direct"],
+      [4, "direct"],
+    ]);
     // #4 fixes #2's service, so its part changes a file #2 added.
     const fix = get("stack").report.parts[3];
     expect(fix?.files.map((file) => [file.path, file.status])).toEqual([
@@ -273,7 +280,7 @@ describe("shape invariance", () => {
   });
 
   it("never lets main's own new commits into the whole-stack diff", () => {
-    for (const name of ["squash-merged", "restacked"] as const) {
+    for (const name of ["squash-merged", "restacked", "landed"] as const) {
       const paths = get(name).report.change.files.map((file) => file.path);
       expect(paths, name).not.toContain("README.md");
     }

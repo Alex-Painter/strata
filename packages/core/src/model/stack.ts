@@ -107,6 +107,10 @@ export type FactRequest =
  * - `merged-into-parent`: the PR was merged into the parent's branch, so the
  *   parent's head already holds it.
  * - `unknown`: git couldn't answer, usually because a commit is missing.
+ *
+ * A PR that merged onto the trunk while still targeting the parent's branch,
+ * as when a whole stack is merged at once, is linked by its head like an open
+ * one.
  */
 export type LinkState =
   | "intact"

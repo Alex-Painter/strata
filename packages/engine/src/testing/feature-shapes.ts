@@ -11,6 +11,9 @@
  * 4. `restacked`: shape 3 with #2 rebased onto main. #3 still sits on #2's
  *    old head.
  * 5. `fork`: shape 2 plus #5 on #2, so the stack has two paths.
+ * 6. `landed`: shape 2 merged all at once after main moved on: each PR lands
+ *    on main as one new commit, while GitHub keeps the branch below as the
+ *    base of each PR above #1.
  */
 import type { PrNode } from "../github/graphql.js";
 import {
@@ -23,7 +26,7 @@ import {
 } from "./fake-github.js";
 import { StackRepo } from "./stack-repo.js";
 
-export type FeatureShape = "one-pr" | "stack" | "squash-merged" | "restacked" | "fork";
+export type FeatureShape = "one-pr" | "stack" | "squash-merged" | "restacked" | "fork" | "landed";
 
 export interface ShapeRepo {
   remote: StackRepo;
@@ -137,7 +140,7 @@ const TITLES: Record<number, string> = {
 
 export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
   const remote = await StackRepo.create();
-  await remote.write("main", MAIN);
+  const m = await remote.write("main", MAIN);
 
   if (shape === "one-pr") {
     const head = await remote.write("b1", { ...PART_1, ...PART_2, ...PART_3, ...PART_4 }, "main");
@@ -201,6 +204,23 @@ export async function featureShape(shape: FeatureShape): Promise<ShapeRepo> {
         nodes: [retargeted("b1", "main", 21), forcePushed(h2, rebased, 22)],
       },
     });
+  }
+
+  if (shape === "landed") {
+    await remote.write("main", ELSEWHERE);
+    for (const n of [1, 2, 3, 4]) {
+      const landed = await remote.land(`b${n}`, n === 1 ? m : (heads[n - 1] as string), "main");
+      prs[n] = prNode(n, heads[n] as string, {
+        title: TITLES[n] as string,
+        ...(n > 1 ? { baseRefName: `b${n - 1}` } : {}),
+        state: "MERGED",
+        mergedAt: ghTime(30 + n),
+        closedAt: ghTime(30 + n),
+        updatedAt: ghTime(30 + n),
+        mergeCommit: { oid: landed },
+      });
+    }
+    for (const n of [1, 2, 3, 4]) await remote.deleteBranch(`b${n}`);
   }
 
   for (const [n, oid] of Object.entries(heads)) await remote.holdPr(Number(n), oid);

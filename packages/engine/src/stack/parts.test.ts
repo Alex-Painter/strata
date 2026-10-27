@@ -9,7 +9,7 @@ import type { GitHubPort } from "../github/port.js";
 import type { LayerJudge, LayerRequest } from "../layers/judge.js";
 import { settingsPath } from "../settings.js";
 import { demoRepo } from "../testing/demo-repo.js";
-import { fakeGitHub, prNode } from "../testing/fake-github.js";
+import { fakeGitHub, ghTime, prNode } from "../testing/fake-github.js";
 import { StackRepo } from "../testing/stack-repo.js";
 
 let remote: StackRepo;
@@ -113,6 +113,44 @@ describe("each PR's diff", () => {
       "b9-2.txt",
       "b9-4.txt",
     ]);
+  });
+
+  it("keeps each PR's own changes when the whole stack landed on main at once", async () => {
+    // Each PR is squashed onto main in turn, while GitHub keeps the branch
+    // below as the base of each PR above the bottom one.
+    const heads = [
+      await remote.write("b1", { "a.txt": lines("one") }, "main"),
+      await remote.write("b2", { "b.txt": lines("two") }, "b1"),
+      await remote.write("b3", { "c.txt": lines("three") }, "b2"),
+    ];
+    const squashes: string[] = [];
+    for (const [i, oid] of heads.entries()) {
+      squashes.push(await remote.squashMerge(`b${i + 1}`, "main"));
+      await remote.holdPr(i + 1, oid);
+    }
+    for (const branch of ["b1", "b2", "b3"]) await remote.deleteBranch(branch);
+    const github = fakeGitHub(
+      "acme/app",
+      heads.map((oid, i) =>
+        prNode(i + 1, oid, {
+          state: "MERGED",
+          mergedAt: ghTime(30 + i),
+          closedAt: ghTime(30 + i),
+          baseRefName: i === 0 ? "main" : `b${i}`,
+          mergeCommit: { oid: squashes[i] as string },
+        }),
+      ),
+    );
+    const report = await analyze(github, "acme/app#3");
+
+    expect(report.stack?.edges.map((edge) => edge.link)).toEqual(["intact", "intact"]);
+    expect(report.parts.map((part) => [part.pr, part.how, part.files.map((f) => f.path)])).toEqual([
+      [1, "direct", ["a.txt"]],
+      [2, "direct", ["b.txt"]],
+      [3, "direct", ["c.txt"]],
+    ]);
+    expect(report.change.files.map((file) => file.path)).toEqual(["a.txt", "b.txt", "c.txt"]);
+    expect(report.stack?.issues).toEqual([]);
   });
 
   it("stops the whole-stack diff at a replay conflict", async () => {

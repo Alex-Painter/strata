@@ -72,6 +72,17 @@ export class StackRepo {
     return this.tip(into);
   }
 
+  /**
+   * Lands `branch`'s commits since `upstream` on `into` as one new commit, as
+   * merging a whole stack on GitHub does with each PR in turn.
+   */
+  async land(branch: string, upstream: string, into: string): Promise<string> {
+    await this.git(["checkout", "--quiet", into]);
+    await this.git(["cherry-pick", "--no-commit", `${upstream}..${branch}`]);
+    await this.git(["commit", "--quiet", "-m", `Land ${branch}`]);
+    return this.tip(into);
+  }
+
   /** Merges `branch` into `into` with a merge commit. */
   async mergeCommit(branch: string, into: string): Promise<string> {
     await this.git(["checkout", "--quiet", into]);

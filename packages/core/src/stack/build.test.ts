@@ -331,6 +331,53 @@ describe("buildStack", () => {
     expect(kinds(stack)).toEqual(["non-default-trunk"]);
   });
 
+  describe("a stack merged all at once", () => {
+    // Each PR was squashed onto main in turn (s1, s2, s3), while GitHub kept
+    // each upper PR's base as the branch below.
+    const graph: Graph = {
+      m0: [],
+      h1: ["m0"],
+      h2: ["h1"],
+      h3: ["h2"],
+      s1: ["m0"],
+      s2: ["s1"],
+      s3: ["s2"],
+    };
+    const merged = (n: number, fields: Partial<StackPr> = {}) =>
+      pr(n, { state: "merged", mergedAt: at(100), mergeCommitOid: `s${n}`, ...fields });
+    const landed = index(merged(1), merged(2, { baseRef: "b1" }), merged(3, { baseRef: "b2" }));
+
+    it("links each PR by its head, as before it merged", () => {
+      const { stack } = resolve(landed, { pr: 3 }, graph, { main: "s3" });
+      expect(order(stack)).toEqual([1, 2, 3]);
+      expect(stack.base).toBe("m0");
+      expect(edge(stack, 2)?.link).toBe("intact");
+      expect(edge(stack, 3)?.link).toBe("intact");
+      // Each PR's own diff starts at the head below, as GitHub showed it.
+      expect(anchor(stack, 2)).toBe("h1");
+      expect(anchor(stack, 3)).toBe("h2");
+      expect(kinds(stack)).toEqual([]);
+      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain("#3 landed on main");
+    });
+
+    it("marks a PR rebased onto main before it landed as re-anchored", () => {
+      const rebased = { ...graph, h3: ["s2"], s3: ["s2"] };
+      const { stack } = resolve(landed, { pr: 3 }, rebased, { main: "s3" });
+      expect(edge(stack, 3)?.link).toBe("re-anchored");
+      expect(anchor(stack, 3)).toBe("s2");
+      expect(kinds(stack)).toEqual([]);
+    });
+
+    it("still flags a PR merged into a branch whose PR had already landed", () => {
+      // PR 2's merge commit went onto b1 after PR 1 landed, so main never got it.
+      const late = index(merged(1, { mergedAt: at(50) }), merged(2, { baseRef: "b1" }));
+      const dead = { ...graph, s2: ["h1", "h2"] };
+      const { stack } = resolve(late, { pr: 2 }, dead, { main: "s1" });
+      expect(edge(stack, 2)?.link).toBe("merged-into-parent");
+      expect(kinds(stack)).toEqual(["base-already-merged"]);
+    });
+  });
+
   describe("a child merged into its parent's branch", () => {
     // PR 2 was merged into b1 as mm, so PR 1's head now holds it.
     const graph: Graph = { m0: [], h1: ["m0"], h2: ["h1"], mm: ["h1", "h2"] };
@@ -341,6 +388,18 @@ describe("buildStack", () => {
         pr(2, { baseRef: "b1", state: "merged", mergedAt: at(60), mergeCommitOid: "mm" }),
       );
       const { stack } = resolve(landed, { pr: 1 }, graph, { main: "m0" });
+      expect(edge(stack, 2)?.link).toBe("merged-into-parent");
+      expect(anchor(stack, 2)).toBe("h1");
+      expect(kinds(stack)).toEqual([]);
+    });
+
+    it("stays merged into its parent when the parent then merged into main", () => {
+      // PR 1 was merged into main with a merge commit, so main holds mm too.
+      const both = index(
+        pr(1, { headOid: "mm", state: "merged", mergedAt: at(70), mergeCommitOid: "mp" }),
+        pr(2, { baseRef: "b1", state: "merged", mergedAt: at(60), mergeCommitOid: "mm" }),
+      );
+      const { stack } = resolve(both, { pr: 1 }, { ...graph, mp: ["m0", "mm"] }, { main: "mp" });
       expect(edge(stack, 2)?.link).toBe("merged-into-parent");
       expect(anchor(stack, 2)).toBe("h1");
       expect(kinds(stack)).toEqual([]);

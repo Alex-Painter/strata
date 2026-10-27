@@ -188,7 +188,7 @@ class Builder {
             ],
           );
         }
-        const edge = this.link(parent, pr, choice.ref, anchors.get(parent.number));
+        const edge = this.link(parent, pr, choice.ref, anchors.get(parent.number), trunkName);
         edges.push(edge.edge);
         anchor = edge.anchor;
       } else {
@@ -363,6 +363,7 @@ class Builder {
     child: StackPr,
     ref: string,
     parentAnchor: string | null | undefined,
+    trunk: string,
   ): { edge: StackEdge; anchor: string | null | undefined } {
     const via = child.baseRef === ref ? "base-ref" : "retarget";
     const evidence: Evidence[] = [
@@ -378,7 +379,15 @@ class Builder {
     let link: LinkState = "unknown";
     let anchor: string | null = null;
 
-    if (child.state === "merged" && child.baseRef === ref) {
+    // A stack merged all at once lands each PR on the trunk, while GitHub keeps
+    // the parent's branch as its base. Its head then links it like an open PR's.
+    const landed = this.landedOnTrunk(parent, child, trunk);
+    if (landed === true) {
+      evidence.push(
+        commitEvidence(child.mergeCommitOid as string, `#${child.number} landed on ${trunk}`),
+      );
+    }
+    if (child.state === "merged" && child.baseRef === ref && landed === false) {
       link = "merged-into-parent";
       const into = child.mergeCommitOid ? this.firstParent(child.mergeCommitOid) : null;
       anchor = into ? (this.mergeBase(into, child.headOid) ?? null) : null;
@@ -465,6 +474,23 @@ class Builder {
       edge: { parent: parent.number, child: child.number, via, ref, link, evidence },
       anchor: pending ? undefined : anchor,
     };
+  }
+
+  /**
+   * Whether a merged child landed on the trunk rather than on its parent's
+   * branch: its merge commit is on the trunk, and not in the parent's head
+   * (where a child merged into the parent's branch would be). Undefined while
+   * git facts are pending.
+   */
+  private landedOnTrunk(parent: StackPr, child: StackPr, trunk: string): boolean | undefined {
+    if (child.state !== "merged" || !child.mergeCommitOid) return false;
+    const inParent = this.isAncestor(child.mergeCommitOid, parent.headOid);
+    if (inParent === true) return false;
+    const tip = this.tip(trunk);
+    if (tip === null) return false;
+    const onTrunk = tip === undefined ? undefined : this.isAncestor(child.mergeCommitOid, tip);
+    if (inParent === undefined || onTrunk === undefined) return undefined;
+    return onTrunk === true;
   }
 
   /** Whether `oid` holds the parent's work: its head, or the commit it landed as. */
