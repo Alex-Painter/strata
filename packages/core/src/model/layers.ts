@@ -120,6 +120,12 @@ export interface InspectRule {
   id: string;
   /** What the flag is about, shown on the file: "Access and permissions". */
   title: string;
+  /**
+   * Words looked for in the path's folder and file names, ignoring case:
+   * `login`, `permission*` (a word starting so), `sign in` (words in a row),
+   * `file:role` (in the file's name only), `name:policy` (a whole name).
+   */
+  words: string[];
   /** Globs matched against the repo-relative path, ignoring case. */
   paths: string[];
 }

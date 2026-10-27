@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { type ParsedFile, type ParsedHunk, parseDiff } from "./diff/parse.js";
 import { createClassifier } from "./layers/classify.js";
 import { parseGitAttributes } from "./layers/gitattributes.js";
-import { createInspector } from "./layers/inspect.js";
+import {
+  createInspector,
+  DEFAULT_INSPECT_RULES,
+  nameWords,
+  parseInspectWord,
+} from "./layers/inspect.js";
 import { mechanicalFile, mechanicalHunk } from "./layers/mechanical.js";
 import { createPathClassifier } from "./layers/rules.js";
 import type { LayerAssignment } from "./model/change.js";
@@ -110,78 +115,152 @@ describe("default layer rules", () => {
  * hits, since a flag on every file means nothing.
  */
 const INSPECT_CASES: [path: string, rules: string[]][] = [
+  // Access and permissions, in a folder's name or the file's, in any case.
   ["app/auth/tokens.py", ["access"]],
   ["src/Auth/Session.ts", ["access"]],
   ["AUTH/keys.py", ["access"]],
   ["app/user_auth.py", ["access"]],
-  ["app/auth_utils.py", ["access"]],
-  ["app/authentication_backend.py", ["access"]],
   ["src/hooks/useAuth.ts", ["access"]],
   ["src/AuthProvider.tsx", ["access"]],
+  ["app/(auth)/layout.tsx", ["access"]],
+  ["app/authentication_backend.py", ["access"]],
   ["app/api/permissions.py", ["access"]],
   ["app/rbac/grants.py", ["access"]],
-  ["app/roles.py", ["access"]],
   ["src/user-roles.ts", ["access"]],
+  ["app/models/role.rb", ["access"]],
+  ["charts/app/templates/clusterrole.yaml", ["access"]],
+  ["policies/billing.rego", ["access"]],
+  ["app/models/ability.rb", ["access"]],
   ["frontend/src/pages/Login.tsx", ["access"]],
+  ["app/sign-in/page.tsx", ["access"]],
+  ["src/components/SignOutButton.tsx", ["access"]],
+  ["app/views/sessions/new.html.erb", ["access"]],
   ["app/oauth_client.py", ["access"]],
+  ["internal/middleware/jwt.go", ["access"]],
+  ["backend/app/core/security.py", ["access"]],
+  ["src/2fa.ts", ["access"]],
+  ["scripts/rotate-secrets", ["access"]],
   ["app/middleware/tenant_scope.py", ["access"]],
+  ["infra/iam.tf", ["access"]],
   [".github/CODEOWNERS", ["access"]],
-  ["policy/main.rego", ["access"]],
   ["firestore.rules", ["access"]],
+  ["maverick/utils/access.py", ["access"]],
+  // Deletion and retention.
   ["app/jobs/retention.py", ["deletion"]],
   ["scripts/purge_old_rows.py", ["deletion"]],
   ["app/services/delete_account.py", ["deletion"]],
+  ["internal/deletion/worker.go", ["deletion"]],
+  ["app/services/users/destroy_service.rb", ["deletion"]],
+  ["src/EmptyTrash.tsx", ["deletion"]],
   ["app/gdpr/export.py", ["deletion"]],
   ["scripts/pg_restore.sh", ["deletion"]],
   ["app/backups/run.sh", ["deletion"]],
+  ["bin/anonymize_users", ["deletion"]],
   ["migrations/0043_archive_sessions.sql", ["access", "deletion"]],
-  // Near misses.
+  // Near misses: a keyword inside another word, or a word used another way.
   ["app/author.py", []],
   ["app/authority.py", []],
   ["src/AuthorCard.tsx", []],
+  ["src/hooks/useAuthor.ts", []],
   ["src/components/Accessibility.tsx", []],
-  ["maverick/utils/access.py", []],
+  ["src/components/BlogIndex.tsx", []],
+  ["src/components/DialogInput.tsx", []],
+  ["src/http/logInterceptor.ts", []],
+  ["src/components/DesignInspector.tsx", []],
+  ["app/signing_key.py", []],
+  ["app/secretary.py", []],
+  ["app/controller.py", []],
+  ["app/processor.py", []],
+  ["src/footprint.ts", []],
   ["app/firestore_client.py", []],
   ["src/Swipeable.tsx", []],
+  ["src/Eraser.tsx", []],
+  ["ansible/roles/web/tasks/main.yml", []],
+  ["internal/grpc/retry_policy.go", []],
+  ["pages/privacy-policy.tsx", []],
   ["app/middleware/logging.py", []],
   ["app/services/export.py", []],
-  ["app/battle.py", []],
+  ["web/admin/CacheStats.tsx", []],
 ];
 
 describe("inspect rules", () => {
   const inspect = createInspector();
 
+  it("are all words Strata can read", () => {
+    for (const rule of DEFAULT_INSPECT_RULES) {
+      for (const word of rule.words) expect(() => parseInspectWord(word)).not.toThrow();
+    }
+    expect(() => parseInspectWord("Login")).toThrow();
+    expect(() => parseInspectWord("sign*in")).toThrow();
+  });
+
+  it("split names into words at punctuation, case changes and digits", () => {
+    expect(nameWords("SignOutButton.tsx")).toEqual(["sign", "out", "button", "tsx"]);
+    expect(nameWords("OAuth2Client")).toEqual(["o", "auth", "2", "client"]);
+    expect(nameWords("APIKeyForm")).toEqual(["api", "key", "form"]);
+    expect(nameWords("[[...sign-in]]")).toEqual(["sign", "in"]);
+    expect(nameWords(".htpasswd")).toEqual(["htpasswd"]);
+  });
+
   it.each(INSPECT_CASES)("%s → %j", (path, rules) => {
     expect(inspect({ path }, "logic").map((flag) => flag.rule)).toEqual(rules);
   });
 
-  it("names the rule and the glob that matched, in rule order", () => {
+  it("say which word was found and where, in rule order", () => {
     expect(inspect({ path: "migrations/0043_archive_sessions.sql" }, "data-model")).toEqual([
       {
         rule: "access",
         title: "Access and permissions",
-        reason: "Access and permissions: matches **/*{login,logout,signin,signup,session}*.*",
+        reason: 'Access and permissions: a word starting "session" in 0043_archive_sessions.sql',
       },
       {
         rule: "deletion",
         title: "Deletion and retention",
-        reason:
-          "Deletion and retention: matches **/*{cleanup,clean_up,prune,pruning,archive,archival}*.*",
+        reason: 'Deletion and retention: a word starting "archiv" in 0043_archive_sessions.sql',
       },
     ]);
+    const reason = (path: string) => inspect({ path }, "logic")[0]?.reason;
+    expect(reason("app/auth/tokens.py")).toBe('Access and permissions: the word "auth" in auth/');
+    expect(reason("src/pages/sign-up.tsx")).toBe(
+      'Access and permissions: the words "sign up" in sign-up.tsx',
+    );
+    expect(reason("policies/billing.rego")).toBe(
+      'Access and permissions: the name "policies" in policies/',
+    );
+    expect(reason("firestore.rules")).toBe(
+      "Access and permissions: matches **/{firestore,storage,database}.rules",
+    );
   });
 
-  it("flags a file moved away from a matching path, and says so", () => {
+  it("look at the file's name, then its folders from the nearest", () => {
+    const reason = (path: string) => inspect({ path }, "logic")[0]?.reason;
+    expect(reason("app/auth/permissions.py")).toBe(
+      'Access and permissions: a word starting "permission" in permissions.py',
+    );
+    expect(reason("app/(auth)/login/page.tsx")).toBe(
+      'Access and permissions: a word starting "login" in login/',
+    );
+  });
+
+  it("flag a file moved away from a matching path, and say so", () => {
     expect(
       inspect({ path: "app/users/tokens.py", oldPath: "app/auth/tokens.py" }, "logic"),
     ).toEqual([
       {
         rule: "access",
         title: "Access and permissions",
-        reason:
-          "Access and permissions: its old path matches **/{auth,authn,authz,authentication,authorization}/**",
+        reason: 'Access and permissions: the word "auth" in auth/, on its old path',
       },
     ]);
+    // Where both paths match, the new one is the reason.
+    expect(
+      inspect({ path: "app/auth/users.py", oldPath: "app/auth/tokens.py" }, "logic")[0]?.reason,
+    ).toBe('Access and permissions: the word "auth" in auth/');
+  });
+
+  it("only count roles in a file's own name, not a folder of server roles", () => {
+    expect(inspect({ path: "roles/postgres/defaults/main.yml" }, "config")).toEqual([]);
+    expect(inspect({ path: "app/roles.py" }, "logic").map((flag) => flag.rule)).toEqual(["access"]);
   });
 
   it("flags any layer but Tests and Docs", () => {

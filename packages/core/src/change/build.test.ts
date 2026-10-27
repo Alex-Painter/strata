@@ -29,6 +29,14 @@ old mode 100644
 new mode 100755
 `;
 
+const AUTH_FILE = `diff --git a/src/auth/session.py b/src/auth/session.py
+new file mode 100644
+--- /dev/null
++++ b/src/auth/session.py
+@@ -0,0 +1 @@
++TTL = 60
+`;
+
 describe("buildDiff", () => {
   const model = buildDiff(DIFF);
 
@@ -60,7 +68,11 @@ describe("buildDiff", () => {
     expect(model.layers).toEqual([]);
     expect(model.files.every((f) => f.layer === UNCLASSIFIED)).toBe(true);
     expect(model.hunks.every((h) => h.layer === UNCLASSIFIED && h.mechanical === null)).toBe(true);
-    expect(model.files.every((f) => f.inspect.length === 0)).toBe(true);
+    // Even a file the inspect rules would flag.
+    const auth = buildDiff(`${DIFF}${AUTH_FILE}`).files.find(
+      (f) => f.path === "src/auth/session.py",
+    );
+    expect(auth?.inspect).toEqual([]);
   });
 
   it("groups files by layer, in layer order, when classified", () => {
@@ -82,14 +94,7 @@ describe("buildDiff", () => {
   });
 
   it("flags each file the inspect rules match, on the file alone", () => {
-    const diff = `${DIFF}diff --git a/src/auth/session.py b/src/auth/session.py
-new file mode 100644
---- /dev/null
-+++ b/src/auth/session.py
-@@ -0,0 +1 @@
-+TTL = 60
-`;
-    const classified = buildDiff(diff, { classifier: createClassifier() });
+    const classified = buildDiff(`${DIFF}${AUTH_FILE}`, { classifier: createClassifier() });
     expect(classified.files.map((f) => [f.path, f.inspect.map((flag) => flag.rule)])).toEqual([
       ["bin/run", []],
       ["pnpm-lock.yaml", []],
@@ -100,6 +105,23 @@ new file mode 100644
     expect(classified.hunks.find((h) => h.path === "src/auth/session.py")).not.toHaveProperty(
       "inspect",
     );
+  });
+
+  it("flags a file moved out of a matching folder by its old path", () => {
+    const moved = `diff --git a/src/auth/tokens.py b/src/users/tokens.py
+similarity index 80%
+rename from src/auth/tokens.py
+rename to src/users/tokens.py
+--- a/src/auth/tokens.py
++++ b/src/users/tokens.py
+@@ -1 +1 @@
+-TTL = 60
++TTL = 120
+`;
+    const [file] = buildDiff(moved, { classifier: createClassifier() }).files;
+    expect(file?.inspect.map((flag) => flag.reason)).toEqual([
+      'Access and permissions: the word "auth" in auth/, on its old path',
+    ]);
   });
 
   it("doesn't depend on the order of files in the diff", () => {

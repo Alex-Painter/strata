@@ -106,7 +106,7 @@ describe("Files", () => {
     );
   });
 
-  it("tags each file an inspect rule matched, with the glob, in any layer but Tests", () => {
+  it("tags each file an inspect rule matched, with where, in any layer but Tests", () => {
     const page = render(
       [
         adding("app/auth/session.py", "TTL = 60"),
@@ -123,7 +123,7 @@ describe("Files", () => {
     expect(file?.querySelector("summary")?.textContent).toContain("Access and permissions");
     expect(file?.querySelector("p")?.textContent).toBe(
       "Added · Logic: No rule matched, so it's taken as application code, a guess · " +
-        "Inspect: Access and permissions: matches **/{auth,authn,authz,authentication,authorization}/**",
+        'Inspect: Access and permissions: a word starting "session" in session.py',
     );
     const listed = [...page.querySelectorAll('nav[aria-label="File list"] a')].map((a) =>
       a.textContent?.includes("Inspect"),
