@@ -87,6 +87,9 @@ export function changeRoutes(deps: AppDeps) {
       deps.engineFor(user.id).resolveChange(input, { onProgress }),
     );
     if (!found.done) return pending(c, found.progress);
+    // The client gave up while it waited, maybe to ask for something else, so
+    // it neither gets nor runs this Change. Nobody reads the answer.
+    if (c.req.raw.signal.aborted) return new Response(null, { status: 499 });
     const resolved = found.value;
     const path = resolved.stack?.selectedPath ?? [];
     const rootPr = path[0];

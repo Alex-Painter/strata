@@ -170,6 +170,24 @@ describe("a slow first read of a repo", () => {
     expect(done.status).toBe(201);
     expect(db.select().from(changesTable).all()).toHaveLength(1);
   });
+
+  it("creates no Change for a client that gave up waiting", async () => {
+    const { wrap, open } = held();
+    const { app, db } = setup({ wrap });
+    const controller = new AbortController();
+    const answer = app.request("/api/changes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: "acme/app#2" }),
+      signal: controller.signal,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.abort();
+    open();
+    expect((await answer).status).toBe(499);
+    expect(db.select().from(changesTable).all()).toEqual([]);
+    expect(db.select().from(runsTable).all()).toEqual([]);
+  });
 });
 
 describe("Changes", () => {
