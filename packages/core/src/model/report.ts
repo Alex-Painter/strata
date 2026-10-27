@@ -19,8 +19,9 @@ import type { PrPart, Stack } from "./stack.js";
  * 5: where each PR's lines went (PrPart.provenance).
  * 6: the Guide, and a summary for the whole stack and for each PR.
  * 7: notes about the split moved to the stack, and each PR's baseOid.
+ * 8: the inspect rules each file matched.
  */
-export const REPORT_SCHEMA_VERSION = 7;
+export const REPORT_SCHEMA_VERSION = 8;
 
 export type VerdictStatus =
   /** A gate failed or a blocker finding exists. */

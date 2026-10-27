@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type ParsedFile, type ParsedHunk, parseDiff } from "./diff/parse.js";
 import { createClassifier } from "./layers/classify.js";
 import { parseGitAttributes } from "./layers/gitattributes.js";
+import { createInspector } from "./layers/inspect.js";
 import { mechanicalFile, mechanicalHunk } from "./layers/mechanical.js";
 import { createPathClassifier } from "./layers/rules.js";
 import type { LayerAssignment } from "./model/change.js";
@@ -100,6 +101,127 @@ describe("default layer rules", () => {
       reason: "Billing is always inspected: matches billing/**",
     });
     expect(custom("src/lib/pricing.ts").layer).toBe("logic");
+  });
+});
+
+/**
+ * Inspect rules, as a table too: a path and the rules a reviewer would expect
+ * it to set off, for a file in Logic. The near misses matter as much as the
+ * hits, since a flag on every file means nothing.
+ */
+const INSPECT_CASES: [path: string, rules: string[]][] = [
+  ["app/auth/tokens.py", ["access"]],
+  ["src/Auth/Session.ts", ["access"]],
+  ["AUTH/keys.py", ["access"]],
+  ["app/user_auth.py", ["access"]],
+  ["app/auth_utils.py", ["access"]],
+  ["app/authentication_backend.py", ["access"]],
+  ["src/hooks/useAuth.ts", ["access"]],
+  ["src/AuthProvider.tsx", ["access"]],
+  ["app/api/permissions.py", ["access"]],
+  ["app/rbac/grants.py", ["access"]],
+  ["app/roles.py", ["access"]],
+  ["src/user-roles.ts", ["access"]],
+  ["frontend/src/pages/Login.tsx", ["access"]],
+  ["app/oauth_client.py", ["access"]],
+  ["app/middleware/tenant_scope.py", ["access"]],
+  [".github/CODEOWNERS", ["access"]],
+  ["policy/main.rego", ["access"]],
+  ["firestore.rules", ["access"]],
+  ["app/jobs/retention.py", ["deletion"]],
+  ["scripts/purge_old_rows.py", ["deletion"]],
+  ["app/services/delete_account.py", ["deletion"]],
+  ["app/gdpr/export.py", ["deletion"]],
+  ["scripts/pg_restore.sh", ["deletion"]],
+  ["app/backups/run.sh", ["deletion"]],
+  ["migrations/0043_archive_sessions.sql", ["access", "deletion"]],
+  // Near misses.
+  ["app/author.py", []],
+  ["app/authority.py", []],
+  ["src/AuthorCard.tsx", []],
+  ["src/components/Accessibility.tsx", []],
+  ["maverick/utils/access.py", []],
+  ["app/firestore_client.py", []],
+  ["src/Swipeable.tsx", []],
+  ["app/middleware/logging.py", []],
+  ["app/services/export.py", []],
+  ["app/battle.py", []],
+];
+
+describe("inspect rules", () => {
+  const inspect = createInspector();
+
+  it.each(INSPECT_CASES)("%s → %j", (path, rules) => {
+    expect(inspect({ path }, "logic").map((flag) => flag.rule)).toEqual(rules);
+  });
+
+  it("names the rule and the glob that matched, in rule order", () => {
+    expect(inspect({ path: "migrations/0043_archive_sessions.sql" }, "data-model")).toEqual([
+      {
+        rule: "access",
+        title: "Access and permissions",
+        reason: "Access and permissions: matches **/*{login,logout,signin,signup,session}*.*",
+      },
+      {
+        rule: "deletion",
+        title: "Deletion and retention",
+        reason:
+          "Deletion and retention: matches **/*{cleanup,clean_up,prune,pruning,archive,archival}*.*",
+      },
+    ]);
+  });
+
+  it("flags a file moved away from a matching path, and says so", () => {
+    expect(
+      inspect({ path: "app/users/tokens.py", oldPath: "app/auth/tokens.py" }, "logic"),
+    ).toEqual([
+      {
+        rule: "access",
+        title: "Access and permissions",
+        reason:
+          "Access and permissions: its old path matches **/{auth,authn,authz,authentication,authorization}/**",
+      },
+    ]);
+  });
+
+  it("flags any layer but Tests and Docs", () => {
+    for (const layer of LAYER_IDS) {
+      const flags = inspect({ path: "app/auth/tokens.py" }, layer);
+      expect(flags.length, layer).toBe(layer === "tests" || layer === "docs" ? 0 : 1);
+    }
+  });
+
+  it("goes by the layer the classifier settled on, and skips mechanical files", () => {
+    const classifier = createClassifier({
+      gitattributes: "web/auth/*.html linguist-documentation\nclients/** linguist-generated\n",
+      judged: new Map([
+        [
+          "scripts/purge.sh",
+          { layer: "tests", by: "llm", reason: "A test harness", confidence: "medium" },
+        ],
+      ]),
+    });
+    const [doc, generated, judged, test, plain] = parseDiff(
+      [
+        diffAdding("web/auth/index.html", "<h1>Auth</h1>"),
+        diffAdding("clients/permissions.ts", "export {};"),
+        diffAdding("scripts/purge.sh", "echo"),
+        diffAdding("tests/test_permissions.py", "def test(): ..."),
+        diffAdding("app/permissions.py", "x = 1"),
+      ].join(""),
+    ) as ParsedFile[];
+    const flags = (file: ParsedFile | undefined) => {
+      const parsed = file as ParsedFile;
+      const layer = classifier.layer(parsed);
+      return classifier
+        .inspect(parsed, layer, classifier.mechanicalFile(parsed))
+        .map((f) => f.rule);
+    };
+    expect(flags(doc)).toEqual([]);
+    expect(flags(generated)).toEqual([]);
+    expect(flags(judged)).toEqual([]);
+    expect(flags(test)).toEqual([]);
+    expect(flags(plain)).toEqual(["access"]);
   });
 });
 

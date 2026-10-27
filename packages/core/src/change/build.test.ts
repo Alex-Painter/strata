@@ -60,6 +60,7 @@ describe("buildDiff", () => {
     expect(model.layers).toEqual([]);
     expect(model.files.every((f) => f.layer === UNCLASSIFIED)).toBe(true);
     expect(model.hunks.every((h) => h.layer === UNCLASSIFIED && h.mechanical === null)).toBe(true);
+    expect(model.files.every((f) => f.inspect.length === 0)).toBe(true);
   });
 
   it("groups files by layer, in layer order, when classified", () => {
@@ -78,6 +79,27 @@ describe("buildDiff", () => {
     });
     expect(classified.hunks[0]?.mechanical?.kind).toBe("lockfile");
     expect(classified.layers[0]).toMatchObject({ meaningfulHunks: 1, mechanicalHunks: 0 });
+  });
+
+  it("flags each file the inspect rules match, on the file alone", () => {
+    const diff = `${DIFF}diff --git a/src/auth/session.py b/src/auth/session.py
+new file mode 100644
+--- /dev/null
++++ b/src/auth/session.py
+@@ -0,0 +1 @@
++TTL = 60
+`;
+    const classified = buildDiff(diff, { classifier: createClassifier() });
+    expect(classified.files.map((f) => [f.path, f.inspect.map((flag) => flag.rule)])).toEqual([
+      ["bin/run", []],
+      ["pnpm-lock.yaml", []],
+      ["src/api/users.py", []],
+      ["src/auth/session.py", ["access"]],
+      ["src/models/user.py", []],
+    ]);
+    expect(classified.hunks.find((h) => h.path === "src/auth/session.py")).not.toHaveProperty(
+      "inspect",
+    );
   });
 
   it("doesn't depend on the order of files in the diff", () => {

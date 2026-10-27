@@ -8,7 +8,7 @@
  * (SPEC.md, "Benchmarks", 1).
  */
 import type { Anchor } from "./anchors.js";
-import type { LayerId } from "./layers.js";
+import type { InspectFlag, LayerId } from "./layers.js";
 import type { StackSeed } from "./stack.js";
 
 /** What the reviewer asked Strata to look at. */
@@ -69,6 +69,12 @@ export interface FileChange {
   mechanical: MechanicalVerdict | null;
   /** Layer of the file as a whole; hunks may refine it in future. */
   layer: LayerAssignment;
+  /**
+   * The inspect rules the file's path matched, in rule order. Always empty in
+   * Tests and Docs, for mechanical files, and for a diff built without a
+   * classifier.
+   */
+  inspect: InspectFlag[];
 }
 
 export type DiffLineKind = "context" | "add" | "del";

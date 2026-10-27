@@ -42,6 +42,7 @@ export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffMod
   for (const file of parsed) {
     const layer = classifier?.layer(file) ?? UNCLASSIFIED;
     const fileMechanical = classifier?.mechanicalFile(file) ?? null;
+    const inspect = classifier?.inspect(file, layer, fileMechanical) ?? [];
     const seen = new Map<string, number>();
     const hunkIds: string[] = [];
     let additions = 0;
@@ -88,6 +89,7 @@ export function buildDiff(diff: string, options: BuildDiffOptions = {}): DiffMod
       deletions,
       mechanical: fileMechanical,
       layer,
+      inspect,
     });
   }
 

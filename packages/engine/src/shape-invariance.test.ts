@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   type ChangeReport,
   canonicalReport,
+  type FileChange,
   parseChangeInput,
   stableStringify,
 } from "@strata/core";
@@ -134,6 +135,7 @@ describe("shape invariance", () => {
     expect(one.report.change.files.map((file) => file.path)).toEqual([
       "app/models/account.py",
       "app/routers/forecasts.py",
+      "app/routers/permissions.py",
       "app/services/forecasts.py",
       "docs/forecasts.md",
       "tests/test_forecasts.py",
@@ -157,13 +159,31 @@ describe("shape invariance", () => {
       ]);
     expect(layers("one-pr")).toEqual([
       ["data-model", ["app/models/account.py"], 1, 0],
-      ["api", ["app/routers/forecasts.py"], 1, 0],
+      ["api", ["app/routers/forecasts.py", "app/routers/permissions.py"], 2, 0],
       ["logic", ["app/services/forecasts.py"], 1, 0],
       ["tests", ["tests/test_forecasts.py"], 1, 0],
       ["config", ["uv.lock"], 0, 1],
       ["docs", ["docs/forecasts.md"], 1, 0],
     ]);
     for (const name of same) expect(layers(name), name).toEqual(layers("one-pr"));
+  });
+
+  it("flags the same files to inspect however the feature was split", () => {
+    const flagged = (files: FileChange[]) =>
+      files
+        .filter((file) => file.inspect.length > 0)
+        .map((file) => [file.path, file.inspect.map((flag) => flag.rule)]);
+    const expected = flagged(get("one-pr").report.change.files);
+    expect(expected).toEqual([["app/routers/permissions.py", ["access"]]]);
+    for (const name of [...same, "fork" as const]) {
+      const { change, parts } = get(name).report;
+      expect(flagged(change.files), name).toEqual(expected);
+      // Each part's copy of a file gets the whole stack's flags.
+      const byPath = new Map(change.files.map((file) => [file.path, file]));
+      for (const file of parts.flatMap((part) => part.files)) {
+        expect(file.inspect, `${name} ${file.path}`).toEqual(byPath.get(file.path)?.inspect);
+      }
+    }
   });
 
   it("asks Claude the same question however the feature was split", () => {

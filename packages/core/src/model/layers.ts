@@ -27,8 +27,9 @@ export interface LayerDefinition {
   /** Lower numbers qualify first. */
   order: number;
   /**
-   * Changes here must be right first time, so they are surfaced for mandatory
-   * human inspection (SPEC.md, "Inspection by design").
+   * Changes here must be right first time, so the whole layer is surfaced for
+   * mandatory human inspection (SPEC.md, "Inspection by design"). Files in
+   * other layers can still be flagged one by one (InspectRule).
    */
   inspect: boolean;
 }
@@ -107,5 +108,27 @@ export interface LayerRule {
   /** Globs matched against the repo-relative path. */
   paths: string[];
   /** Shown to the reviewer as the reason for the assignment. */
+  reason: string;
+}
+
+/**
+ * A path rule that flags files for close inspection in whatever layer they
+ * land, such as anything to do with access or deletion (SPEC.md, "Inspection
+ * by design"). Unlike layer rules, every rule that matches gives a flag.
+ */
+export interface InspectRule {
+  id: string;
+  /** What the flag is about, shown on the file: "Access and permissions". */
+  title: string;
+  /** Globs matched against the repo-relative path, ignoring case. */
+  paths: string[];
+}
+
+/** A file an inspect rule matched. */
+export interface InspectFlag {
+  /** The rule's id. */
+  rule: string;
+  title: string;
+  /** The rule and the glob that matched, so a reviewer can check it. */
   reason: string;
 }

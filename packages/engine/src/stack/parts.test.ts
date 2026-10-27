@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { canonicalReport, parseChangeInput, stableStringify } from "@strata/core";
+import { canonicalReport, type FileChange, parseChangeInput, stableStringify } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EngineConfig } from "../api.js";
 import { createEngine } from "../engine.js";
@@ -673,6 +673,7 @@ describe("each PR's diff", () => {
     for (const file of report.parts.flatMap((part) => part.files)) {
       expect(file.layer).toEqual(byPath.get(file.path)?.layer);
       expect(file.mechanical).toEqual(byPath.get(file.path)?.mechanical);
+      expect(file.inspect).toEqual(byPath.get(file.path)?.inspect);
     }
   });
 
@@ -738,6 +739,54 @@ describe("each PR's diff", () => {
     }
     expect(on.change.layers.map((group) => group.layer)).toEqual(["data-model"]);
     expect(on.notes.some((note) => note.includes("guessed"))).toBe(false);
+  });
+
+  it("flags each PR's files as the whole stack does, after Claude has placed them", async () => {
+    const h1 = await remote.write(
+      "b1",
+      {
+        "app/auth/session.py": lines("TTL = 60"),
+        "scripts/purge_rows.py": lines("def purge(): ..."),
+        "app/permissions_pb2.py": lines("DESCRIPTOR = None"),
+      },
+      "main",
+    );
+    const h2 = await remote.write(
+      "b2",
+      {
+        "app/auth/session.py": lines("TTL = 120"),
+        "scripts/purge_rows.py": lines("def purge():", "    return 0"),
+      },
+      "b1",
+    );
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2);
+    await writeSettings({ sendCodeToAnthropic: true });
+    const github = fakeGitHub("acme/app", [prNode(1, h1), prNode(2, h2, { baseRefName: "b1" })]);
+    // Claude takes the purge script for a test helper, so it isn't flagged.
+    const layerJudge: LayerJudge = async (request) =>
+      request.files.map((file) => ({
+        path: file.path,
+        layer: file.path.startsWith("scripts/") ? "tests" : "logic",
+        reason: "Placed by path",
+      }));
+    const report = await analyze(github, "acme/app#2", { layerJudge });
+
+    const flags = (files: FileChange[]) =>
+      files.map((file) => [file.path, file.inspect.map((flag) => flag.rule)]);
+    expect(flags(report.change.files)).toEqual([
+      ["app/auth/session.py", ["access"]],
+      // Generated code is mechanical, so there's nothing to inspect.
+      ["app/permissions_pb2.py", []],
+      ["scripts/purge_rows.py", []],
+    ]);
+    expect(report.parts.map((part) => flags(part.files))).toEqual([
+      flags(report.change.files),
+      [
+        ["app/auth/session.py", ["access"]],
+        ["scripts/purge_rows.py", []],
+      ],
+    ]);
   });
 
   it("says when the repo allows Claude but there's no key", async () => {

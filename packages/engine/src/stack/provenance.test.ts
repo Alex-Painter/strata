@@ -52,6 +52,7 @@ describe("provenance", () => {
           3,
           [
             ["app/routers/forecasts.py", 8, 0],
+            ["app/routers/permissions.py", 5, 0],
             ["tests/test_forecasts.py", 6, 0],
           ],
         ],
@@ -116,13 +117,13 @@ describe("the layer by PR matrix", () => {
     // meaningful/mechanical/revised for #1, #2, #3, #4 and Net.
     expect(grid(get("stack"))).toEqual([
       ["data-model", "1/0/0", "", "", "", "1/0/0"],
-      ["api", "", "", "8/0/0", "", "8/0/0"],
+      ["api", "", "", "13/0/0", "", "13/0/0"],
       ["logic", "", "5/0/1", "", "2/0/0", "5/0/0"],
       ["tests", "", "", "6/0/0", "", "6/0/0"],
       ["config", "0/2/0", "", "", "", "0/2/0"],
       ["docs", "", "", "", "3/0/0", "3/0/0"],
     ]);
-    expect(matrix.max).toBe(8);
+    expect(matrix.max).toBe(13);
   });
 
   it("gives Net the whole stack's layers however the work was split", () => {

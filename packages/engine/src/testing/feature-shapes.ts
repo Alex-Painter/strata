@@ -1,7 +1,8 @@
 /**
  * One small feature built six ways, for the shape-invariance tests (SPEC.md,
  * "Benchmarks", 1). The feature looks like maverick's: a Beanie model field, a
- * service, a router, a test, a lockfile bump and a doc. Every shape starts
+ * service, a router with a permission check, a test, a lockfile bump and a
+ * doc. Every shape starts
  * from the same main, and every shape but the fork (5) ends with the same code.
  *
  * 1. `one-pr`: the whole feature in one PR.
@@ -77,8 +78,15 @@ const PART_2 = {
   ),
 };
 
-/** The router and its test. */
+/** The router, who may see a forecast, and the router's test. */
 const PART_3 = {
+  "app/routers/permissions.py": lines(
+    "from app.models.account import Account",
+    "",
+    "",
+    "def can_see_forecast(account: Account, user_email: str) -> bool:",
+    "    return account.email == user_email",
+  ),
   "app/routers/forecasts.py": lines(
     "from app.routers import router",
     "from app.services.forecasts import forecast_for",
