@@ -1,8 +1,8 @@
 /**
  * A stand-in GitHub for driving the app with no token or network. It builds
- * the engine's demo repo (acme/app) plus one stack that needs a restack,
- * serves their PRs from a GraphQL endpoint, and leaves the repo on disk for
- * Strata to fetch from. The verify skill starts it with
+ * the engine's demo repo (acme/app) plus one stack that needs a restack and a
+ * branch whose files the inspect rules flag, serves their PRs from a GraphQL
+ * endpoint, and leaves the repo on disk for Strata to fetch from. The verify skill starts it with
  * `strata-verify up --github fixture`; point a dev server at it with
  * DEV_GITHUB_GRAPHQL_URL and DEV_GIT_REMOTE.
  *
@@ -115,6 +115,26 @@ for (const [n, oid] of [
 ] as const) {
   await remote.holdPr(n, oid);
 }
+// A branch with no PR, for a range whose files the inspect rules flag:
+// acme/app@main...inspect-demo.
+await remote.write(
+  "inspect-demo",
+  {
+    "app/auth/permissions.py": lines(
+      "def can_see_forecast(user, account) -> bool:",
+      "    return user.account_id == account.id",
+    ),
+    "migrations/0043_archive_sessions.sql": lines(
+      "delete from sessions where expires_at < now() - interval '90 days';",
+    ),
+    "tests/test_permissions.py": lines(
+      "def test_other_accounts_are_hidden(user, other_account):",
+      "    assert not can_see_forecast(user, other_account)",
+    ),
+    "docs/retention.md": lines("# Retention", "", "Sessions are kept for 90 days."),
+  },
+  "main",
+);
 const rollup = (state: string) => ({ nodes: [{ commit: { statusCheckRollup: { state } } }] });
 demo.github.prs.push(
   prNode(9, h9, {

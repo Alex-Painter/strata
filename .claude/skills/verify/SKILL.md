@@ -5,7 +5,7 @@ description: Drive the real Strata app (Hono API + React web app + `strata` CLI)
 
 # Verify Strata
 
-Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs, each PR's diff and the whole-stack diff, layers, the layer by PR matrix, the summaries and the Guide) in the web app and API, and the CLI's `stacks` and `analyze` commands, with the review page `analyze` writes and the stack vs range script. Sources, files and threads answer 501. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
+Strata has three user surfaces: the **web app** (primary: sign-in, the home page, a repo's stacks, the review workspace), the **JSON API** under `/api` and `/auth`, and the **`strata` CLI**. Real so far: sign-in, `/api/me`, `/healthz`, the app shell, stacks (finding them, the stack map, Changes and runs, each PR's diff and the whole-stack diff, layers, inspect flags, the layer by PR matrix, the summaries and the Guide) in the web app and API, and the CLI's `stacks` and `analyze` commands, with the review page `analyze` writes and the stack vs range script. Sources, files and threads answer 501. Verify what is real, and when you build a milestone-1 feature, add a file for it under `features/` (see "Extending").
 
 Everything goes through `scripts/strata-verify`, which lives next to this file. From the repo root:
 

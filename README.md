@@ -1,6 +1,6 @@
 # Strata
 
-Strata is a system change review tool. Its core object is a **Change**: one feature, which may span many PRs and lives on past merge. Instead of reviewing a diff file by file, Strata classifies hunks into architectural layers, separates mechanical edits from meaningful ones, shows the before/after data model, and checks the change against its stated intent, with every claim linked back to evidence. The result should be the same no matter how the feature was split into PRs.
+Strata is a system change review tool. Its core object is a **Change**: one feature, which may span many PRs and lives on past merge. Instead of reviewing a diff file by file, Strata classifies hunks into architectural layers, separates mechanical edits from meaningful ones, flags what must be right first time for close inspection, shows the before/after data model, and checks the change against its stated intent, with every claim linked back to evidence. The result should be the same no matter how the feature was split into PRs.
 
 See [SPEC.md](SPEC.md) for the product and [docs/architecture.md](docs/architecture.md) for how the code is laid out.
 
@@ -49,7 +49,7 @@ Open http://localhost:5173. With `DEV_AUTH_BYPASS=1` you're signed in as `DEV_GI
 GITHUB_TOKEN="$(gh auth token)" pnpm --filter @strata/cli start analyze 'owner/repo#123' --repo-path ~/work/repo
 ```
 
-`analyze` takes a PR, a branch (`owner/repo:feature/x`), a chain (`owner/repo#12,13,14`) or a range (`owner/repo@main...feature`). With no input, it's the stack around the branch checked out in `--repo-path`, or in the folder you run it from. It prints the stack in brief, then writes the review page and the report as JSON to `reports/<owner>/<name>/` in the data folder (`~/.strata`, or `--data-dir`); `--out` and `--json` choose other paths. Strata won't write inside a git checkout, so a page of work code can't be committed by accident. The page is the web app's static build with the report in it, so build that first: `pnpm --filter @strata/web build`.
+`analyze` takes a PR, a branch (`owner/repo:feature/x`), a chain (`owner/repo#12,13,14`) or a range (`owner/repo@main...feature`). With no input, it's the stack around the branch checked out in `--repo-path`, or in the folder you run it from. It prints the stack in brief, with its files by layer: layers to inspect end `(inspect)`, and a file that touches access and permissions or deletion and retention, in any layer but Tests and Docs, says which path rule flagged it. Then it writes the review page and the report as JSON to `reports/<owner>/<name>/` in the data folder (`~/.strata`, or `--data-dir`); `--out` and `--json` choose other paths. Strata won't write inside a git checkout, so a page of work code can't be committed by accident. The page is the web app's static build with the report in it, so build that first: `pnpm --filter @strata/web build`.
 
 `strata stacks owner/repo` lists a repo's stacks. Both commands only read a checkout; Strata keeps its own clone in the data folder.
 
