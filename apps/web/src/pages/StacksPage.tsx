@@ -72,16 +72,15 @@ export function StacksPage({ me }: { me: MeResponse }) {
 
 function StackCard({ stack }: { stack: StackSummary }) {
   const [tip, setTip] = useState(stack.defaultPath[stack.defaultPath.length - 1] as number);
+  // A refreshed list can end the chosen path elsewhere; the card then shows the default.
   const path = stack.paths.find((p) => p[p.length - 1] === tip) ?? stack.defaultPath;
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const request = useLatestRequest();
   const open = useMutation({
-    mutationFn: () =>
-      api.createChange(
-        { input: `${stack.repo}#${stack.root}`, leaf: tip },
-        { signal: request.next() },
-      ),
+    // Opens the path the card shows.
+    mutationFn: (leaf: number) =>
+      api.createChange({ input: `${stack.repo}#${stack.root}`, leaf }, { signal: request.next() }),
     onSuccess: (detail) => {
       queryClient.setQueryData(["change", detail.change.id], detail);
       queryClient.invalidateQueries({ queryKey: ["changes"] });
@@ -133,7 +132,7 @@ function StackCard({ stack }: { stack: StackSummary }) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => open.mutate()}
+            onClick={() => open.mutate(path[path.length - 1] as number)}
             disabled={open.isPending}
             className="rounded-md bg-accent px-3 py-1.5 font-medium text-on-accent disabled:opacity-50"
           >
