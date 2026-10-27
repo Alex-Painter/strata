@@ -67,7 +67,7 @@ Save each `read_page` tree with `strata-verify note $B stacks/<step>.aria.txt`, 
 ## Gotchas
 
 - The first request for a repo clones it into the instance's data folder. When that takes over 1.5 s, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}`: repeat the same request until it returns 200 or 201 (the web app does this each second and shows the step). On a real repo the first read can take minutes; pass `--checkouts` so Strata borrows objects from a local checkout.
-- The fixture's timestamps are moved to the last hour at startup, so "updated 1h ago" is expected, and its commit ids change on every `up`. Compare structure, not shas.
+- The fixture's PR timestamps are moved to the last hour at startup, so "updated 1h ago" is expected. Its commits have fixed authors and dates, so their ids are the same on every `up` (main at dd4a224, #3's head 709ec39), which [cli.md](cli.md) relies on.
 - `?pr=<n>` with a PR outside the stack shows the whole stack rather than an error.
 - The stand-in Claude's sentences are mechanical on purpose ("Changes <path>."). They test the plumbing: labels, dropping bad citations, the Guide's merge and order, and opening hunks. How good real answers are can only be judged with a real key on a real stack.
 - With `--github gh`, the real repo's data stays on the developer's machine. Don't paste work titles or code into evidence you share outside it.

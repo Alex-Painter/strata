@@ -59,7 +59,7 @@ To check that a real stack gives the same whole-stack view as the same code give
 GITHUB_TOKEN="$(gh auth token)" pnpm --filter @strata/cli exec tsx scripts/stack-vs-range.ts 'owner/repo#123' --repo-path ~/work/repo
 ```
 
-It prints `Same: the canonical reports are equal.` and exits 0, or lists where they differ (places only, never code) and exits 1.
+It prints the stack's path and the range it compared, then any of the stack's notes on how the work was split as `Note: …`. Then it prints `Same: the canonical reports are equal.` and exits 0, or lists where they differ (places only, never code) and exits 1. When some PRs couldn't be put on the stack, it compares only the PRs in the whole-stack diff and says so, as in `Same, but only for #1 → #2: #3 isn't in the whole-stack diff.`, and exits 1.
 
 ## Repo settings
 

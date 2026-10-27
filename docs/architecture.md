@@ -70,7 +70,7 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 - `src/db/` holds the Drizzle schema (users, sessions, Changes, runs and reports) and runs migrations from `drizzle/` on startup.
 - `src/routes/api.ts` declares every milestone-1 route. `/api/me`, `GET /api/repos/:owner/:name/stacks` and the Changes routes (`routes/changes.ts`) work; sources, files and threads answer 501.
 - `src/runs.ts` runs analyses one at a time in-process; `src/engines.ts` gives each user an engine with their own GitHub token.
-- `src/jobs.ts` runs the slow requests, listing a repo's stacks and finding a new Change's stack, as jobs keyed by user and input. A request waits 1.5 s, then answers `202 {"pending":true,"progress":...}` with the latest step; the client asks again with the same request until it gets the result. A job carries on if its client goes away, and a finished one is kept for 5 minutes.
+- `src/jobs.ts` runs the slow requests, listing a repo's stacks and finding a new Change's stack, as jobs keyed by user and input. A request waits 1.5 s, then answers `202 {"pending":true,"progress":...}` with the latest step; the client asks again with the same request until it gets the result. A job carries on if its client goes away, and a finished one is kept for 5 minutes, but a new Change is only made for a client that's still there. The server's engines set `logProgress`, so the clone and fetch steps a job follows stay in the server log too.
 - `src/app.ts` adds security headers, CSRF origin checks, `/healthz`, and serves the web build with an SPA fallback.
 - `src/dev/fixture-github.ts` is a stand-in GitHub (the engine's demo repo behind a GraphQL endpoint) for driving the app with no token. Outside production, `DEV_GITHUB_GRAPHQL_URL` and `DEV_GIT_REMOTE` point the server at it; the verify skill's `up --github fixture` does that. It also serves a stand-in Claude (`src/dev/fixture-claude.ts`) that answers from Strata's own prompts; `DEV_ANTHROPIC_BASE_URL` points the server's Anthropic client at it, and `up --claude fixture` wires it up.
 
@@ -84,7 +84,7 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 
 ### cli
 
-`src/main.ts` parses the command (`args.ts`), runs the engine (`engine.ts`, which also reads the server's `DEV_` settings for stand-ins), prints the report (`report.ts`) and writes the page and JSON (`html.ts`): the web app's `dist-static/index.html` with the report embedded, in `reports/<owner>/<name>/` in the data folder by default. `html.ts` refuses any path inside a git checkout, found by the nearest `.git` above it with symlinks resolved. `scripts/stack-vs-range.ts` is the shape-invariance check on a real stack, comparing canonical reports and printing only where they differ (`compare.ts`).
+`src/main.ts` parses the command (`args.ts`), runs the engine (`engine.ts`, which also reads the server's `DEV_` settings for stand-ins), prints the report (`report.ts`) and writes the page and JSON (`html.ts`): the web app's `dist-static/index.html` with the report embedded, in `reports/<owner>/<name>/` in the data folder by default. `html.ts` refuses any path inside a git checkout, found by the nearest `.git` above it with symlinks resolved. `scripts/stack-vs-range.ts` is the shape-invariance check on a real stack, comparing canonical reports and printing where they differ (`compare.ts`, places only, never code), or that it could compare only the PRs in the whole-stack diff.
 
 ## Highlight and chat
 
