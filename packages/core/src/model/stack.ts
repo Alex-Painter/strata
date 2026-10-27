@@ -110,9 +110,10 @@ export type FactRequest =
  * - `re-anchored`: the PR sits on its base branch now rather than on the
  *   parent: rebased onto it or updated from it after the parent landed, or
  *   moved somewhere else. Its diff starts where it last met that base.
- * - `merged-into-parent`: the PR was merged into the parent's branch. The
- *   parent's head then holds it, unless it merged after the parent landed,
- *   which raises `base-already-merged`.
+ * - `merged-into-parent`: the PR was merged into the parent's branch: its
+ *   merge commit is in the parent's head, or on neither the trunk nor a branch
+ *   below. Its diff starts where it met that branch. One that merged after the
+ *   parent landed raises `base-already-merged`.
  * - `unknown`: git couldn't answer, usually because a commit is missing.
  *
  * A PR that merged onto the trunk while still targeting the parent's branch,

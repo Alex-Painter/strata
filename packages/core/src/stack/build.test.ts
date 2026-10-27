@@ -358,7 +358,9 @@ describe("buildStack", () => {
       expect(anchor(stack, 2)).toBe("h1");
       expect(anchor(stack, 3)).toBe("h2");
       expect(kinds(stack)).toEqual([]);
-      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain("#3 landed on main");
+      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain(
+        "#3's merge commit is on main",
+      );
     });
 
     it("marks a PR rebased onto main before it landed as re-anchored", () => {
@@ -402,7 +404,10 @@ describe("buildStack", () => {
       expect(edge(stack, 3)?.link).toBe("intact");
       expect(anchor(stack, 3)).toBe("h2");
       expect(kinds(stack)).toEqual(["non-default-trunk"]);
-      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain("#3 landed on main");
+      // Main holds the merge commit, which says nothing of where it went first.
+      expect(edge(stack, 3)?.evidence.map((e) => e.label)).toContain(
+        "#3's merge commit is on main",
+      );
     });
 
     it("claims nothing about a deleted trunk that main doesn't hold", () => {
@@ -425,8 +430,26 @@ describe("buildStack", () => {
       expect(order(stack)).toEqual([9, 1, 2]);
       expect(edge(stack, 1)?.link).toBe("merged-into-parent");
       expect(edge(stack, 2)?.link).toBe("intact");
-      expect(edge(stack, 2)?.evidence.map((e) => e.label)).toContain("#2 landed on feat");
+      expect(edge(stack, 2)?.evidence.map((e) => e.label)).toContain(
+        "#2's merge commit is in #9's head",
+      );
       expect(kinds(stack)).toEqual([]);
+    });
+
+    it("says only where the merge commit is when the PR below merged feat into main", () => {
+      // As above, but #9 took feat into main with a merge commit, so main holds s2 too.
+      const onFeat = index(
+        merged(9, { headRef: "feat", headOid: "s2", mergeCommitOid: "mf" }),
+        merged(1, { baseRef: "feat" }),
+        merged(2, { baseRef: "b1" }),
+      );
+      const withFeat = { ...graph, mf: ["m0", "s2"], s1: ["m0"], s2: ["s1"] };
+      const { stack } = resolve(onFeat, { pr: 2 }, withFeat, { main: "mf" });
+      expect(order(stack)).toEqual([9, 1, 2]);
+      expect(edge(stack, 2)?.link).toBe("intact");
+      const labels = edge(stack, 2)?.evidence.map((e) => e.label) ?? [];
+      expect(labels).toContain("#2's merge commit is on main");
+      expect(labels.some((label) => label.includes("landed"))).toBe(false);
     });
 
     it("still warns when a merge commit missing from the clone never reached main", () => {
@@ -588,6 +611,38 @@ describe("deep stacks", () => {
     expect(stack.edges.every((e) => e.link === "re-anchored")).toBe(true);
     expect(anchor(stack, n)).toBe(`s${n - 1}`);
     expect(rounds).toBeLessThanOrEqual(5);
+  });
+
+  it("resolves a long stack that landed on a branch below it in a few rounds", () => {
+    // #99 took feat into main as sf; the stack on top landed on feat as s1..sn.
+    const n = 30;
+    const graph: Graph = { m0: [], sf: ["m0"], h1: ["m0"], s1: ["m0"] };
+    const prs = [
+      pr(99, {
+        state: "merged",
+        mergedAt: at(2000),
+        headRef: "feat",
+        headOid: `s${n}`,
+        mergeCommitOid: "sf",
+      }),
+      pr(1, { state: "merged", mergedAt: at(1000), baseRef: "feat", mergeCommitOid: "s1" }),
+    ];
+    for (let i = 2; i <= n; i++) {
+      graph[`h${i}`] = [`h${i - 1}`];
+      graph[`s${i}`] = [`s${i - 1}`];
+      prs.push(
+        pr(i, {
+          state: "merged",
+          mergedAt: at(1000 + i),
+          baseRef: `b${i - 1}`,
+          mergeCommitOid: `s${i}`,
+        }),
+      );
+    }
+    const { stack, rounds } = resolve(index(...prs), { pr: n }, graph, { main: "sf" });
+    expect(order(stack)).toHaveLength(n + 1);
+    expect(stack.edges.filter((e) => e.link !== "intact").map((e) => e.child)).toEqual([1]);
+    expect(rounds).toBeLessThanOrEqual(8);
   });
 
   it("resolves a long chain where every PR needs a restack", () => {

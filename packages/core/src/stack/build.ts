@@ -382,11 +382,9 @@ class Builder {
 
     // A stack merged all at once lands each PR on the trunk, while GitHub keeps
     // the parent's branch as its base. Its head then links it like an open PR's.
-    const landed = this.landedOnTrunk(parent, child, trunk);
+    const landed = this.landedElsewhere(parent, child, trunk);
     if (typeof landed === "string") {
-      evidence.push(
-        commitEvidence(child.mergeCommitOid as string, `#${child.number} landed on ${landed}`),
-      );
+      evidence.push(commitEvidence(child.mergeCommitOid as string, landed));
     }
     if (child.state === "merged" && child.baseRef === ref && typeof landed !== "string") {
       // Null: git can't tell where it landed, so the link stays unknown and nothing is claimed.
@@ -481,15 +479,16 @@ class Builder {
   }
 
   /**
-   * Where a merged child landed, if not on its parent's branch: on the trunk,
-   * or on the branch of a PR further down (a stack that landed on a branch with
-   * a PR of its own). Its merge commit is there and not in the parent's head,
-   * where a child merged into the parent's branch would be. A trunk that was
-   * deleted is checked through the default branch, which can only show that it
-   * landed. Returns the branch, false when it was merged into the parent's
-   * branch, null when git can't tell, and undefined while facts are pending.
+   * Whether a merged child landed somewhere other than its parent's branch: on
+   * the trunk, or on the branch of a PR further down (a stack that landed on a
+   * branch with a PR of its own). Its merge commit is there and not in the
+   * parent's head, where a child merged into the parent's branch would be. A
+   * trunk that was deleted is checked through the default branch. Returns what
+   * git shows, as the evidence's label, false when the child was merged into
+   * the parent's branch, null when git can't tell, and undefined while facts
+   * are pending.
    */
-  private landedOnTrunk(
+  private landedElsewhere(
     parent: StackPr,
     child: StackPr,
     trunk: string,
@@ -506,8 +505,21 @@ class Builder {
       tip = this.tip(branch);
     }
     const onTrunk = tip ? this.isAncestor(merge, tip) : tip;
+    // Every PR below is asked at once, so a deep stack takes one round.
+    const below: Array<{ pr: StackPr; holds: boolean | null | undefined }> = [];
+    const seen = new Set([child.number, parent.number]);
+    for (
+      let pr = this.parentOf(parent)?.pr;
+      pr && !seen.has(pr.number);
+      pr = this.parentOf(pr)?.pr
+    ) {
+      seen.add(pr.number);
+      below.push({ pr, holds: this.isAncestor(merge, pr.headOid) });
+    }
     if (inParent === undefined || onTrunk === undefined) return undefined;
-    if (onTrunk === true) return branch;
+    // Its merge commit says nothing about where the child went, only where it is.
+    const on = `#${child.number}'s merge commit is on ${branch}`;
+    if (onTrunk === true) return on;
     if (inParent === null || onTrunk === null) {
       // Strata's clone fetched the trunk just now, so a merge commit missing
       // from it isn't on the trunk: it went to a branch that's gone since.
@@ -515,13 +527,9 @@ class Builder {
       const present = this.firstParent(merge);
       return present === undefined ? undefined : present === null ? false : null;
     }
-    const seen = new Set([child.number, parent.number]);
-    for (let below = this.parentOf(parent)?.pr; below; below = this.parentOf(below)?.pr) {
-      if (seen.has(below.number)) break;
-      seen.add(below.number);
-      const holds = this.isAncestor(merge, below.headOid);
+    for (const { pr, holds } of below) {
       if (holds === undefined) return undefined;
-      if (holds === true) return below.headRef;
+      if (holds === true) return `#${child.number}'s merge commit is in #${pr.number}'s head`;
     }
     // Not being on the default branch says nothing about a deleted trunk.
     return branch === trunk ? false : null;
