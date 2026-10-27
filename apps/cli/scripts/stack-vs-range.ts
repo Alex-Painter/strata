@@ -7,14 +7,17 @@
  * The range runs from where the stack left its trunk to the tip PR's head
  * when every PR's diff is direct. Otherwise Strata replayed some PRs, and
  * the tip's head would bring in the trunk's own changes, so the range ends
- * at Strata's last commit on its chain instead, and says so.
+ * at Strata's last commit on its chain instead, and says so. When some PRs
+ * couldn't be put on the stack, the whole-stack diff stops early, so only
+ * the PRs in it are compared; it says which, and doesn't count as a pass.
  *
  *   pnpm --filter @strata/cli exec tsx scripts/stack-vs-range.ts <input> \
  *     [--repo-path <checkout>] [--leaf <n>] [--data-dir <dir>]
  *
  * It takes the same inputs and settings as `strata analyze`, writes nothing
  * but Strata's caches, and prints only where the reports differ, never what
- * they say, so its output names no code. Exits 0 when they're equal.
+ * they say, so its output names no code. Exits 0 when they're equal and
+ * cover the whole path.
  */
 import {
   type ChangeReport,
@@ -71,20 +74,36 @@ async function main(argv: string[]): Promise<number> {
   }
   const tip = stack.stack.nodes.find((node) => node.pr.number === path[path.length - 1]);
   const direct = stack.parts.every((part) => part.how === "direct");
+  const placed = stack.parts
+    .filter((part) => part.how === "direct" || part.how === "replayed")
+    .map((part) => part.pr);
+  const left = path.filter((n) => !placed.includes(n));
   const head = direct && tip ? tip.pr.headOid : revisions.head;
   const range = await engine.analyzeChange(
     parseChangeInput(`${repo}@${revisions.base}...${head}`),
     { onProgress },
   );
 
-  console.log(`Stack: ${repo}, ${path.map((n) => `#${n}`).join(" → ")}, ${files(stack)}`);
+  console.log(`Stack: ${repo}, ${prs(path)}, ${files(stack)}`);
   console.log(
     `Range: ${repo}@${short(revisions.base)}...${short(head)}, ${files(range)}, ending at ` +
-      (direct ? `#${tip?.pr.number}'s head` : "Strata's last commit, since some PRs were replayed"),
+      (direct
+        ? `#${tip?.pr.number}'s head`
+        : left.length > 0
+          ? `Strata's last commit, where the whole-stack diff stops`
+          : "Strata's last commit, since some PRs were replayed"),
   );
+  // Strata's own words about the split, which name PRs but no code.
+  for (const note of stack.stack.notes) console.log(`Note: ${note}`);
   const a = canonicalReport(stack);
   const b = canonicalReport(range);
   if (stableStringify(a) === stableStringify(b)) {
+    if (left.length > 0) {
+      console.log(
+        `Same, but only for ${prs(placed)}: ${prs(left, ", ")} ${left.length === 1 ? "isn't" : "aren't"} in the whole-stack diff.`,
+      );
+      return 1;
+    }
     console.log("Same: the canonical reports are equal.");
     return 0;
   }
@@ -97,6 +116,7 @@ async function main(argv: string[]): Promise<number> {
 }
 
 const short = (oid: string) => oid.slice(0, 7);
+const prs = (numbers: number[], join = " → ") => numbers.map((n) => `#${n}`).join(join);
 const files = (report: ChangeReport) =>
   report.change.files.length === 1 ? "1 file" : `${report.change.files.length} files`;
 
