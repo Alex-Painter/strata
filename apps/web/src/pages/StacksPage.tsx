@@ -6,8 +6,9 @@ import { EvidenceList } from "../components/EvidenceList";
 import { PathPicker } from "../components/PathPicker";
 import { CopyMermaid, StackMap } from "../components/StackMap";
 import { TopBar } from "../components/TopBar";
-import { api, isPending } from "../lib/api";
+import { api, isPending, pollWhilePending } from "../lib/api";
 import { ago, countPrs, prCount } from "../lib/format";
+import { useLatestRequest } from "../lib/latest-request";
 
 /** Every stack in a repo, newest activity first, each ready to open as a Change. */
 export function StacksPage({ me }: { me: MeResponse }) {
@@ -16,8 +17,10 @@ export function StacksPage({ me }: { me: MeResponse }) {
   const stacks = useQuery({
     queryKey: ["stacks", repo],
     queryFn: () => api.stacks(repo),
-    // The server answers "still reading" until the repo's first read is done.
-    refetchInterval: (query) => (isPending(query.state.data) ? 1000 : false),
+    // The server answers "still reading" until the repo's first read is done,
+    // and keeps the result a few minutes, so keep asking from a background tab.
+    refetchInterval: pollWhilePending,
+    refetchIntervalInBackground: true,
   });
   const found = stacks.data && !isPending(stacks.data) ? stacks.data : null;
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
@@ -34,16 +37,24 @@ export function StacksPage({ me }: { me: MeResponse }) {
               PRs whose branches feed into each other, from PRs updated in the last 90 days.
             </p>
           </header>
-          {(stacks.isPending || isPending(stacks.data)) && (
+          {!stacks.error && (stacks.isPending || isPending(stacks.data)) && (
             <p role="status" className="text-muted">
               Reading {repo}'s PRs and fetching their branches…
               {progress && <span className="block">{progress}.</span>}
             </p>
           )}
           {stacks.error && (
-            <p role="alert" className="text-closed">
-              {stacks.error.message}
-            </p>
+            <div role="alert" className="space-y-2">
+              <p className="text-closed">{stacks.error.message}</p>
+              <button
+                type="button"
+                onClick={() => stacks.refetch()}
+                disabled={stacks.isFetching}
+                className="rounded-md border border-line bg-surface px-2 py-1 hover:bg-raised"
+              >
+                Try again
+              </button>
+            </div>
           )}
           {found?.stacks.length === 0 && (
             <div className="rounded-lg border border-dashed border-line p-6 text-center text-muted">
@@ -64,8 +75,13 @@ function StackCard({ stack }: { stack: StackSummary }) {
   const path = stack.paths.find((p) => p[p.length - 1] === tip) ?? stack.defaultPath;
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const request = useLatestRequest();
   const open = useMutation({
-    mutationFn: () => api.createChange({ input: `${stack.repo}#${stack.root}`, leaf: tip }),
+    mutationFn: () =>
+      api.createChange(
+        { input: `${stack.repo}#${stack.root}`, leaf: tip },
+        { signal: request.next() },
+      ),
     onSuccess: (detail) => {
       queryClient.setQueryData(["change", detail.change.id], detail);
       queryClient.invalidateQueries({ queryKey: ["changes"] });

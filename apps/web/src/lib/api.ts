@@ -46,18 +46,37 @@ export function isPending(body: unknown): body is PendingResponse {
   return typeof body === "object" && body !== null && (body as PendingResponse).pending === true;
 }
 
+/**
+ * How often a query asks again while the server is still working: each second,
+ * until it answers or fails. A failed read isn't retried by itself, since each
+ * try starts the whole read again.
+ */
+export function pollWhilePending(query: {
+  state: { status: string; data: unknown };
+}): number | false {
+  return query.state.status !== "error" && isPending(query.state.data) ? 1000 : false;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export interface PollOptions {
+  onProgress?: (step: string | null) => void;
+  /** Stops asking; the request then rejects. */
+  signal?: AbortSignal;
+}
 
 /** Sends the request until it's done, passing on the progress of each 202. */
 async function untilDone<T>(
   send: () => Promise<T | PendingResponse>,
-  onProgress?: (step: string | null) => void,
+  { onProgress, signal }: PollOptions,
 ): Promise<T> {
   for (;;) {
     const body = await send();
+    signal?.throwIfAborted();
     if (!isPending(body)) return body;
     onProgress?.(body.progress);
     await sleep(1000);
+    signal?.throwIfAborted();
   }
 }
 
@@ -71,10 +90,14 @@ export const api = {
     ),
   changes: () => request<ChangeSummary[]>("/api/changes"),
   change: (id: string) => request<ChangeDetail>(`/api/changes/${encodeURIComponent(id)}`),
-  createChange: (body: CreateChangeRequest, onProgress?: (step: string | null) => void) =>
+  createChange: (body: CreateChangeRequest, options: PollOptions = {}) =>
     untilDone(
-      () => request<ChangeDetail | PendingResponse>("/api/changes", post(body)),
-      onProgress,
+      () =>
+        request<ChangeDetail | PendingResponse>("/api/changes", {
+          ...post(body),
+          ...(options.signal ? { signal: options.signal } : {}),
+        }),
+      options,
     ),
   runAgain: (id: string) =>
     request<RunInfo>(`/api/changes/${encodeURIComponent(id)}/runs`, post({})),

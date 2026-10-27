@@ -108,10 +108,13 @@ function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean }) {
   if (info.status === "queued" || info.status === "running") {
     const step =
       info.status === "queued"
-        ? "waiting for another run to finish"
-        : (info.progress ?? "analysing").toLowerCase();
-    // With a report on screen, a run is a refresh of it.
-    const text = hasReport ? `Refreshing: ${step}` : step.charAt(0).toUpperCase() + step.slice(1);
+        ? "Waiting for another run to finish"
+        : (info.progress ?? "Analysing");
+    // With a report on screen, a run is a refresh of it. Steps name repos and
+    // products ("Reading PRs from GitHub"), so only a plain first word is lowered.
+    const text = hasReport
+      ? `Refreshing: ${/^[A-Z][a-z]/.test(step) ? step.charAt(0).toLowerCase() + step.slice(1) : step}`
+      : step;
     return (
       <p className="text-muted" role="status">
         {text}…

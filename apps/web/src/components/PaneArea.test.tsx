@@ -10,7 +10,7 @@ import type { ChangeReport, Hunk, Stack, StackPr, StackSummary } from "@strata/c
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { PaneArea } from "./PaneArea";
+import { PaneArea, type RunView } from "./PaneArea";
 
 const adding = (path: string, ...lines: string[]) =>
   `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join("\n")}\n`;
@@ -101,7 +101,11 @@ const stack: Stack = {
   notes: ["The whole-stack diff covers #1 only."],
 };
 
-function mount(report: ChangeReport, summary: StackSummary | null = null) {
+function mount(
+  report: ChangeReport,
+  summary: StackSummary | null = null,
+  run: RunView | null = null,
+) {
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -112,7 +116,7 @@ function mount(report: ChangeReport, summary: StackSummary | null = null) {
         summary={summary}
         scope={null}
         onScope={() => {}}
-        run={null}
+        run={run}
         pickingPath={null}
         pickError={null}
       />,
@@ -141,6 +145,35 @@ describe("PaneArea", () => {
     expect(page.textContent).toContain("app/models/account.py");
     expect(page.textContent).not.toContain("Layers by PR");
     expect(page.textContent).not.toContain("How it arrived");
+  });
+
+  it("keeps a run step's names as they are while refreshing", () => {
+    const running = (progress: string): RunView => ({
+      info: {
+        id: "run_1",
+        status: "running",
+        progress,
+        error: null,
+        queuedAt: "2026-10-02T00:00:00.000Z",
+        startedAt: "2026-10-02T00:00:00.000Z",
+        finishedAt: null,
+      },
+      loading: false,
+      onRunAgain: () => {},
+      rerunning: false,
+    });
+    const status = (progress: string) => {
+      const page = mount(range, null, running(progress));
+      const text = page.querySelector("[role=status]")?.textContent;
+      act(() => root?.unmount());
+      return text;
+    };
+    expect(status("Reading PRs from GitHub: 350 so far")).toBe(
+      "Refreshing: reading PRs from GitHub: 350 so far…",
+    );
+    expect(status("Cloning GlyphicAI/app into Strata's cache")).toBe(
+      "Refreshing: cloning GlyphicAI/app into Strata's cache…",
+    );
   });
 
   it("shows the stack's notes before the report's", () => {

@@ -12,6 +12,7 @@ import { Navigator } from "../components/Navigator";
 import { PaneArea, type RunView } from "../components/PaneArea";
 import { TopBar } from "../components/TopBar";
 import { api } from "../lib/api";
+import { useLatestRequest } from "../lib/latest-request";
 
 /**
  * The review workspace: every kind of context side by side, with chat beside
@@ -49,11 +50,15 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       return status === "queued" || status === "running" ? 1000 : false;
     },
   });
+  const request = useLatestRequest();
   const pickPath = useMutation({
     mutationFn: (tip: number) => {
       const stack = detail.data?.report?.stack;
       if (!stack) throw new Error("No stack to pick from.");
-      return api.createChange({ input: `${stack.repo}#${stack.root}`, leaf: tip });
+      return api.createChange(
+        { input: `${stack.repo}#${stack.root}`, leaf: tip },
+        { signal: request.next() },
+      );
     },
     onSuccess: (next) => {
       queryClient.setQueryData(["change", next.change.id], next);

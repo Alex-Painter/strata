@@ -6,6 +6,7 @@ import { TopBar } from "../components/TopBar";
 import { api } from "../lib/api";
 import { ago } from "../lib/format";
 import { inputHint } from "../lib/input";
+import { useLatestRequest } from "../lib/latest-request";
 
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
@@ -36,10 +37,22 @@ function NewChange() {
   const queryClient = useQueryClient();
   const hint = inputHint(text);
   const [progress, setProgress] = useState<string | null>(null);
+  // Editing the input, a new submit or leaving the page stops the request in
+  // flight, so an abandoned one can't open its Change later.
+  const request = useLatestRequest();
   const create = useMutation({
     mutationFn: (input: string) => {
+      const signal = request.next();
       setProgress(null);
-      return api.createChange({ input }, setProgress);
+      return api.createChange(
+        { input },
+        {
+          onProgress: (step) => {
+            if (!signal.aborted) setProgress(step);
+          },
+          signal,
+        },
+      );
     },
     onSuccess: (detail) => {
       queryClient.setQueryData(["change", detail.change.id], detail);
@@ -63,6 +76,7 @@ function NewChange() {
           value={text}
           onChange={(event) => {
             setText(event.target.value);
+            request.stop();
             create.reset();
           }}
           placeholder="PR URL, owner/repo#123 or owner/repo:branch"
