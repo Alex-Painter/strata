@@ -47,8 +47,10 @@ export function changeRoutes(deps: AppDeps) {
   app.get("/repos/:owner/:name/stacks", async (c) => {
     const repo = `${c.req.param("owner")}/${c.req.param("name")}`;
     const user = c.get("user");
-    const found = await jobs.run(`stacks\0${user.id}\0${repo}`, (onProgress) =>
-      deps.engineFor(user.id).discoverStacks(repo, { onProgress }),
+    const found = await jobs.run(
+      `stacks\0${user.id}\0${repo}`,
+      (onProgress) => deps.engineFor(user.id).discoverStacks(repo, { onProgress }),
+      c.req.raw.signal,
     );
     if (!found.done) return pending(c, found.progress);
     return c.json<StacksResponse>({
@@ -83,12 +85,15 @@ export function changeRoutes(deps: AppDeps) {
     }
 
     const user = c.get("user");
-    const found = await jobs.run(`resolve\0${user.id}\0${JSON.stringify(input)}`, (onProgress) =>
-      deps.engineFor(user.id).resolveChange(input, { onProgress }),
+    const found = await jobs.run(
+      `resolve\0${user.id}\0${JSON.stringify(input)}`,
+      (onProgress) => deps.engineFor(user.id).resolveChange(input, { onProgress }),
+      c.req.raw.signal,
     );
     if (!found.done) return pending(c, found.progress);
     // The client gave up while it waited, maybe to ask for something else, so
-    // it neither gets nor runs this Change. Nobody reads the answer.
+    // it neither gets nor runs this Change; the job keeps the result in case it
+    // asks again. Nobody reads the answer.
     if (c.req.raw.signal.aborted) return new Response(null, { status: 499 });
     const resolved = found.value;
     const path = resolved.stack?.selectedPath ?? [];

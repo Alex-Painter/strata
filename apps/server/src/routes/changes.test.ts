@@ -173,7 +173,18 @@ describe("a slow first read of a repo", () => {
 
   it("creates no Change for a client that gave up waiting", async () => {
     const { wrap, open } = held();
-    const { app, db } = setup({ wrap });
+    let resolves = 0;
+    const counted = (engine: Engine): Engine => {
+      const inner = wrap(engine);
+      return {
+        ...inner,
+        resolveChange(input, options) {
+          resolves++;
+          return inner.resolveChange(input, options);
+        },
+      };
+    };
+    const { app, db, post } = setup({ wrap: counted });
     const controller = new AbortController();
     const answer = app.request("/api/changes", {
       method: "POST",
@@ -187,6 +198,10 @@ describe("a slow first read of a repo", () => {
     expect((await answer).status).toBe(499);
     expect(db.select().from(changesTable).all()).toEqual([]);
     expect(db.select().from(runsTable).all()).toEqual([]);
+
+    // Asking again takes the result the first request left, without reading again.
+    expect((await post("/api/changes", { input: "acme/app#2" })).status).toBe(201);
+    expect(resolves).toBe(1);
   });
 });
 

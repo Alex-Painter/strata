@@ -21,9 +21,14 @@ export class Jobs {
     private readonly keepMs = 5 * 60_000,
   ) {}
 
+  /**
+   * `signal` is the caller's request: a result it can no longer take is kept
+   * for the next caller rather than collected.
+   */
   async run<T>(
     key: string,
     work: (onProgress: (step: string) => void) => Promise<T>,
+    signal?: AbortSignal,
   ): Promise<JobState<T>> {
     const job = (this.jobs.get(key) as Job<T> | undefined) ?? this.start(key, work);
     let timer: NodeJS.Timeout | undefined;
@@ -37,7 +42,7 @@ export class Jobs {
     const first = await Promise.race([settled, waited]);
     clearTimeout(timer);
     if (first === "waiting") return { done: false, progress: job.progress };
-    this.forget(key, job);
+    if (!signal?.aborted) this.forget(key, job);
     // Throws when the work failed, so the route reports it.
     return { done: true, value: await job.promise };
   }

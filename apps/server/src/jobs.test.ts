@@ -48,6 +48,23 @@ describe("Jobs", () => {
     await expect(jobs.run("k", () => work.promise)).rejects.toThrow("GitHub has no repo");
   });
 
+  it("keeps a result for the next caller when the one waiting went away", async () => {
+    const jobs = new Jobs(50);
+    const work = gate<string>();
+    let started = 0;
+    const start = () => {
+      started++;
+      return work.promise;
+    };
+    const left = new AbortController();
+    const waiting = jobs.run("k", start, left.signal);
+    left.abort();
+    work.open("stacks");
+    expect(await waiting).toEqual({ done: true, value: "stacks" });
+    expect(await jobs.run("k", start)).toEqual({ done: true, value: "stacks" });
+    expect(started).toBe(1);
+  });
+
   it("keeps jobs with different keys apart", async () => {
     const jobs = new Jobs(10);
     const slow = gate<string>();
