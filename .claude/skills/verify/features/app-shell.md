@@ -1,12 +1,12 @@
 # App shell and navigation
 
-Once signed in, the user lands on the home page: a top bar with the Strata home link, their login and Sign out, then "Review a stack", "Browse a repo's stacks" and the list of their Changes. Opening `/changes/<id>` shows the review workspace: the stack map as a rail on the left, panes in the centre, chat on the right. Unknown client routes show "Page not found." The server serves the same app shell for every client route, and serves fingerprinted assets with long-lived caching. What the home page and the workspace do with real stacks is in [stacks.md](./stacks.md).
+Once signed in, the user lands on the home page. Every page shares one frame: a sidebar with the Strata home link at the top and their login, a theme switch and Sign out at the bottom, and one card with a 44 px top bar (a breadcrumb) holding the page. The home page has "Review a stack", "Browse a repo's stacks" and the list of their Changes; its sidebar lists the repos they've reviewed. Opening `/changes/<id>` shows the review workspace: layers and pull requests in the sidebar, the canvas in the centre, details on the right. Unknown client routes show "Page not found." The server serves the same app shell for every client route, and serves fingerprinted assets with long-lived caching. What the home page and the workspace do with real stacks is in [stacks.md](./stacks.md).
 
 ## Sub-features
 
 - `changes-empty` is the home page with no Changes yet.
 - `workspace-missing` is the workspace at `/changes/<id>` for an id that doesn't exist.
-- `home-link` is the `Strata` link in the top bar, which goes back to `/`.
+- `home-link` is the `Strata` link at the top of the sidebar, which goes back to `/`.
 - `not-found` is the client-side "Page not found." for unknown routes.
 - `shell-caching` covers the shell's `no-cache` and the assets' `immutable` caching, plus the security headers.
 
@@ -14,7 +14,7 @@ Once signed in, the user lands on the home page: a top bar with the Strata home 
 
 - Open Strata at `/` while signed in.
 - Open a link or type the URL `/changes/<id>`.
-- Choose `Strata` in the top bar from any page.
+- Choose `Strata` at the top of the sidebar from any page.
 - Type any other path, for example `/nope`.
 
 ## Driving it with strata-verify
@@ -23,8 +23,8 @@ Preconditions:
 
 - One instance from `strata-verify up` (bypass mode), passing `doctor`. `$B` stands for its RUN_ID and `URL` for its URL.
 
-- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Review a stack"` with `textbox "PR or branch"` and a disabled `button "Review"`, `heading "Browse a repo's stacks"` with `textbox "Repository"`, and `heading "Changes"` with the text `No Changes yet. Give Strata a PR above, or pick a stack from a repo.` Also `link "Strata"`, the text `verify-bot` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
-- **Missing Change.** `navigate` to `URL/changes/abc`. The page shows `Not found.` under a top bar titled `Change`.
+- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Review a stack"` with `textbox "PR or branch"` and a disabled `button "Review"`, `heading "Browse a repo's stacks"` with `textbox "Repository"`, and `heading "Changes"` with the text `No Changes yet. Give Strata a PR above, or pick a stack from a repo.` Also `link "Strata"`, the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
+- **Missing Change.** `navigate` to `URL/changes/abc`. The page shows `Not found.` under a breadcrumb `Changes › Change`.
 - **Home link.** From that page, `find` "Strata" (the link) and click it. The URL becomes `URL/` and `heading "Review a stack"` appears, with no full page reload needed.
 - **Not found.** `navigate` to `URL/nope`. The page shows `Page not found.`
 - **Server side of routing.** `strata-verify http $B app-shell/deep-link GET /changes/abc` returns `200`, `cache-control: no-cache` and a body containing `<title>Strata</title>`.

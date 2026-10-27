@@ -105,7 +105,7 @@ Stable handles in this app:
 - The link `Strata` (top bar home), the button `Sign out`, and the signed-in login as text in the top bar.
 - On the home page: `textbox "PR or branch"`, `button "Review"`, `textbox "Repository"`, `button "Show stacks"` and the heading `Changes`.
 - On `/repos/<owner>/<name>`: one `article "Stack from #<n>"` per stack.
-- In the workspace: the landmarks `navigation "Change"`, `main` and `complementary "Chat"`; `button "Whole stack"`; `list "Stack map"`, whose rows carry `data-pr`, a `link "#<n>"` to GitHub and a `button "Show #<n> <title>"`.
+- In the workspace: the landmarks `navigation "Change"`, `main` and `complementary "Details"` (the side panel, toggled by `button "Side panel"` or `\`); in the sidebar `button "Whole stack"`, one button per layer with `data-layer` and its file count, and `list "Pull requests"`, whose rows carry `data-pr` and a `button "Show #<n> <title>"`; in the view bar `button "Display"`; `button "Command menu"` (⌘K) and `button "Keyboard shortcuts"` (`?`). Canvas stops for J and K carry `data-nav` (`file:<path>`, `hunk:<id>`, `claim:<text>`); the selected one has `aria-current="true"` or `aria-pressed="true"`.
 
 There is no Playwright or headless Chrome in this repo. Don't add one just to verify.
 
