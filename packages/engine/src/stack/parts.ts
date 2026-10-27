@@ -194,7 +194,13 @@ async function compareWithGitHub(
     same,
     onlyOnGitHub: [...theirPaths].filter((path) => !ourPaths.has(path)),
     onlyHere: [...ourPaths].filter((path) => !theirPaths.has(path)),
-    reason: same ? null : differsBecause(stack, node, edge, part),
+    reason: same
+      ? null
+      : differsBecause(stack, node, edge, part, {
+          // GitHub's diff starts below where the PR's own changes start, so it
+          // repeats commits the PR sits on.
+          repeats: base !== anchor && (await mergeBase(gitDir, base, anchor)) === base,
+        }),
     evidence,
   };
 }
@@ -216,6 +222,7 @@ function differsBecause(
   node: StackNode,
   edge: StackEdge | null,
   part: Omit<PrPart, "github" | "provenance" | "summary">,
+  { repeats }: { repeats: boolean },
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;
@@ -227,15 +234,14 @@ function differsBecause(
   const parent = edge ? stack.nodes.find((other) => other.pr.number === edge.parent) : undefined;
   const p = parent ? `#${parent.pr.number}` : null;
   const link = edge?.link;
-  // Retargeted after its parent landed as a new commit, so GitHub diffs it from
-  // the trunk, which doesn't hold the parent's commits it sits on.
-  if (
-    edge?.via === "retarget" &&
-    parent?.pr.state === "merged" &&
-    (link === "intact" || link === "behind" || link === "stale")
-  ) {
-    const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
-    return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+  // Retargeted to a branch that doesn't hold the parent's commits it sits on,
+  // such as the trunk after the parent landed as a new commit.
+  if (edge?.via === "retarget" && repeats && (link === "intact" || link === "behind")) {
+    if (parent?.pr.state === "merged") {
+      const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
+      return `${p} landed on ${parent.pr.baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+    }
+    return `${n} was retargeted to ${baseRef}, which doesn't have ${p}'s commits, so GitHub's diff of ${n} repeats the ones it sits on.`;
   }
   switch (link) {
     case "behind":
@@ -246,12 +252,22 @@ function differsBecause(
       return `${p} was force-pushed after ${n} branched from it, so GitHub's diff of ${n} repeats the old ${p} commits it sits on, and Strata's starts at ${p}'s head now.`;
     case "re-anchored":
       if (node.pr.baseRef === edge?.ref) {
-        // It still targets the parent's branch, but sits on the trunk.
-        return `${n} was rebased onto ${stack.trunk.name}${open ? "" : ` before it ${ended}`} but still targets ${baseRef}, so GitHub's diff of ${n} repeats the changes below it.`;
+        // It still targets the parent's branch, but sits somewhere else.
+        const moved = `${n} ${open ? "no longer sits" : "didn't sit"} on ${p}'s head but ${open ? "still targets" : "targeted"} ${baseRef}`;
+        return repeats
+          ? `${moved}, so GitHub's diff of ${n} starts further back and repeats the commits up to where its own changes start.`
+          : `${moved}, so GitHub diffs it from where it meets ${baseRef}, and Strata from the stack below it.`;
       }
       return `${n} ${open ? "now sits" : "sat"} on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
-    case "merged-into-parent":
+    case "merged-into-parent": {
+      const late = stack.issues.some(
+        (issue) => issue.kind === "base-already-merged" && issue.prs[0] === node.pr.number,
+      );
+      if (late) {
+        return `${n} was merged into ${baseRef} after ${p} landed, so GitHub diffs it from ${baseRef} as it was then, and Strata from ${p}'s head.`;
+      }
       return `${n} was merged into ${baseRef}, so its changes are in ${p}'s diff here, and GitHub's diff of ${n} shows them as its own.`;
+    }
   }
   if (part.how === "replayed") {
     return `A PR below ${n} was replayed onto newer code, so Strata diffs ${n} from that, and GitHub from ${baseRef}.`;

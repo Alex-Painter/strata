@@ -314,8 +314,125 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#2 was rebased onto main before it merged but still targets b1, " +
-          "so GitHub's diff of #2 repeats the changes below it.",
+          "#2 didn't sit on #1's head but targeted b1, so GitHub's diff of #2 starts " +
+          "further back and repeats the commits up to where its own changes start.",
+      });
+    });
+
+    it("for a PR retargeted away from a parent that was closed", async () => {
+      await remote.write("b1", { "a.txt": lines("one") }, "main");
+      const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const h1 = await remote.tip("b1");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, { state: "CLOSED", closedAt: ghTime(30) }),
+        prNode(2, h2, { timelineItems: timeline(retargeted("b1", "main", 30)) }),
+      ]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link, e.via])).toEqual([
+        [2, "intact", "retarget"],
+      ]);
+      expect(report.parts[1]?.github).toMatchObject({
+        same: false,
+        onlyOnGitHub: ["a.txt"],
+        reason:
+          "#2 was retargeted to main, which doesn't have #1's commits, " +
+          "so GitHub's diff of #2 repeats the ones it sits on.",
+      });
+    });
+
+    const ten = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const withLine = (i: number, value: string) => ten.map((x, j) => (j === i ? value : x));
+
+    it("for a retargeted PR behind a parent that landed with a merge commit", async () => {
+      // The trunk holds #1's commits, so GitHub's diff of #2 repeats nothing.
+      const m0 = await remote.tip("main");
+      const h1a = await remote.write("b1", { "a.txt": lines(...ten) }, "main");
+      const h2 = await remote.write("b2", { "a.txt": lines(...withLine(8, "nine")) }, "b1");
+      const h1 = await remote.write("b1", { "a.txt": lines(...withLine(6, "seven")) });
+      const mp = await remote.mergeCommit("b1", "main");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, merged(30, mp, m0)),
+        prNode(2, h2, { timelineItems: timeline(retargeted("b1", "main", 30)) }),
+      ]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link, e.via])).toEqual([
+        [2, "behind", "retarget"],
+      ]);
+      expect(report.parts[1]?.github).toMatchObject({
+        base: h1a,
+        same: false,
+        reason:
+          "#2 is behind #1, so GitHub diffs it from where it left #1, " +
+          "and Strata from #1's head now.",
+      });
+    });
+
+    it("for a PR that moved off its open parent but still targets its branch", async () => {
+      await remote.write("main", { "a.txt": lines(...ten) });
+      const m0 = await remote.tip("main");
+      const h1 = await remote.write("b1", { "a.txt": lines(...withLine(4, "five")) }, "main");
+      await remote.write("b2", { "b.txt": lines("x") }, "b1");
+      await remote.rebase("b2", m0, h1);
+      const h2 = await remote.write("b2", { "a.txt": lines(...withLine(7, "eight")) });
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      const github = fakeGitHub("acme/app", [prNode(1, h1), prNode(2, h2, { baseRefName: "b1" })]);
+      const report = await analyze(github, "acme/app#2");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link, e.via])).toEqual([
+        [2, "re-anchored", "base-ref"],
+      ]);
+      expect(report.parts[1]?.github).toMatchObject({
+        base: m0,
+        same: false,
+        reason:
+          "#2 no longer sits on #1's head but still targets b1, so GitHub diffs it " +
+          "from where it meets b1, and Strata from the stack below it.",
+      });
+    });
+
+    it("for a PR merged into its parent's branch after the parent landed", async () => {
+      const m0 = await remote.tip("main");
+      const h1a = await remote.write("b1", { "a.txt": lines(...ten) }, "main");
+      const h2 = await remote.write("b2", { "b.txt": lines("two") }, "b1");
+      const h3 = await remote.write("b3", { "a.txt": lines(...withLine(8, "nine")) }, "b2");
+      const h1 = await remote.write("b1", { "a.txt": lines(...withLine(6, "seven")) });
+      const s1 = await remote.squashMerge("b1", "main");
+      const s2 = await remote.land("b2", h1a, "main");
+      const mm = await remote.mergeCommit("b3", "b2");
+      await remote.holdPr(1, h1);
+      await remote.holdPr(2, h2);
+      await remote.holdPr(3, h3);
+      const github = fakeGitHub("acme/app", [
+        prNode(1, h1, merged(30, s1, m0)),
+        prNode(2, h2, {
+          ...merged(31, s2, s1),
+          timelineItems: timeline(retargeted("b1", "main", 30)),
+        }),
+        prNode(3, h3, { baseRefName: "b2", ...merged(40, mm, h2) }),
+      ]);
+      const report = await analyze(github, "acme/app#3");
+
+      expect(report.stack?.edges.map((e) => [e.child, e.link])).toEqual([
+        [2, "behind"],
+        [3, "merged-into-parent"],
+      ]);
+      expect(report.stack?.issues.map((issue) => [issue.kind, issue.prs])).toContainEqual([
+        "base-already-merged",
+        [3, 2],
+      ]);
+      expect(report.parts[2]?.github).toMatchObject({
+        base: h2,
+        same: false,
+        reason:
+          "#3 was merged into b2 after #2 landed, so GitHub diffs it from b2 as it " +
+          "was then, and Strata from #2's head.",
       });
     });
   });
