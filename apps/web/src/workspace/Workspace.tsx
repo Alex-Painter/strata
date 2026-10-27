@@ -77,15 +77,17 @@ export function Workspace({
     [onNav, layer, pr],
   );
   const scope = useCallback((to: number | null) => go({ pr: to }), [go]);
-  /** Shows a file or hunk in its layer and selects it. */
+  /** Shows a file or hunk in its layer, in this scope or another PR's, and selects it. */
   const reveal = useCallback(
-    (target: Selection) => {
-      if (!diff || !target || target.kind === "claim") return setSelection(target);
-      const path = target.kind === "file" ? target.path : diff.byId.get(target.id)?.path;
-      const file = path ? diff.byPath.get(path) : undefined;
-      if (file) go({ layer: file.layer.layer }, target);
+    (target: Selection, to: number | null = pr) => {
+      if (!report || !diff || !target || target.kind === "claim") return setSelection(target);
+      const where =
+        to === pr ? diff : scopedDiff(report, report.parts.find((p) => p.pr === to) ?? null);
+      const path = target.kind === "file" ? target.path : where.byId.get(target.id)?.path;
+      const file = path ? where.byPath.get(path) : undefined;
+      if (file) go({ layer: file.layer.layer, pr: to }, target);
     },
-    [diff, go],
+    [report, diff, pr, go],
   );
 
   // Keep the selection in view, wherever it was chosen from.
@@ -273,7 +275,7 @@ export function Workspace({
       selected: selection?.kind === "claim" ? selection.claim : null,
       onClaim: (claim: Claim) =>
         setSelection({ kind: "claim", claim, by: claimSource(report, claim) }),
-      onFile: (path: string) => reveal({ kind: "file", path }),
+      onFile: (path: string, to?: number | null) => reveal({ kind: "file", path }, to),
       onLayer: (to: LayerId) => go({ layer: to }),
       onScope: scope,
       matrix: display.matrix && pr === null,

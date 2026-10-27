@@ -5,7 +5,7 @@ import {
   REPORT_SCHEMA_VERSION,
   ruleGuide,
 } from "@strata/core";
-import type { ChangeReport, Hunk, Stack, StackPr } from "@strata/core/model";
+import type { ChangeReport, Hunk, PrPart, Stack, StackPr } from "@strata/core/model";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -223,6 +223,32 @@ describe("Workspace", () => {
     expect(page.querySelector(".vbar")?.textContent).toContain("Only #1");
     press("Escape");
     expect(page.textContent).not.toContain("How it arrived");
+  });
+
+  it("opens a matrix cell's file in that PR's scope and layer", () => {
+    const part: PrPart = {
+      pr: 1,
+      how: "direct",
+      from: base,
+      to: head,
+      files: whole.files,
+      hunks: whole.hunks,
+      github: null,
+      provenance: null,
+      summary: [],
+    };
+    const report = { ...range, change: { ...range.change, hints: [] }, stack, parts: [part] };
+    const page = mount(report);
+    press("m");
+    act(() =>
+      (page.querySelector('button[aria-label^="Data model in #1"]') as HTMLButtonElement).click(),
+    );
+    act(() =>
+      (page.querySelector('section[aria-label="Data model in #1"] a') as HTMLAnchorElement).click(),
+    );
+    expect(page.querySelector(".vbar h2")?.textContent).toBe("Data model");
+    expect(page.querySelector(".vbar")?.textContent).toContain("Only #1");
+    expect(panel(page)?.querySelector("h2")?.textContent).toBe("app/models/account.py");
   });
 
   it("shows a layer's files and hunks, and the details of what J selects", () => {

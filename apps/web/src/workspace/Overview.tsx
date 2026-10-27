@@ -48,8 +48,8 @@ export interface OverviewProps {
   diff: ScopedDiff;
   selected: Claim | null;
   onClaim: (claim: Claim) => void;
-  /** Opens a file in its layer. */
-  onFile: (path: string) => void;
+  /** Opens a file in its layer, in another PR's scope when given one (null for the whole stack). */
+  onFile: (path: string, pr?: number | null) => void;
   onLayer: (layer: LayerId) => void;
   onScope: (pr: number | null) => void;
   matrix: boolean;
@@ -158,10 +158,7 @@ export function StackOverview({
             <LayerMatrixView
               matrix={matrix}
               titles={titles}
-              onOpen={(pr, file) => {
-                if (pr !== null) props.onScope(pr);
-                props.onFile(file);
-              }}
+              onOpen={(pr, file) => props.onFile(file, pr)}
             />
           )}
           <WholeSummary {...props} of="stack" />
