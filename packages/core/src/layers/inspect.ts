@@ -207,7 +207,8 @@ export const DEFAULT_INSPECT_RULES: InspectRule[] = [
       "clean up",
       "prune*",
       "pruning",
-      "*archiv*",
+      // Only in the file's name: an archive/ folder holds old code, not code that archives.
+      "file:*archiv*",
       "*backup*",
       "back up",
       "restor*",
@@ -229,9 +230,13 @@ const CATALOGS = [
 /** Layers whose files are never flagged: a test or a doc can't break access or lose data. */
 const UNFLAGGED: ReadonlySet<LayerId> = new Set(["tests", "docs"]);
 
-type Entry =
-  | { kind: "word" | "prefix" | "infix" | "file" | "name"; text: string }
-  | { kind: "words"; words: string[] };
+type Entry = (
+  | { kind: "word" | "prefix" | "infix" | "name"; text: string }
+  | { kind: "words"; words: string[] }
+) & {
+  /** Found in the file's own name only, never a folder's. */
+  fileOnly: boolean;
+};
 
 /**
  * Reads one of a rule's words:
@@ -239,19 +244,20 @@ type Entry =
  * - `permission*`: a word that starts with it.
  * - `*password*`: a word that has it anywhere, as `resetpassword` does.
  * - `sign in`: those words next to each other in one name.
- * - `file:role`: that word in the file's own name only.
+ * - `file:` before any of those: in the file's own name only, as `file:role`.
  * - `name:policy`: a folder, or a file before its extension, named just that.
  */
 export function parseInspectWord(entry: string): Entry {
-  if (!/^((name:|file:)?[a-z0-9]+(\*|( [a-z0-9]+)*)|\*[a-z0-9]+\*)$/.test(entry)) {
+  if (!/^(name:[a-z0-9]+|(file:)?([a-z0-9]+(\*|( [a-z0-9]+)*)|\*[a-z0-9]+\*))$/.test(entry)) {
     throw new Error(`Can't read the inspect word "${entry}".`);
   }
-  if (entry.startsWith("name:")) return { kind: "name", text: entry.slice(5) };
-  if (entry.startsWith("file:")) return { kind: "file", text: entry.slice(5) };
-  if (entry.includes(" ")) return { kind: "words", words: entry.split(" ") };
-  if (entry.startsWith("*")) return { kind: "infix", text: entry.slice(1, -1) };
-  if (entry.endsWith("*")) return { kind: "prefix", text: entry.slice(0, -1) };
-  return { kind: "word", text: entry };
+  if (entry.startsWith("name:")) return { kind: "name", text: entry.slice(5), fileOnly: false };
+  const fileOnly = entry.startsWith("file:");
+  const word = fileOnly ? entry.slice(5) : entry;
+  if (word.includes(" ")) return { kind: "words", words: word.split(" "), fileOnly };
+  if (word.startsWith("*")) return { kind: "infix", text: word.slice(1, -1), fileOnly };
+  if (word.endsWith("*")) return { kind: "prefix", text: word.slice(0, -1), fileOnly };
+  return { kind: "word", text: word, fileOnly };
 }
 
 /** The words in a folder or file name, lower case. A plural acronym like ACLs is one word, acl. */
@@ -290,12 +296,11 @@ function names(path: string): Name[] {
 
 /** What the entry found in the name, said plainly, or null. A word in `except` is never found alone. */
 function find(entry: Entry, name: Name, except: ReadonlySet<string>): string | null {
+  if (entry.fileOnly && name.folder) return null;
   const words = name.words.filter((word) => !except.has(word));
   switch (entry.kind) {
     case "word":
       return words.includes(entry.text) ? `the word "${entry.text}"` : null;
-    case "file":
-      return !name.folder && words.includes(entry.text) ? `the word "${entry.text}"` : null;
     case "prefix":
       return words.some((word) => word.startsWith(entry.text))
         ? `a word starting "${entry.text}"`

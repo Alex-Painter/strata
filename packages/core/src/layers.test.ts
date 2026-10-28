@@ -191,6 +191,8 @@ const INSPECT_CASES: [path: string, rules: string[]][] = [
   ["app/backups/run.sh", ["deletion"]],
   ["bin/anonymize_users", ["deletion"]],
   ["app/models/concerns/softdelete.rb", ["deletion"]],
+  ["app/services/call_archiver.py", ["deletion"]],
+  ["src/Unarchive.tsx", ["deletion"]],
   ["app/dataretention.py", ["deletion"]],
   ["app/services/forget_user.py", ["deletion"]],
   ["app/rtbf/handler.py", ["deletion"]],
@@ -225,6 +227,8 @@ const INSPECT_CASES: [path: string, rules: string[]][] = [
   ["app/lieutenant.py", []],
   ["app/logging/loginfo.py", []],
   ["app/logoutput.py", []],
+  // An archive/ folder holds old code, not code that archives.
+  ["scripts/archive/send_weekly_report.py", []],
   // Translation catalogs are words about logins and deletion, not code.
   ["config/locales/devise.en.yml", []],
   ["src/locales/en/auth.json", []],
@@ -244,8 +248,18 @@ describe("inspect rules", () => {
     expect(() => parseInspectWord("Login")).toThrow();
     expect(() => parseInspectWord("sign*in")).toThrow();
     expect(() => parseInspectWord("*sign in*")).toThrow();
-    expect(() => parseInspectWord("file:*role*")).toThrow();
-    expect(parseInspectWord("*password*")).toEqual({ kind: "infix", text: "password" });
+    expect(() => parseInspectWord("name:polic*")).toThrow();
+    expect(() => parseInspectWord("file:name:role")).toThrow();
+    expect(parseInspectWord("*password*")).toEqual({
+      kind: "infix",
+      text: "password",
+      fileOnly: false,
+    });
+    expect(parseInspectWord("file:*archiv*")).toEqual({
+      kind: "infix",
+      text: "archiv",
+      fileOnly: true,
+    });
   });
 
   it("split names into words at punctuation, case changes and digits", () => {
@@ -326,6 +340,13 @@ describe("inspect rules", () => {
     expect(
       inspect({ path: "app/auth/users.py", oldPath: "app/auth/tokens.py" }, "logic")[0]?.reason,
     ).toBe('Access and permissions: the word "auth" in auth/');
+  });
+
+  it("only count archiving in a file's own name, not a folder of old code", () => {
+    expect(inspect({ path: "scripts/archive/2023/backfill.py" }, "logic")).toEqual([]);
+    expect(inspect({ path: "scripts/archive/archive_calls.py" }, "logic")[0]?.reason).toBe(
+      'Deletion and retention: a word starting "archiv" in archive_calls.py',
+    );
   });
 
   it("only count roles in a file's own name, not a folder of server roles", () => {

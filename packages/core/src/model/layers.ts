@@ -123,8 +123,8 @@ export interface InspectRule {
   /**
    * Words looked for in the path's folder and file names, ignoring case:
    * `login`, `permission*` (a word starting so), `*password*` (a word with it
-   * anywhere), `sign in` (words in a row), `file:role` (in the file's name
-   * only), `name:policy` (a whole name).
+   * anywhere), `sign in` (words in a row), `file:role` or `file:*archiv*` (in
+   * the file's name only), `name:policy` (a whole name).
    */
   words: string[];
   /** Words that never count on their own, though a word above would find them: `author` for `auth*`. */
