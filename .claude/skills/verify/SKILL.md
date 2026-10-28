@@ -53,7 +53,7 @@ Where Claude's answers come from (`--claude`, with `--github fixture` only):
 ## Launch
 
 ```bash
-$V up                 # bypass mode; or: $V up --mode oauth, $V up --github fixture [--claude fixture]
+$V up                 # bypass mode; or: $V up --mode oauth, $V up --github fixture [--claude fixture] [--assigned acme/app]
 # RUN_ID=20261025-091902-bypass-24552
 # URL=http://localhost:8790
 # MODE=bypass

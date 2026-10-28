@@ -41,5 +41,6 @@ Keep implementation detail out. Name only user paths, stable handles, required s
 - [Sign-in](./sign-in.md) covers the signed-out screen, the GitHub redirect, auth error messages, the dev bypass and sign-out.
 - [App shell and navigation](./app-shell.md) covers the home page, client-side routes, not-found pages and caching.
 - [Stacks](./stacks.md) covers finding a stack from a PR or branch, a repo's stack list, the stack map, the PR pane, the path picker and the stack and Changes API.
+- [Assigned Changes](./assigned.md) covers the search for PRs assigned to you, "Waiting on you" on the home page, Refresh and the `yours` marker.
 - [API surface](./api-surface.md) covers `/healthz`, `/api/me`, the milestone-1 routes that still answer 501, auth gating and the CSRF check.
 - [CLI](./cli.md) covers `strata --help`, usage errors, input validation and the `analyze` stub.

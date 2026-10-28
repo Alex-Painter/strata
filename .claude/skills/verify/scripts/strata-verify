@@ -51,7 +51,7 @@ free_port() {
 }
 
 cmd_up() {
-  local mode="bypass" port="" github="none" claude="none" checkouts=""
+  local mode="bypass" port="" github="none" claude="none" checkouts="" assigned=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --mode) mode="$2"; shift 2 ;;
@@ -59,6 +59,7 @@ cmd_up() {
       --github) github="$2"; shift 2 ;;
       --claude) claude="$2"; shift 2 ;;
       --checkouts) checkouts="$2"; shift 2 ;;
+      --assigned) assigned="$2"; shift 2 ;;
       *) die "up: unknown option $1" ;;
     esac
   done
@@ -104,6 +105,8 @@ cmd_up() {
   # Where GitHub data comes from. The token only ever lives in the server's env.
   local github_env=()
   [ -n "$checkouts" ] && github_env+=("STRATA_CHECKOUTS=$checkouts")
+  # The assignment search is off unless asked for, so other recipes see a quiet home page.
+  github_env+=("STRATA_ASSIGNED_REPOS=$assigned")
   if [ "$github" = fixture ]; then
     # A stand-in GitHub serving the demo repo acme/app, with its git repo on disk.
     (
