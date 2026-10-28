@@ -31,6 +31,8 @@ export interface FakeGitHub extends GitHubPort {
 
 export interface FakeRequests {
   assignees?: string[];
+  /** Who has reviewed it. */
+  reviewedBy?: string[];
   reviewers?: string[];
   teams?: { slug: string; members: string[] }[];
 }
@@ -122,6 +124,7 @@ function search(
     if (terms.includes("is:open") && pr.state !== "OPEN") return false;
     if (terms.includes(`-author:${me}`) && pr.author?.login.toLowerCase() === me) return false;
     if (terms.includes(`assignee:${me}`) && !has(asks.assignees)) return false;
+    if (terms.includes(`reviewed-by:${me}`) && !has(asks.reviewedBy)) return false;
     if (
       terms.includes(`review-requested:${me}`) &&
       !has(asks.reviewers) &&

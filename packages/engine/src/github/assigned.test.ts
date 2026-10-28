@@ -5,7 +5,7 @@ import { findAssigned } from "./assigned.js";
 const oid = (n: number) => String(n).repeat(40).slice(0, 40);
 
 describe("findAssigned", () => {
-  it("finds assigned PRs and review requests, direct or through a team, but not your own", async () => {
+  it("finds assigned, review-requested and reviewed PRs, but not your own", async () => {
     const github = fakeGitHub(
       "acme/app",
       [
@@ -16,6 +16,7 @@ describe("findAssigned", () => {
         prNode(5, oid(5), { author: { login: "Alex" } }),
         prNode(6, oid(6), { state: "MERGED" }),
         prNode(7, oid(7)),
+        prNode(8, oid(8)),
       ],
       { viewer: "alex", pageSize: 2 },
     );
@@ -32,6 +33,7 @@ describe("findAssigned", () => {
       5: { assignees: ["alex"] },
       6: { assignees: ["alex"] },
       7: { assignees: ["sam"], reviewers: ["sam"] },
+      8: { reviewedBy: ["alex", "sam"] },
     };
 
     const found = await findAssigned(github, "acme/app");
@@ -42,6 +44,7 @@ describe("findAssigned", () => {
       [2, [{ kind: "review-requested", direct: true, teams: [] }]],
       [3, [{ kind: "review-requested", direct: false, teams: ["acme/backend", "acme/infra"] }]],
       [4, [{ kind: "assignee" }, { kind: "review-requested", direct: true, teams: [] }]],
+      [8, [{ kind: "reviewed" }]],
     ]);
     expect(found.prs[0]).toMatchObject({ title: "PR 1", headOid: oid(1) });
     const queries = github.calls.map((call) => call.variables.q);
@@ -49,6 +52,7 @@ describe("findAssigned", () => {
       new Set([
         "repo:acme/app is:pr is:open assignee:alex -author:alex",
         "repo:acme/app is:pr is:open review-requested:alex -author:alex",
+        "repo:acme/app is:pr is:open reviewed-by:alex -author:alex",
       ]),
     );
   });

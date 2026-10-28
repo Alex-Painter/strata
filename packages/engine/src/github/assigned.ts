@@ -1,8 +1,9 @@
 /**
  * Open PRs in a repo that GitHub lists for the token's user: assigned to
- * them, or with their review requested directly or through a team they're
- * on. Their own PRs are left out. Two searches, since GitHub's search can't
- * OR the two qualifiers, after asking whose token it is.
+ * them, with their review requested directly or through a team they're on,
+ * or already reviewed by them. Their own PRs are left out. One search per
+ * reason, since GitHub's search can't OR qualifiers, after asking whose
+ * token it is.
  */
 import type { AssignedPr, AssignedPrs, AssignedReason } from "@strata/core";
 import type { PageInfo } from "./graphql.js";
@@ -62,6 +63,7 @@ export interface AssignedPage {
 const QUALIFIERS: Record<AssignedReason["kind"], string> = {
   assignee: "assignee",
   "review-requested": "review-requested",
+  reviewed: "reviewed-by",
 };
 
 export async function findAssigned(port: GitHubPort, repo: string): Promise<AssignedPrs> {
@@ -114,6 +116,7 @@ function toAssignedPr(
       : reviewers.flatMap((r) => (r.__typename === "Team" ? [r.combinedSlug] : [])).sort();
     reasons.push({ kind: "review-requested", direct, teams });
   }
+  if (kinds.has("reviewed")) reasons.push({ kind: "reviewed" });
   return {
     number: node.number,
     title: node.title,

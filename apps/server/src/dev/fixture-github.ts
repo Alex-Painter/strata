@@ -11,8 +11,8 @@
  * Prints `READY <graphql url> <git remote>` once it's listening, and deletes
  * the repo when stopped.
  *
- * It lists #4 and #10 as asking something of the token's user, for the
- * assignment search.
+ * It lists #4 and #10 as asking something of the token's user, and #3 as
+ * reviewed by them, for the assignment search.
  *
  * It also stands in for Claude at POST /v1/messages (fixture-claude.ts): point
  * DEV_ANTHROPIC_BASE_URL at its origin, set any ANTHROPIC_API_KEY, and turn on
@@ -170,10 +170,11 @@ for (const pr of demo.github.prs) {
 }
 
 // What GitHub lists for the verify bot, for the assignment search (strata-verify
-// up --assigned acme/app): #10 in the middle of #9-#11 through a team, and the
-// lone #4 by name.
+// up --assigned acme/app): #10 in the middle of #9-#11 through a team, the
+// lone #4 by name, and #3, which it has reviewed already.
 demo.github.viewer = "verify-bot";
 demo.github.requests = {
+  3: { reviewedBy: ["verify-bot"] },
   4: { assignees: ["verify-bot"] },
   10: { teams: [{ slug: "acme/backend", members: ["verify-bot"] }] },
 };

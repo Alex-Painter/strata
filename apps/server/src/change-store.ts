@@ -104,7 +104,9 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
     status: latestRun(db, row.id)?.status ?? null,
     origin: row.origin,
     yours,
-    waiting: yours.some((pr) => pr.active),
+    waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
+    rootPr: row.rootPr,
+    tipPr: row.tipPr,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

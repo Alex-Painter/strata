@@ -142,6 +142,21 @@ describe("the assignment search", () => {
     expect(runCount()).toBe(2);
   });
 
+  it("makes and runs a Change for a PR you've reviewed, which doesn't wait on you", async () => {
+    demo.github.requests = {
+      4: { reviewedBy: ["alex"] },
+      6: { reviewedBy: ["alex"], assignees: ["alex"] },
+    };
+    const { assigned, list, runCount } = setup();
+    await assigned.search(USER);
+    expect(shape(await list())).toEqual([
+      ["acme/app#4", "assigned", [[4, true]], false],
+      ["acme/app#6", "assigned", [[6, true]], true],
+    ]);
+    expect((await list())[0]?.yours[0]?.reasons).toEqual([{ kind: "reviewed" }]);
+    expect(runCount()).toBe(2);
+  });
+
   it("keeps a Change once GitHub stops listing its PR, no longer waiting", async () => {
     demo.github.requests = { 4: { assignees: ["alex"] } };
     const { assigned, list } = setup();

@@ -115,6 +115,7 @@ export function reasonLabel(reasons: AssignedReason[]): string {
   return reasons
     .map((reason) => {
       if (reason.kind === "assignee") return "assigned";
+      if (reason.kind === "reviewed") return "reviewed by you";
       if (reason.direct || reason.teams.length === 0) return "review requested";
       return `review requested from ${reason.teams.join(", ")}`;
     })

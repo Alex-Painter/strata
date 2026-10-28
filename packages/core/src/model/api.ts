@@ -104,7 +104,7 @@ export interface RunInfo {
 export interface YourPr {
   number: number;
   reasons: AssignedReason[];
-  /** False once GitHub stops listing it: merged, closed, unassigned or reviewed. */
+  /** False once GitHub stops listing it: merged, closed, or no longer yours. */
   active: boolean;
   /** When GitHub last listed it. */
   seenAt: string;
@@ -120,8 +120,14 @@ export interface ChangeSummary {
   origin: "added" | "assigned";
   /** Your PRs on its path, active first, then by number. */
   yours: YourPr[];
-  /** True while GitHub still lists one of its PRs for you. */
+  /**
+   * True while one of its PRs is assigned to you or asks for your review.
+   * A PR you've only reviewed doesn't wait on you.
+   */
   waiting: boolean;
+  /** Its path's bottom and tip PRs, to match it to a stack. */
+  rootPr: number;
+  tipPr: number;
   createdAt: string;
   updatedAt: string;
 }
