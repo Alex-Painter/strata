@@ -17,7 +17,7 @@ import {
   type LayerAssignment,
   type LayerId,
 } from "@strata/core";
-import { cachedAsk, type LlmSettings } from "../llm.js";
+import { cachedAsk, type LlmSettings, STE_RULE } from "../llm.js";
 
 /** One file Claude is asked about, with the start of its change. */
 export interface LayerQuestion {
@@ -51,7 +51,7 @@ const LINE_CHARS = 160;
 const KNOWN_FILES = 200;
 
 /** Bump when the prompt or schema changes, so cached answers aren't reused. */
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 
 /**
  * Asks about every file in the whole-stack diff that only got a guess, and
@@ -102,7 +102,7 @@ export async function judgeLayers(
   if (failures.length > 0) {
     const files = unanswered === 1 ? "1 file" : `${unanswered} files`;
     notes.push(
-      `Strata couldn't ask Claude about ${files}, so their layers are still guesses: ${failures[0]}`,
+      `Strata cannot ask Claude about ${files}. Thus their layers are still guesses. Cause: ${failures[0]}`,
     );
   }
   return { judged, notes };
@@ -132,6 +132,8 @@ const SYSTEM = [
   "Give each a reason in one short sentence a reviewer can check against the path or the lines, such as",
   '"Defines the SQLAlchemy model for invoices" or "A nightly job that rebuilds the cache".',
   'Use "other" only when no layer fits.',
+  "",
+  STE_RULE,
 ].join("\n");
 
 const SCHEMA = {

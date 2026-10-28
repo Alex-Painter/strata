@@ -24,6 +24,23 @@ export function createLlm(config: EngineConfig): LlmSettings | null {
   return { client, model: config.model ?? DEFAULT_MODEL };
 }
 
+/**
+ * Strata writes all user-facing text in ASD-STE100 Simplified Technical
+ * English (see AGENTS.md). Every prompt whose answer a person reads ends with
+ * this, so Claude's text follows the same rules as the rest of the UI.
+ */
+export const STE_RULE = [
+  "Write all text that a person reads in ASD-STE100 Simplified Technical English:",
+  "- Use short sentences: 20 words at most for an instruction, 25 words at most for a description.",
+  "- Give one topic in each sentence, and one instruction in each sentence.",
+  "- Use the active voice and simple tenses (present, simple past, future).",
+  "- Use the imperative for instructions.",
+  "- Use the approved ASD-STE100 words, with their approved meanings. Use one word for one meaning, and one meaning for one word.",
+  '- Do not use phrasal verbs (for example, use "start", not "set up"), or -ing forms that are not technical names.',
+  '- Use "a", "an" and "the" where English permits them. Do not use contractions.',
+  "- Technical names (paths, symbols, product names, code terms) are permitted as they are.",
+].join("\n");
+
 /** A request for JSON that fits a schema. */
 export interface JsonQuestion {
   /** Bump when the prompt or schema changes, so cached answers aren't reused. */
@@ -66,16 +83,16 @@ export function cachedAsk(llm: LlmSettings, cacheDir: string): AskJson {
     if (cached !== null) return cached;
 
     const message = await llm.client.messages.create(body, signal ? { signal } : {});
-    if (message.stop_reason === "refusal") throw new ClaudeError("Claude declined to answer.");
+    if (message.stop_reason === "refusal") throw new ClaudeError("Claude did not answer.");
     if (message.stop_reason === "max_tokens") {
-      throw new ClaudeError("Claude's answer was cut off.");
+      throw new ClaudeError("Claude's answer is not complete.");
     }
     const text = message.content.flatMap((block) => (block.type === "text" ? [block.text] : []));
     let answer: unknown;
     try {
       answer = JSON.parse(text.join(""));
     } catch {
-      throw new ClaudeError("Claude's answer wasn't valid JSON.");
+      throw new ClaudeError("Claude's answer is not valid JSON.");
     }
     await mkdir(cacheDir, { recursive: true });
     // Written whole, then renamed, so a crash never leaves half an answer.

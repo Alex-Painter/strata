@@ -29,7 +29,7 @@ import {
   type SourceRef,
 } from "@strata/core";
 import { runLimited } from "../limit.js";
-import type { AskJson } from "../llm.js";
+import { type AskJson, STE_RULE } from "../llm.js";
 
 export interface Summaries {
   /** About the whole stack, from its diff alone. */
@@ -44,7 +44,7 @@ export interface Summaries {
 }
 
 /** Bump when a prompt or schema changes, so cached answers aren't reused. */
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 /** Characters of hunk text per request. Hunks past it are listed by header only. */
 const HUNK_CHARS = 120_000;
 /** Lines shown per hunk, and characters per line. */
@@ -112,7 +112,7 @@ export async function writeSummaries(
     } catch (error) {
       signal?.throwIfAborted();
       notes.push(
-        `Strata couldn't ask Claude for the summary, so the Guide shows Strata's own groups: ${(error as Error).message}`,
+        `Strata cannot ask Claude for the summary. Thus the Guide shows Strata's own groups. Cause: ${(error as Error).message}`,
       );
     }
   }
@@ -156,7 +156,7 @@ export async function writeSummaries(
   const partNotes: string[] = [];
   if (failures.length > 0) {
     const prs = failures.length === 1 ? "1 PR" : `${failures.length} PRs`;
-    partNotes.push(`Strata couldn't ask Claude to summarise ${prs}: ${failures[0]}`);
+    partNotes.push(`Strata cannot ask Claude to summarise ${prs}. Cause: ${failures[0]}`);
   }
 
   return { summary, guide, parts: byPr, notes, partNotes };
@@ -271,10 +271,12 @@ const WHOLE_SYSTEM = [
   "2. The Guide: Strata's groups arranged into sections, in the order a reviewer should read them.",
   "Put the core of the change first (its data model, contracts and main logic), and glue code, tests, config and mechanical changes last.",
   "Merge groups that are best read together, and give each section a short title saying what it is about,",
-  'such as "Forecast storage" or "Wiring up the new route". A section may have one or two sentences on what it does.',
+  'such as "Forecast storage" or "Connect the new route". A section may have one or two sentences on what it does.',
   "Use each group once at most. Groups you leave out are shown after your sections, as Strata grouped them.",
   "",
   CITING,
+  "",
+  STE_RULE,
 ].join("\n");
 
 const PART_SYSTEM = [
@@ -285,6 +287,8 @@ const PART_SYSTEM = [
   "Say what the code does in plain words. Don't praise it, guess at intent the code doesn't show, or count lines.",
   "",
   CITING,
+  "",
+  STE_RULE,
 ].join("\n");
 
 const CLAIMS_SCHEMA = {
