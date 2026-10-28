@@ -12,7 +12,7 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 - `summaries`: three to six sentences about the whole stack and one to three per PR, each with a button that shows the hunks it rests on in the side panel.
 - `guide`: the whole stack's sections in reading order, each opening to its files, which open in their layer; Claude's when the repo allows it, Strata's groups otherwise.
 - `mermaid`: "Copy as Mermaid" puts the map on the clipboard as a flowchart.
-- `changes-api`: `GET /api/repos/:owner/:name/stacks`, `POST /api/changes`, `GET /api/changes`, `GET /api/changes/:id` and `POST /api/changes/:id/runs`. One Change per path: asking again for any PR on a path returns the same Change. While a repo's first read runs, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}` after 1.5 s; the same request asked again returns the latest step, then the result.
+- `changes-api`: `GET /api/repos/:owner/:name/stacks`, `POST /api/changes`, `GET /api/changes`, `GET /api/changes/:id` and `POST /api/changes/:id/runs`. One Change per path: asking again for any PR on a path returns the same Change. While a repo's first read runs, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}` after 1.5 s; the same request asked again returns the latest step, then the result. The stack list holds only stacks with at least one open PR. It's kept under `<dataDir>/cache/stacks/` and answers at once after the first read, with `readAt`; once it's over 10 minutes old it still answers, with `refreshing: true`, while a new read runs behind it.
 
 ## How to get to it (user POV)
 

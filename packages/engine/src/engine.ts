@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { type ChangeInput, linkedGroups, type PrIndex, type RepoRef } from "@strata/core";
+import type { ChangeInput, PrIndex, RepoRef } from "@strata/core";
 import type { CreateEngine, EngineConfig } from "./api.js";
 import { NotImplementedError } from "./errors.js";
 import { RepoCache } from "./git/cache.js";
@@ -17,7 +17,7 @@ import {
   StackInputError,
   stackReport,
 } from "./stack/change.js";
-import { discoverStacks } from "./stack/discover.js";
+import { discoverStacks, groupsToFind } from "./stack/discover.js";
 import { ENGINE_VERSION } from "./version.js";
 
 /**
@@ -33,14 +33,14 @@ export const createEngine: CreateEngine = (config) => {
 
   return {
     discoverStacks(repo, options = {}) {
-      const { signal, onProgress } = options;
+      const { signal, onProgress, open = false } = options;
       return serialize(lockKey(config, repo), async () => {
         const index = await loadIndex(config, repo, onProgress);
         signal?.throwIfAborted();
         const cache = await openCache(config, repo, onProgress);
-        await cache.fetch({ pulls: linkedGroups(index).flat() });
+        await cache.fetch({ pulls: groupsToFind(index, open).flat() });
         signal?.throwIfAborted();
-        return discoverStacks(index, cache.gitDir, onProgress ? { onProgress } : {});
+        return discoverStacks(index, cache.gitDir, { open, ...(onProgress ? { onProgress } : {}) });
       });
     },
     // Two small searches; nothing in the repo's caches, so no lock.

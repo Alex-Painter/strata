@@ -1,6 +1,6 @@
 /**
  * Every stack in a PR index. The git repo must already hold the trunk, the
- * branches and the head of every PR in `linkedGroups(index)`.
+ * branches and the head of every PR in `groupsToFind(index, options.open)`.
  */
 import { linkedGroups, type PrIndex, type Stack } from "@strata/core";
 import { type ResolveStackOptions, resolveStack } from "./resolve.js";
@@ -8,6 +8,16 @@ import { type ResolveStackOptions, resolveStack } from "./resolve.js";
 export interface DiscoverOptions extends ResolveStackOptions {
   /** Told how many groups of linked PRs are done, before each one. */
   onProgress?: (step: string) => void;
+  /** Only stacks with an open PR, skipping the git work for fully closed groups. */
+  open?: boolean;
+}
+
+/** The groups of linked PRs to look at; with `open`, only those with an open PR. */
+export function groupsToFind(index: PrIndex, open = false): number[][] {
+  const groups = linkedGroups(index);
+  if (!open) return groups;
+  const isOpen = new Set(index.prs.filter((pr) => pr.state === "open").map((pr) => pr.number));
+  return groups.filter((group) => group.some((number) => isOpen.has(number)));
 }
 
 export async function discoverStacks(
@@ -17,7 +27,7 @@ export async function discoverStacks(
 ): Promise<Stack[]> {
   const stacks = new Map<string, Stack>();
   const covered = new Set<number>();
-  const groups = linkedGroups(index);
+  const groups = groupsToFind(index, options.open);
   for (const [i, group] of groups.entries()) {
     options.onProgress?.(`Finding stacks: ${i} of ${groups.length} groups of linked PRs done`);
     for (const number of group) {

@@ -90,7 +90,12 @@ beforeEach(() => {
       }
       if (url === "/api/changes") return Response.json(changes);
       if (url.endsWith("/stacks")) {
-        return Response.json({ repo: "acme/app", stacks: [summarizeStack(listed)] });
+        return Response.json({
+          repo: "acme/app",
+          stacks: [summarizeStack(listed)],
+          readAt: "2026-10-01T00:00:00Z",
+          refreshing: false,
+        });
       }
       return new Response(null, { status: 404 });
     }),
@@ -161,6 +166,8 @@ it("opens the path the card shows after the stack list changes under it", async 
   client.setQueryData(["stacks", "acme/app"], {
     repo: "acme/app",
     stacks: [summarizeStack({ ...stack, selectedPath: [5, 7] })],
+    readAt: "2026-10-01T00:00:00Z",
+    refreshing: false,
   });
   listed = grown;
   opened = true;

@@ -8,8 +8,9 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
-import { api, isPending, pollWhilePending } from "../lib/api";
+import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, yoursLabel } from "../lib/format";
+import { ReadAt } from "./StacksPage";
 
 /**
  * The home page, by how much each Change asks of you: waiting on you (from
@@ -153,9 +154,10 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
   const stacks = useQuery({
     queryKey: ["stacks", repo],
     queryFn: () => api.stacks(repo),
-    refetchInterval: pollWhilePending,
+    refetchInterval: pollStacks,
   });
-  const found = stacks.data && !isPending(stacks.data) ? stacks.data.stacks : null;
+  const list = stacks.data && !isPending(stacks.data) ? stacks.data : null;
+  const found = list?.stacks ?? null;
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
   const covers = (stack: StackSummary, change: ChangeSummary) =>
     stack.prs.some((pr) => pr.number === change.tipPr);
@@ -172,6 +174,7 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
       <p className="-mt-1 text-[12px] text-muted">
         Open stacks nobody has asked you about, not analysed yet. Choose one to see it and analyse
         it.
+        {list && <ReadAt readAt={list.readAt} refreshing={list.refreshing} />}
       </p>
       {stacks.error ? (
         <p className="alert">{stacks.error.message}</p>

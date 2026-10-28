@@ -75,6 +75,10 @@ export interface StacksResponse {
   repo: string;
   /** Newest activity first. */
   stacks: StackSummary[];
+  /** When this list was read; it may be a few minutes old. */
+  readAt: string;
+  /** True while a newer read runs behind this list. */
+  refreshing: boolean;
 }
 
 /**

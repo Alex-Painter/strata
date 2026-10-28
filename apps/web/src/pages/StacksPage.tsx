@@ -6,7 +6,7 @@ import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { EvidenceList } from "../components/EvidenceList";
 import { PathPicker } from "../components/PathPicker";
 import { CopyMermaid, StackMap } from "../components/StackMap";
-import { api, isPending, pollWhilePending } from "../lib/api";
+import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, prCount } from "../lib/format";
 import { useLatestRequest } from "../lib/latest-request";
 
@@ -19,7 +19,7 @@ export function StacksPage({ me }: { me: MeResponse }) {
     queryFn: () => api.stacks(repo),
     // The server answers "still reading" until the repo's first read is done,
     // and keeps the result a few minutes, so keep asking from a background tab.
-    refetchInterval: pollWhilePending,
+    refetchInterval: pollStacks,
     refetchIntervalInBackground: true,
   });
   const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
@@ -43,7 +43,9 @@ export function StacksPage({ me }: { me: MeResponse }) {
           <header className="grid gap-1">
             <h1 className="h1">Stacks in {repo}</h1>
             <p className="text-muted">
-              PRs whose branches feed into each other, from PRs updated in the last 90 days.
+              PRs whose branches feed into each other, with at least one still open, from PRs
+              updated in the last 90 days.
+              {found && <ReadAt readAt={found.readAt} refreshing={found.refreshing} />}
             </p>
           </header>
           {!stacks.error && (stacks.isPending || isPending(stacks.data)) && (
@@ -66,7 +68,9 @@ export function StacksPage({ me }: { me: MeResponse }) {
             </div>
           )}
           {found?.stacks.length === 0 && (
-            <div className="empty">No stacks here: no recent PR targets another PR's branch.</div>
+            <div className="empty">
+              No open stacks here: no open PR targets another PR's branch.
+            </div>
           )}
           {found?.stacks.map((stack) => (
             <StackCard key={stack.id} stack={stack} changes={changes.data ?? []} />
@@ -163,6 +167,16 @@ function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSum
         </div>
       </footer>
     </article>
+  );
+}
+
+/** When the list was read; the server keeps it a while and reads again behind it. */
+export function ReadAt({ readAt, refreshing }: { readAt: string; refreshing: boolean }) {
+  return (
+    <span className="block text-[12px] text-faint">
+      Read {ago(readAt)}
+      {refreshing && ", checking for changes…"}
+    </span>
   );
 }
 

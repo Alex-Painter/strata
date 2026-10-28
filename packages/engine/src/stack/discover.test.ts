@@ -122,6 +122,32 @@ describe("engine.discoverStacks", () => {
     expect(logged.filter((message) => message === fetching)).toHaveLength(1);
   });
 
+  it("skips fully closed stacks, and their fetch, when asked only for open ones", async () => {
+    const { github } = await demoRepo(remote);
+    // The whole #1 → #3 chain has landed.
+    for (const pr of github.prs) {
+      if (pr.number === 2 || pr.number === 3) Object.assign(pr, { state: "MERGED" });
+    }
+    const engine = createEngine({
+      dataDir,
+      githubPort: github,
+      gitRemote: () => remote.dir,
+      now: () => new Date(Date.UTC(2026, 9, 2)),
+    });
+
+    const steps: string[] = [];
+    const open = await engine.discoverStacks("acme/app", {
+      open: true,
+      onProgress: (step) => steps.push(step),
+    });
+    expect(open.map((stack) => stack.root)).toEqual([5]);
+    expect(steps).toContain("Fetching acme/app's branches and 3 PR heads");
+    expect(steps).toContain("Finding stacks: 0 of 1 groups of linked PRs done");
+
+    const all = await engine.discoverStacks("acme/app");
+    expect(all.map((stack) => stack.root)).toEqual([1, 5]);
+  });
+
   it("needs a GitHub token or port", async () => {
     const engine = createEngine({ dataDir });
     await expect(engine.discoverStacks("acme/app")).rejects.toThrow(/GITHUB_TOKEN/);

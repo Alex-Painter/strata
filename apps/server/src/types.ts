@@ -5,6 +5,7 @@ import type { ServerConfig } from "./config.js";
 import type { Db } from "./db/client.js";
 import type { Jobs } from "./jobs.js";
 import type { RunQueue } from "./runs.js";
+import type { StackCache } from "./stack-cache.js";
 
 export interface SessionUser {
   id: string;
@@ -29,4 +30,6 @@ export interface AppDeps {
   assigned: AssignedSearch;
   /** For slow requests (the first read of a repo); tests pass a short wait. */
   jobs?: Jobs;
+  /** The last stack list per repo; tests pass one with their own clock. */
+  stackCache?: StackCache;
 }

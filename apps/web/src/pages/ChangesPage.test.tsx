@@ -54,6 +54,8 @@ const stack = (root: number, prs: StackPrSummary[]) =>
   ({ id: `s${root}`, repo: "acme/app", root, prs, updatedAt: seenAt }) as unknown as StackSummary;
 const stacks = {
   repo: "acme/app",
+  readAt: seenAt,
+  refreshing: true,
   stacks: [
     // #2-#3 is yours (waiting), #5-#6 too (reviewed): neither is listed again.
     stack(2, [pr(2), pr(3)]),
@@ -135,6 +137,7 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
   expect(others[0]?.[1]).toContain("Not analysed");
   expect(others[0]?.[1]).toContain("by kim, sam");
+  expect(section("others-acme-app").textContent).toContain("checking for changes");
 
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",

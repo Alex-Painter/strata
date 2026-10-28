@@ -25,6 +25,7 @@ import { queueRun, saveChange, summarize } from "../change-store.js";
 import { type ChangeRow, changes, reports } from "../db/schema.js";
 import { Jobs } from "../jobs.js";
 import { latestRun, runInfo } from "../runs.js";
+import { StackCache } from "../stack-cache.js";
 import type { AppDeps, AppEnv } from "../types.js";
 
 const CreateChange = z.object({
@@ -36,24 +37,37 @@ const CreateChange = z.object({
 export function changeRoutes(deps: AppDeps) {
   const { db } = deps;
   const jobs = deps.jobs ?? new Jobs();
+  const stackCache =
+    deps.stackCache ??
+    new StackCache(deps.config.dataDir, jobs, {
+      onError: (error) => console.warn(`[strata] Reading stacks again failed: ${error}`),
+    });
   const app = new Hono<AppEnv>();
   const pending = (c: Context<AppEnv>, progress: string | null) =>
     c.json<PendingResponse>({ pending: true, progress }, 202);
 
   // The first read of a big repo takes minutes, so it runs as a job the client
   // asks after until it's done; the job carries on if the client goes away.
+  // After that the last list answers at once, read again behind it when old.
+  // Only stacks with an open PR: a busy repo's are mostly merged, and skipping
+  // them makes the read many times quicker.
   app.get("/repos/:owner/:name/stacks", async (c) => {
     const repo = `${c.req.param("owner")}/${c.req.param("name")}`;
     const user = c.get("user");
-    const found = await jobs.run(
-      `stacks\0${user.id}\0${repo}`,
-      (onProgress) => deps.engineFor(user.id).discoverStacks(repo, { onProgress }),
+    const found = await stackCache.get(
+      { userId: user.id, repo },
+      async (onProgress) =>
+        (await deps.engineFor(user.id).discoverStacks(repo, { onProgress, open: true }))
+          .map(summarizeStack)
+          .sort(byRecentActivity),
       c.req.raw.signal,
     );
     if (!found.done) return pending(c, found.progress);
     return c.json<StacksResponse>({
       repo,
-      stacks: found.value.map(summarizeStack).sort(byRecentActivity),
+      stacks: found.value.stacks,
+      readAt: found.value.readAt,
+      refreshing: found.refreshing,
     });
   });
 

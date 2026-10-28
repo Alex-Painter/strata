@@ -58,6 +58,17 @@ export function pollWhilePending(query: {
   return query.state.status !== "error" && isPending(query.state.data) ? 1000 : false;
 }
 
+/**
+ * How often a stack list asks again: like pollWhilePending, then every few
+ * seconds while the server reads a newer list behind the one it answered.
+ */
+export function pollStacks(query: { state: { status: string; data: unknown } }): number | false {
+  const data = query.state.data as { refreshing?: boolean } | undefined;
+  return (
+    pollWhilePending(query) || (query.state.status !== "error" && data?.refreshing ? 5000 : false)
+  );
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface PollOptions {

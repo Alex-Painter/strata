@@ -68,6 +68,14 @@ export interface ProgressOptions {
   signal?: AbortSignal;
 }
 
+export interface DiscoverStacksOptions extends ProgressOptions {
+  /**
+   * Only stacks with an open PR. Most of a busy repo's stacks are fully
+   * merged, and skipping their git work makes the read many times quicker.
+   */
+  open?: boolean;
+}
+
 export interface AnalyzeOptions extends ProgressOptions {
   /** Intent sources linked to the Change (spec, ticket, design, notes). */
   sources?: ContextSource[];
@@ -112,7 +120,7 @@ export type ChatChunk = { type: "text"; text: string } | { type: "status"; text:
 
 export interface Engine {
   /** Every stack among the PRs updated in the last 90 days, bottom PR first. */
-  discoverStacks(repo: string, options?: ProgressOptions): Promise<Stack[]>;
+  discoverStacks(repo: string, options?: DiscoverStacksOptions): Promise<Stack[]>;
   /**
    * Open PRs in `repo` assigned to the token's user or asking for their
    * review (directly or through a team), leaving out their own.
