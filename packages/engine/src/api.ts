@@ -6,6 +6,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type {
   Anchor,
+  AssignedPrs,
   ChangeHint,
   ChangeInput,
   ChangeReport,
@@ -112,6 +113,11 @@ export type ChatChunk = { type: "text"; text: string } | { type: "status"; text:
 export interface Engine {
   /** Every stack among the PRs updated in the last 90 days, bottom PR first. */
   discoverStacks(repo: string, options?: ProgressOptions): Promise<Stack[]>;
+  /**
+   * Open PRs in `repo` assigned to the token's user or asking for their
+   * review (directly or through a team), leaving out their own.
+   */
+  findAssigned(repo: string): Promise<AssignedPrs>;
   resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */

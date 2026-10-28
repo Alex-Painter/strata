@@ -3,6 +3,7 @@ import { type ChangeInput, linkedGroups, type PrIndex, type RepoRef } from "@str
 import type { CreateEngine, EngineConfig } from "./api.js";
 import { NotImplementedError } from "./errors.js";
 import { RepoCache } from "./git/cache.js";
+import { findAssigned } from "./github/assigned.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
@@ -41,6 +42,10 @@ export const createEngine: CreateEngine = (config) => {
         signal?.throwIfAborted();
         return discoverStacks(index, cache.gitDir, onProgress ? { onProgress } : {});
       });
+    },
+    // Two small searches; nothing in the repo's caches, so no lock.
+    findAssigned(repo) {
+      return findAssigned(githubPort(config), repo);
     },
     async resolveChange(input, options = {}) {
       const gh = githubInput(input);

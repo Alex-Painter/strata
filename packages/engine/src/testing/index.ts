@@ -2,6 +2,7 @@
 export { type DemoRepo, demoRepo } from "./demo-repo.js";
 export {
   type FakeGitHub,
+  type FakeRequests,
   fakeGitHub,
   forcePushed,
   ghTime,

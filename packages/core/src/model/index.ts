@@ -1,5 +1,6 @@
 export * from "./anchors.js";
 export * from "./api.js";
+export * from "./assigned.js";
 export * from "./change.js";
 export * from "./chat.js";
 export * from "./context.js";
