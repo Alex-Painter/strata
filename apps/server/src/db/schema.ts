@@ -49,6 +49,15 @@ export const changes = sqliteTable(
     /** What the user typed, as `describeInput` writes it. */
     input: text("input").notNull(),
     title: text("title").notNull(),
+    /** "assigned" when the assignment search made it, "added" once the user asks for it. */
+    origin: text("origin", { enum: ["added", "assigned"] })
+      .notNull()
+      .default("added"),
+    /**
+     * The path's PR heads (JSON, bottom first) when the assignment search
+     * last queued a run, so it runs again only once one moves.
+     */
+    queuedHeads: text("queued_heads"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
@@ -92,6 +101,34 @@ export const reports = sqliteTable(
   (table) => [index("reports_change_id_idx").on(table.changeId)],
 );
 
+/**
+ * A PR GitHub lists for a user in a repo Strata searches, and the Change for
+ * its path. Kept once GitHub stops listing it (merged, closed, unassigned,
+ * reviewed), with `active` false, since the Change lives on.
+ */
+export const assignments = sqliteTable(
+  "assignments",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    repo: text("repo").notNull(),
+    pr: integer("pr").notNull(),
+    /** Null until its Change is resolved, or when resolving it failed (see `error`). */
+    changeId: text("change_id").references(() => changes.id, { onDelete: "set null" }),
+    /** AssignedReason[] as JSON. */
+    reasons: text("reasons").notNull(),
+    active: integer("active", { mode: "boolean" }).notNull(),
+    error: text("error"),
+    firstSeenAt: integer("first_seen_at", { mode: "timestamp_ms" }).notNull(),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("assignments_pr_idx").on(table.ownerId, table.repo, table.pr),
+    index("assignments_change_id_idx").on(table.changeId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type ChangeRow = typeof changes.$inferSelect;
 export type RunRow = typeof runs.$inferSelect;
+export type AssignmentRow = typeof assignments.$inferSelect;

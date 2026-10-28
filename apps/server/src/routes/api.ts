@@ -2,11 +2,11 @@
  * The JSON API. Types come from @strata/core's model/api.ts and model/chat.ts
  * so the web app and the server can't drift apart.
  *
- * /api/me, the stack list and the Changes routes are live (routes/changes.ts).
+ * /api/me, the assignment search, the stack list and the Changes routes are live (routes/changes.ts).
  * The rest are declared with their final paths and answer 501, so the web app
  * can be wired against them and later slices fill them in.
  */
-import type { MeResponse } from "@strata/core/model";
+import type { AssignedStatus, MeResponse } from "@strata/core/model";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { requireUser } from "../auth/routes.js";
@@ -20,6 +20,14 @@ export function apiRoutes(deps: AppDeps) {
   app.get("/me", (c) => {
     const user = c.get("user");
     return c.json<MeResponse>({ login: user.login, name: user.name, avatarUrl: user.avatarUrl });
+  });
+
+  // The assignment search runs on a timer; this asks for one now.
+  app.get("/assigned", (c) => c.json<AssignedStatus>(deps.assigned.status(c.get("user").id)));
+  app.post("/assigned/search", (c) => {
+    const userId = c.get("user").id;
+    void deps.assigned.search(userId);
+    return c.json<AssignedStatus>(deps.assigned.status(userId), 202);
   });
 
   app.route("/", changeRoutes(deps));

@@ -2,6 +2,7 @@
  * HTTP contract between `apps/server` and `apps/web`. Both import these types,
  * so a change here is a compile error on both sides rather than a runtime 404.
  */
+import type { AssignedReason } from "./assigned.js";
 import type { Evidence } from "./change.js";
 import type { ContextKind, ContextSource } from "./context.js";
 import type { ChangeReport } from "./report.js";
@@ -99,12 +100,28 @@ export interface RunInfo {
   finishedAt: string | null;
 }
 
+/** One of your PRs on a Change's path, and why GitHub lists it for you. */
+export interface YourPr {
+  number: number;
+  reasons: AssignedReason[];
+  /** False once GitHub stops listing it: merged, closed, unassigned or reviewed. */
+  active: boolean;
+  /** When GitHub last listed it. */
+  seenAt: string;
+}
+
 export interface ChangeSummary {
   id: string;
   title: string;
   repo: string;
   input: string;
   status: RunStatus | null;
+  /** "assigned" when Strata found it from your GitHub assignments, "added" when you typed it in. */
+  origin: "added" | "assigned";
+  /** Your PRs on its path, active first, then by number. */
+  yours: YourPr[];
+  /** True while GitHub still lists one of its PRs for you. */
+  waiting: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,6 +139,19 @@ export interface FileContentResponse {
   side: "base" | "head";
   revision: string;
   lines: string[];
+}
+
+/** Where the search for your assigned PRs stands. */
+export interface AssignedStatus {
+  /** The repos Strata searches. */
+  repos: string[];
+  running: boolean;
+  /** The step in progress, e.g. "Finding the stack for GlyphicAI/maverick-backend#9338". */
+  progress: string | null;
+  /** When the last search finished, or null before the first. */
+  lastFinishedAt: string | null;
+  /** Problems from the last search, one per repo or PR that failed. */
+  errors: string[];
 }
 
 export interface ApiError {

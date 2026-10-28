@@ -11,6 +11,9 @@
  * Prints `READY <graphql url> <git remote>` once it's listening, and deletes
  * the repo when stopped.
  *
+ * It lists #4 and #10 as asking something of the token's user, for the
+ * assignment search.
+ *
  * It also stands in for Claude at POST /v1/messages (fixture-claude.ts): point
  * DEV_ANTHROPIC_BASE_URL at its origin, set any ANTHROPIC_API_KEY, and turn on
  * sendCodeToAnthropic for acme/app in the data folder's settings.
@@ -165,6 +168,15 @@ for (const pr of demo.github.prs) {
     Object.assign(pr, { reviewDecision: "CHANGES_REQUESTED", commits: rollup("FAILURE") });
   }
 }
+
+// What GitHub lists for the verify bot, for the assignment search (strata-verify
+// up --assigned acme/app): #10 in the middle of #9-#11 through a team, and the
+// lone #4 by name.
+demo.github.viewer = "verify-bot";
+demo.github.requests = {
+  4: { assignees: ["verify-bot"] },
+  10: { teams: [{ slug: "acme/backend", members: ["verify-bot"] }] },
+};
 
 // The fixture's clock starts on 1 Oct 2026. Move every timestamp so the newest
 // is an hour ago, keeping the PRs inside the 90 days Strata reads.

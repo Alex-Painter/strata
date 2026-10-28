@@ -8,6 +8,7 @@ import { parseChangeInput } from "@strata/core";
 import type { StacksResponse } from "@strata/core/model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
+import { AssignedSearch } from "../assigned.js";
 import { loadConfig } from "../config.js";
 import { openDatabase } from "../db/client.js";
 import { engineFactory } from "../engines.js";
@@ -62,7 +63,14 @@ describe("the fixture GitHub", () => {
     const { db, close } = openDatabase(":memory:", migrations);
     const engineFor = engineFactory(config, db, { log: () => {} });
     const runs = new RunQueue(db, engineFor);
-    const app = createApp({ config, db, oauth: null, engineFor, runs });
+    const app = createApp({
+      config,
+      db,
+      oauth: null,
+      engineFor,
+      runs,
+      assigned: new AssignedSearch(db, engineFor, runs, config.assignedRepos),
+    });
 
     const res = await app.request("/api/repos/acme/app/stacks");
     expect(res.status).toBe(200);

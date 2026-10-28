@@ -7,6 +7,7 @@ import type { Engine } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.js";
+import { AssignedSearch } from "../assigned.js";
 import { loadConfig } from "../config.js";
 import { openDatabase } from "../db/client.js";
 import { changes as changesTable, runs as runsTable } from "../db/schema.js";
@@ -53,6 +54,7 @@ function setup(options: { jobs?: Jobs; wrap?: (engine: Engine) => Engine } = {})
     oauth: null,
     engineFor,
     runs,
+    assigned: new AssignedSearch(db, engineFor, runs, ["acme/app"]),
     // A long wait, so only the tests about a slow first read see a 202.
     jobs: options.jobs ?? new Jobs(60_000),
   });

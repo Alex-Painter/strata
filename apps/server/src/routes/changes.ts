@@ -12,8 +12,6 @@ import {
   ChangeInputError,
   type ChangeReport,
   type ChangeSummary,
-  describeInput,
-  describeRepo,
   type PendingResponse,
   parseChangeInput,
   type StacksResponse,
@@ -23,7 +21,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
-import { newId } from "../auth/crypto.js";
+import { queueRun, saveChange, summarize } from "../change-store.js";
 import { type ChangeRow, changes, reports } from "../db/schema.js";
 import { Jobs } from "../jobs.js";
 import { latestRun, runInfo } from "../runs.js";
@@ -66,7 +64,7 @@ export function changeRoutes(deps: AppDeps) {
       .where(eq(changes.ownerId, c.get("user").id))
       .orderBy(desc(changes.updatedAt))
       .all();
-    return c.json<ChangeSummary[]>(rows.map((row) => summary(row)));
+    return c.json<ChangeSummary[]>(rows.map((row) => summarize(db, row)));
   });
 
   app.post("/changes", async (c) => {
@@ -96,49 +94,15 @@ export function changeRoutes(deps: AppDeps) {
     // asks again. Nobody reads the answer.
     if (c.req.raw.signal.aborted) return new Response(null, { status: 499 });
     const resolved = found.value;
-    const path = resolved.stack?.selectedPath ?? [];
-    const rootPr = path[0];
-    const tipPr = path[path.length - 1];
-    if (rootPr === undefined || tipPr === undefined)
-      throw new Error("A stack came back with no PRs.");
-    const repo = describeRepo(input.repo);
-    const now = new Date();
-
-    const existing = db
-      .select()
-      .from(changes)
-      .where(
-        and(
-          eq(changes.ownerId, user.id),
-          eq(changes.repo, repo),
-          eq(changes.rootPr, rootPr),
-          eq(changes.tipPr, tipPr),
-        ),
-      )
-      .get();
-    const row: ChangeRow = existing
-      ? { ...existing, title: resolved.title, updatedAt: now }
-      : {
-          id: newId("chg"),
-          ownerId: user.id,
-          repo,
-          rootPr,
-          tipPr,
-          input: describeInput(input),
-          title: resolved.title,
-          createdAt: now,
-          updatedAt: now,
-        };
-    if (existing) {
-      db.update(changes)
-        .set({ title: row.title, updatedAt: now })
-        .where(eq(changes.id, row.id))
-        .run();
-    } else {
-      db.insert(changes).values(row).run();
-    }
-    deps.runs.enqueue(row);
-    return c.json<ChangeDetail>(detail(row), existing ? 200 : 201);
+    const { row, created } = saveChange(db, {
+      ownerId: user.id,
+      input,
+      resolved,
+      origin: "added",
+      now: new Date(),
+    });
+    queueRun(db, deps.runs, row, resolved);
+    return c.json<ChangeDetail>(detail(row), created ? 201 : 200);
   });
 
   app.get("/changes/:id", (c) => {
@@ -175,18 +139,6 @@ export function changeRoutes(deps: AppDeps) {
       .get();
   }
 
-  function summary(row: ChangeRow): ChangeSummary {
-    return {
-      id: row.id,
-      title: row.title,
-      repo: row.repo,
-      input: row.input,
-      status: latestRun(db, row.id)?.status ?? null,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    };
-  }
-
   function detail(row: ChangeRow): ChangeDetail {
     const run = latestRun(db, row.id);
     // Reports from an older schema are left out; the next run replaces them.
@@ -197,7 +149,7 @@ export function changeRoutes(deps: AppDeps) {
       .orderBy(desc(reports.createdAt), desc(reports.id))
       .get();
     return {
-      change: summary(row),
+      change: summarize(db, row),
       run: run ? runInfo(run) : null,
       report: report ? (JSON.parse(report.body) as ChangeReport) : null,
       sources: [],

@@ -100,13 +100,16 @@ export function authRoutes({ config, db, oauth }: AppDeps) {
   return app;
 }
 
+/** The dev bypass's synthetic user. It has no row in `users`. */
+export const DEV_USER_ID = "usr_dev";
+
 /** Loads the signed-in user for /api routes, or answers 401. */
 export function requireUser({ config, db }: AppDeps): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     let user: SessionUser | null = null;
     if (config.devBypass) {
       user = {
-        id: "usr_dev",
+        id: DEV_USER_ID,
         login: config.devBypass.login,
         name: config.devBypass.login,
         avatarUrl: null,

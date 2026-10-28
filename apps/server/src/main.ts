@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
+import { AssignedSearch, searchedUsers } from "./assigned.js";
 import { createGitHubOAuth } from "./auth/github.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
@@ -11,6 +12,9 @@ import { RunQueue } from "./runs.js";
 
 // Both src/main.ts (tsx) and dist/main.js (bundle) sit one level below
 // apps/server, so these resolve the same way in dev and production.
+/** How often to search for PRs assigned to each user, while the server runs. */
+const SEARCH_EVERY_MS = 10 * 60_000;
+
 const fromHere = (relative: string) => fileURLToPath(new URL(relative, import.meta.url));
 
 let config: ReturnType<typeof loadConfig>;
@@ -30,13 +34,19 @@ const { db, close } = openDatabase(
   fromHere("../drizzle"),
 );
 const engineFor = engineFactory(config, db);
+const runs = new RunQueue(db, engineFor);
+const assigned = new AssignedSearch(db, engineFor, runs, config.assignedRepos);
 const app = createApp({
   config,
   db,
   oauth: createGitHubOAuth(config),
   engineFor,
-  runs: new RunQueue(db, engineFor),
+  runs,
+  assigned,
 });
+if (config.assignedRepos.length > 0) {
+  assigned.every(() => searchedUsers(db, Boolean(config.devBypass)), SEARCH_EVERY_MS);
+}
 
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   const signIn = config.devBypass ? `dev bypass as ${config.devBypass.login}` : "GitHub";
@@ -44,7 +54,7 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
     config.webDist && existsSync(config.webDist) ? config.webDist : "not built (API only)";
   console.log(
     `[strata] Listening on :${info.port} | public URL ${config.publicUrl.origin} | data ${config.dataDir} | ` +
-      `sign-in ${signIn} | LLM ${config.anthropicApiKey ? "on" : "off"} | web ${web}`,
+      `sign-in ${signIn} | assigned PRs from ${config.assignedRepos.join(", ") || "nowhere"} | LLM ${config.anthropicApiKey ? "on" : "off"} | web ${web}`,
   );
 });
 

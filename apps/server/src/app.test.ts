@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
+import { AssignedSearch } from "./assigned.js";
 import type { GitHubOAuth } from "./auth/github.js";
 import { SESSION_TTL_MS } from "./auth/session.js";
 import { loadConfig } from "./config.js";
@@ -39,7 +40,17 @@ function setup(env: Record<string, string> = {}) {
   closers.push(close);
   const engineFor = engineFactory(config, db);
   const runs = new RunQueue(db, engineFor);
-  return { app: createApp({ config, db, oauth: fakeOAuth, engineFor, runs }), config };
+  return {
+    app: createApp({
+      config,
+      db,
+      oauth: fakeOAuth,
+      engineFor,
+      runs,
+      assigned: new AssignedSearch(db, engineFor, runs, config.assignedRepos),
+    }),
+    config,
+  };
 }
 
 function cookieValue(res: Response, name: string): string | undefined {

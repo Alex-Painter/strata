@@ -1,4 +1,5 @@
 import type { Engine } from "@strata/engine";
+import type { AssignedSearch } from "./assigned.js";
 import type { GitHubOAuth } from "./auth/github.js";
 import type { ServerConfig } from "./config.js";
 import type { Db } from "./db/client.js";
@@ -24,6 +25,8 @@ export interface AppDeps {
   /** The engine that reads GitHub as this user. */
   engineFor: (userId: string) => Engine;
   runs: RunQueue;
+  /** Finds the Changes GitHub lists for the user. */
+  assigned: AssignedSearch;
   /** For slow requests (the first read of a repo); tests pass a short wait. */
   jobs?: Jobs;
 }

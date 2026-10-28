@@ -6,6 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
 
+/** Alex's pick for now (2026-10-28); STRATA_ASSIGNED_REPOS replaces it, and "" turns the search off. */
+const DEFAULT_ASSIGNED_REPOS = "GlyphicAI/maverick-backend";
+
 const DEV_SESSION_SECRET = "strata-development-session-secret-not-for-production";
 
 const Env = z.object({
@@ -33,6 +36,8 @@ const Env = z.object({
   DEV_ANTHROPIC_BASE_URL: z.url().optional(),
   /** Local checkouts Strata may borrow objects from: `owner/name=path,owner/name=path`. */
   STRATA_CHECKOUTS: z.string().default(""),
+  /** Repos searched for PRs assigned to you or asking for your review: `owner/name,owner/name`. */
+  STRATA_ASSIGNED_REPOS: z.string().default(DEFAULT_ASSIGNED_REPOS),
 });
 
 export interface DevBypass {
@@ -54,6 +59,8 @@ export interface ServerConfig {
   webDist: string | null;
   /** Local checkouts by `owner/name`, absolute paths. Only ever read. */
   checkouts: Record<string, string>;
+  /** Repos searched for PRs assigned to the user, `owner/name`. */
+  assignedRepos: string[];
   /** Skips GitHub OAuth with a synthetic session. Never set in production. */
   devBypass: DevBypass | null;
   /** Stand-ins for GitHub's API and git host, for driving the app offline. Never set in production. */
@@ -133,6 +140,13 @@ export function loadConfig(
   }
 
   const checkouts = parseCheckouts(env.STRATA_CHECKOUTS, problems);
+  const assignedRepos = env.STRATA_ASSIGNED_REPOS.split(",")
+    .map((repo) => repo.trim())
+    .filter(Boolean);
+  for (const repo of assignedRepos) {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo))
+      problems.push(`STRATA_ASSIGNED_REPOS: "${repo}" should look like owner/name.`);
+  }
 
   if (problems.length > 0) throw new ConfigError(problems);
 
@@ -148,6 +162,7 @@ export function loadConfig(
     model: env.STRATA_MODEL ?? null,
     webDist: env.WEB_DIST ? path.resolve(env.WEB_DIST) : (defaults.webDist ?? null),
     checkouts,
+    assignedRepos,
     devBypass,
     devGitHub,
     devAnthropicBaseUrl,
