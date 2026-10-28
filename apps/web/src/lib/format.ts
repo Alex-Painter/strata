@@ -1,5 +1,12 @@
 /** Words and dates for PR metadata, shared by the stack map and the panes. */
-import type { FileStatus, LinkState, PrState, StackPr } from "@strata/core/model";
+import type {
+  AssignedReason,
+  FileStatus,
+  LinkState,
+  PrState,
+  StackPr,
+  YourPr,
+} from "@strata/core/model";
 
 export function stateLabel(pr: { state: PrState; draft: boolean }): string {
   if (pr.state === "open") return pr.draft ? "Draft" : "Open";
@@ -101,4 +108,23 @@ export const FILE_STATUS: Record<FileStatus, string> = {
 /** `+40 −3`, with a real minus sign. */
 export function lineCount(additions: number, deletions: number): string {
   return `+${additions} −${deletions}`;
+}
+
+/** Why GitHub lists a PR for you, e.g. "assigned, review requested from acme/backend". */
+export function reasonLabel(reasons: AssignedReason[]): string {
+  return reasons
+    .map((reason) => {
+      if (reason.kind === "assignee") return "assigned";
+      if (reason.direct || reason.teams.length === 0) return "review requested";
+      return `review requested from ${reason.teams.join(", ")}`;
+    })
+    .join(", ");
+}
+
+/** Your PRs on a Change, e.g. "#3 assigned · #4 review requested"; the ones still listed if any. */
+export function yoursLabel(yours: YourPr[]): string {
+  const active = yours.filter((pr) => pr.active);
+  return (active.length > 0 ? active : yours)
+    .map((pr) => `#${pr.number} ${reasonLabel(pr.reasons)}`)
+    .join(" · ");
 }

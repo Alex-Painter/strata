@@ -1,6 +1,14 @@
 import type { LinkState } from "@strata/core/model";
 import { describe, expect, it } from "vitest";
-import { ago, countPrs, describePath, linkLabel, needsRestack, stateLabel } from "./format";
+import {
+  ago,
+  countPrs,
+  describePath,
+  linkLabel,
+  needsRestack,
+  stateLabel,
+  yoursLabel,
+} from "./format";
 
 describe("format", () => {
   it("counts PRs by state, leaving out states with none", () => {
@@ -49,5 +57,36 @@ describe("format", () => {
     expect(ago("2026-10-25T09:00:00Z", now)).toBe("3h ago");
     expect(ago("2026-10-20T12:00:00Z", now)).toBe("5d ago");
     expect(ago("2026-08-01T12:00:00Z", now)).toBe("1 Aug 2026");
+  });
+});
+
+describe("yoursLabel", () => {
+  const seenAt = "2026-10-28T00:00:00Z";
+  it("says why each PR still waits on you", () => {
+    expect(
+      yoursLabel([
+        { number: 3, reasons: [{ kind: "assignee" }], active: true, seenAt },
+        {
+          number: 4,
+          reasons: [{ kind: "review-requested", direct: false, teams: ["acme/backend"] }],
+          active: true,
+          seenAt,
+        },
+        { number: 5, reasons: [{ kind: "assignee" }], active: false, seenAt },
+      ]),
+    ).toBe("#3 assigned · #4 review requested from acme/backend");
+  });
+
+  it("falls back to the PRs you were on once none waits", () => {
+    expect(
+      yoursLabel([
+        {
+          number: 5,
+          reasons: [{ kind: "assignee" }, { kind: "review-requested", direct: true, teams: [] }],
+          active: false,
+          seenAt,
+        },
+      ]),
+    ).toBe("#5 assigned, review requested");
   });
 });

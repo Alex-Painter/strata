@@ -1,10 +1,11 @@
-import type { ChangeReport, Claim, LayerId, MeResponse } from "@strata/core/model";
+import type { ChangeReport, Claim, LayerId, MeResponse, YourPr } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
+import { reasonLabel } from "../lib/format";
 import { toggleTheme } from "../lib/theme";
 import { LayerView } from "./LayerView";
 import {
@@ -41,9 +42,12 @@ export function Workspace({
   onPickPath,
   pickingPath = null,
   pickError = null,
+  yours = [],
 }: {
   me?: MeResponse | undefined;
   title?: string | undefined;
+  /** Your PRs on this Change, from your GitHub assignments; marked in the PR list. */
+  yours?: YourPr[];
   report: ChangeReport | null;
   run: RunView | null;
   nav: Nav;
@@ -342,6 +346,7 @@ export function Workspace({
             pr={pr}
             countIn={(id) => filesIn(diff, id).length}
             onNav={go}
+            yours={yours}
           />
         )
       }
@@ -484,6 +489,7 @@ function Sidebar({
   pr,
   countIn,
   onNav,
+  yours,
 }: {
   report: ChangeReport;
   layers: LayerId[];
@@ -491,6 +497,7 @@ function Sidebar({
   pr: number | null;
   countIn: (layer: LayerId) => number;
   onNav: (nav: Partial<Nav>) => void;
+  yours: YourPr[];
 }) {
   const stack = report.stack;
   const path = stack?.selectedPath ?? [];
@@ -543,10 +550,15 @@ function Sidebar({
             <span className="sn">{path.length}</span>
           </button>
           {prsOpen && (
-            <ul id="prs-nav" aria-label="Pull requests" className="grid gap-px">
+            <ul
+              id="prs-nav"
+              aria-label="Pull requests"
+              className="grid grid-cols-[minmax(0,1fr)] gap-px"
+            >
               {path.map((n) => {
                 const node = stack.nodes.find((x) => x.pr.number === n);
                 const title = node?.pr.title ?? "";
+                const mine = yours.find((y) => y.number === n && y.active);
                 return (
                   <li key={n} data-pr={n}>
                     <button
@@ -559,6 +571,11 @@ function Sidebar({
                     >
                       <span className="pid">{n}</span>
                       <span className="nl">{title}</span>
+                      {mine && (
+                        <span className="nm" title={`Yours: ${reasonLabel(mine.reasons)}`}>
+                          yours
+                        </span>
+                      )}
                     </button>
                   </li>
                 );

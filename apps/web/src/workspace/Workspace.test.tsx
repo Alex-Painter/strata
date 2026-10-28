@@ -5,7 +5,7 @@ import {
   REPORT_SCHEMA_VERSION,
   ruleGuide,
 } from "@strata/core";
-import type { ChangeReport, Hunk, PrPart, Stack, StackPr } from "@strata/core/model";
+import type { ChangeReport, Hunk, PrPart, Stack, StackPr, YourPr } from "@strata/core/model";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -107,20 +107,31 @@ function Harness({
   report,
   run,
   start = { layer: null, pr: null },
+  yours = [],
 }: {
   report: ChangeReport;
   run: RunView | null;
   start?: Nav;
+  yours?: YourPr[];
 }) {
   const [nav, setNav] = useState<Nav>(start);
-  return <Workspace report={report} run={run} nav={nav} onNav={setNav} />;
+  return <Workspace report={report} run={run} nav={nav} onNav={setNav} yours={yours} />;
 }
 
-function mount(report: ChangeReport, run: RunView | null = null, start?: Nav) {
+function mount(report: ChangeReport, run: RunView | null = null, start?: Nav, yours?: YourPr[]) {
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  act(() => root?.render(<Harness report={report} run={run} {...(start ? { start } : {})} />));
+  act(() =>
+    root?.render(
+      <Harness
+        report={report}
+        run={run}
+        {...(start ? { start } : {})}
+        {...(yours ? { yours } : {})}
+      />,
+    ),
+  );
   return container;
 }
 
@@ -190,6 +201,22 @@ describe("Workspace", () => {
     expect(status("Cloning GlyphicAI/app into Strata's cache")).toBe(
       "Refreshing: cloning GlyphicAI/app into Strata's cache…",
     );
+  });
+
+  it("marks the PRs GitHub lists for you, and still opens on the whole stack", () => {
+    const report = { ...range, change: { ...range.change, hints: [] }, stack };
+    const page = mount(report, null, undefined, [
+      {
+        number: 1,
+        reasons: [{ kind: "review-requested", direct: false, teams: ["acme/backend"] }],
+        active: true,
+        seenAt: "2026-10-02T00:00:00Z",
+      },
+    ]);
+    const mark = page.querySelector('li[data-pr="1"] .nm');
+    expect(mark?.textContent).toBe("yours");
+    expect(mark?.getAttribute("title")).toBe("Yours: review requested from acme/backend");
+    expect(button(page, "Whole stack").getAttribute("aria-current")).toBe("true");
   });
 
   it("shows the stack's notes before the report's", () => {

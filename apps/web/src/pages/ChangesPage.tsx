@@ -1,19 +1,40 @@
-import type { ChangeSummary, MeResponse, RunStatus } from "@strata/core/model";
+import type { AssignedStatus, ChangeSummary, MeResponse, RunStatus } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { api } from "../lib/api";
-import { ago } from "../lib/format";
+import { ago, yoursLabel } from "../lib/format";
 import { inputHint } from "../lib/input";
 import { useLatestRequest } from "../lib/latest-request";
 
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
-/** Start a review from a PR or branch, browse a repo's stacks, or reopen a Change. */
+/**
+ * Changes waiting on you (from your GitHub assignments), then start a review
+ * from a PR or branch, browse a repo's stacks, or reopen a Change.
+ */
 export function ChangesPage({ me }: { me: MeResponse }) {
-  const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
-  const repos = [...new Set((changes.data ?? []).map((change) => change.repo))];
+  const queryClient = useQueryClient();
+  const assigned = useQuery({
+    queryKey: ["assigned"],
+    queryFn: api.assigned,
+    // Quick while a search runs; otherwise often enough to see the server's own.
+    refetchInterval: (query) => (query.state.data?.running ? 1000 : 30_000),
+  });
+  const lastFinished = assigned.data?.lastFinishedAt ?? null;
+  const changes = useQuery({
+    queryKey: ["changes", lastFinished],
+    queryFn: api.changes,
+    refetchInterval: 30_000,
+  });
+  const search = useMutation({
+    mutationFn: api.searchAssigned,
+    onSuccess: (status) => queryClient.setQueryData(["assigned"], status),
+  });
+  const all = changes.data;
+  const repos = [...new Set((all ?? []).map((change) => change.repo))];
+  const error = changes.error?.message ?? null;
   return (
     <AppShell
       me={me}
@@ -23,12 +44,26 @@ export function ChangesPage({ me }: { me: MeResponse }) {
     >
       <main className="page">
         <div className="page-in">
+          <WaitingOnYou
+            changes={all?.filter((change) => change.waiting)}
+            error={error}
+            status={assigned.data ?? null}
+            searching={search.isPending || Boolean(assigned.data?.running)}
+            onSearch={() => search.mutate()}
+            searchError={search.error?.message ?? assigned.error?.message ?? null}
+          />
           <NewChange />
           <BrowseStacks repos={repos} />
           <section className="grid gap-3">
             <h2 className="h2">Changes</h2>
-            <ChangeList changes={changes.data} error={changes.error?.message ?? null} />
+            <ChangeList
+              changes={all?.filter((change) => !change.waiting && change.origin === "added")}
+              error={error}
+            />
           </section>
+          <EarlierAssigned
+            changes={all?.filter((change) => !change.waiting && change.origin === "assigned")}
+          />
         </div>
       </main>
     </AppShell>
@@ -146,6 +181,67 @@ function BrowseStacks({ repos }: { repos: string[] }) {
   );
 }
 
+function WaitingOnYou({
+  changes,
+  error,
+  status,
+  searching,
+  onSearch,
+  searchError,
+}: {
+  changes: ChangeSummary[] | undefined;
+  error: string | null;
+  status: AssignedStatus | null;
+  searching: boolean;
+  onSearch: () => void;
+  searchError: string | null;
+}) {
+  if (status && status.repos.length === 0) return null;
+  const repos = status?.repos.join(", ") ?? "";
+  const note = searching
+    ? (status?.progress ?? "Searching…")
+    : status?.lastFinishedAt
+      ? `Searched ${repos} ${ago(status.lastFinishedAt)}`
+      : `Searches ${repos} for PRs assigned to you or asking for your review`;
+  const problems = [...(searchError ? [searchError] : []), ...(status?.errors ?? [])];
+  return (
+    <section className="grid gap-3" aria-labelledby="waiting-h">
+      <div className="flex items-center gap-3">
+        <h2 id="waiting-h" className="h2 flex-1">
+          Waiting on you
+        </h2>
+        <button type="button" className="btn h-8" disabled={searching} onClick={onSearch}>
+          {searching ? "Searching…" : "Refresh"}
+        </button>
+      </div>
+      <p className="-mt-1 text-[12px] text-muted" aria-live="polite">
+        {note}
+      </p>
+      {problems.map((problem) => (
+        <p key={problem} className="alert">
+          {problem}
+        </p>
+      ))}
+      {changes && changes.length === 0 && !error ? (
+        <div className="empty">Nothing assigned to you right now.</div>
+      ) : (
+        <ChangeList changes={changes} error={error} />
+      )}
+    </section>
+  );
+}
+
+/** Changes from PRs GitHub no longer lists for you. They stay, since a Change lives past merge. */
+function EarlierAssigned({ changes }: { changes: ChangeSummary[] | undefined }) {
+  if (!changes || changes.length === 0) return null;
+  return (
+    <details className="grid gap-3">
+      <summary className="h2 cursor-pointer">Earlier assignments ({changes.length})</summary>
+      <ChangeList changes={changes} error={null} />
+    </details>
+  );
+}
+
 const STATUS: Record<RunStatus, string> = {
   queued: "Queued",
   running: "Running",
@@ -174,7 +270,12 @@ function ChangeList({
       {changes.map((change) => (
         <li key={change.id}>
           <Link href={`/changes/${change.id}`} className="lrow">
-            <span className="min-w-0 flex-1 truncate font-medium">{change.title}</span>
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium">{change.title}</span>
+              {change.yours.length > 0 && (
+                <span className="ml-2 text-[12px] text-muted">{yoursLabel(change.yours)}</span>
+              )}
+            </span>
             <span className="shrink-0 font-mono text-[12px] text-faint">{change.input}</span>
             {change.status && <span className="pill">{STATUS[change.status]}</span>}
             <span className="w-16 shrink-0 text-right text-[12px] text-faint">

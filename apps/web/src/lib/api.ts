@@ -4,6 +4,7 @@
  */
 import type {
   ApiError,
+  AssignedStatus,
   ChangeDetail,
   ChangeSummary,
   CreateChangeRequest,
@@ -89,6 +90,10 @@ export const api = {
       `/api/repos/${repo.split("/").map(encodeURIComponent).join("/")}/stacks`,
     ),
   changes: () => request<ChangeSummary[]>("/api/changes"),
+  /** Where the search for PRs assigned to you stands. */
+  assigned: () => request<AssignedStatus>("/api/assigned"),
+  /** Starts that search now, or joins the one going. */
+  searchAssigned: () => request<AssignedStatus>("/api/assigned/search", post({})),
   change: (id: string) => request<ChangeDetail>(`/api/changes/${encodeURIComponent(id)}`),
   createChange: (body: CreateChangeRequest, options: PollOptions = {}) =>
     untilDone(

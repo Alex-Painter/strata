@@ -97,6 +97,7 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
     <Workspace
       me={me}
       title={data?.change.title}
+      yours={data?.change.yours ?? []}
       report={data?.report ?? null}
       run={{
         info: data?.run ?? null,
