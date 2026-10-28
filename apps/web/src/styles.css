@@ -536,6 +536,10 @@ code,
     display: grid;
     gap: 32px;
   }
+  /* A page-in that fills the card, like the home page. */
+  .page-in.wide {
+    max-width: none;
+  }
   .h1 {
     margin: 0;
     font-size: 16px;

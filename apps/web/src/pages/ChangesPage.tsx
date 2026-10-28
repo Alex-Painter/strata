@@ -1,18 +1,21 @@
-import type { AssignedStatus, ChangeSummary, MeResponse, RunStatus } from "@strata/core/model";
+import type {
+  AssignedStatus,
+  ChangeSummary,
+  MeResponse,
+  RunStatus,
+  StackSummary,
+} from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
-import { api } from "../lib/api";
-import { ago, yoursLabel } from "../lib/format";
-import { inputHint } from "../lib/input";
-import { useLatestRequest } from "../lib/latest-request";
-
-const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+import { api, isPending, pollWhilePending } from "../lib/api";
+import { ago, countPrs, yoursLabel } from "../lib/format";
 
 /**
- * Changes waiting on you (from your GitHub assignments), then start a review
- * from a PR or branch, browse a repo's stacks, or reopen a Change.
+ * The home page, by how much each Change asks of you: waiting on you (from
+ * your GitHub assignments), assigned or reviewed but not waiting, and the
+ * rest of each searched repo's stacks. Strata analyses the first two by
+ * itself; the others only when you choose Analyse on their stack.
  */
 export function ChangesPage({ me }: { me: MeResponse }) {
   const queryClient = useQueryClient();
@@ -33,8 +36,10 @@ export function ChangesPage({ me }: { me: MeResponse }) {
     onSuccess: (status) => queryClient.setQueryData(["assigned"], status),
   });
   const all = changes.data;
-  const repos = [...new Set((all ?? []).map((change) => change.repo))];
   const error = changes.error?.message ?? null;
+  const repos = assigned.data?.repos ?? [];
+  // Your own Changes in repos Strata doesn't search have no stack list to sit in.
+  const elsewhere = all?.filter((c) => c.yours.length === 0 && !repos.includes(c.repo)) ?? [];
   return (
     <AppShell
       me={me}
@@ -43,141 +48,43 @@ export function ChangesPage({ me }: { me: MeResponse }) {
       top={<Breadcrumb items={[{ label: "Changes" }]} />}
     >
       <main className="page">
-        <div className="page-in">
+        <div className="page-in wide">
           <WaitingOnYou
-            changes={all?.filter((change) => change.waiting)}
+            changes={all?.filter((c) => c.waiting)}
             error={error}
             status={assigned.data ?? null}
             searching={search.isPending || Boolean(assigned.data?.running)}
             onSearch={() => search.mutate()}
             searchError={search.error?.message ?? assigned.error?.message ?? null}
           />
-          <NewChange />
-          <BrowseStacks repos={repos} />
-          <section className="grid gap-3">
-            <h2 className="h2">Changes</h2>
+          <section className="grid gap-3" aria-labelledby="assigned-h">
+            <h2 id="assigned-h" className="h2">
+              Assigned to you, not waiting
+            </h2>
+            <p className="-mt-1 text-[12px] text-muted">
+              Stacks you've reviewed already, or were on before.
+            </p>
             <ChangeList
-              changes={all?.filter((change) => !change.waiting && change.origin === "added")}
+              changes={all?.filter((c) => !c.waiting && c.yours.length > 0)}
               error={error}
+              empty="Nothing here yet."
             />
           </section>
-          <EarlierAssigned
-            changes={all?.filter((change) => !change.waiting && change.origin === "assigned")}
-          />
+          {all &&
+            repos.map((repo) => (
+              <OtherStacks key={repo} repo={repo} changes={all.filter((c) => c.repo === repo)} />
+            ))}
+          {elsewhere.length > 0 && (
+            <section className="grid gap-3" aria-labelledby="elsewhere-h">
+              <h2 id="elsewhere-h" className="h2">
+                Other Changes
+              </h2>
+              <ChangeList changes={elsewhere} error={null} empty="" />
+            </section>
+          )}
         </div>
       </main>
     </AppShell>
-  );
-}
-
-function NewChange() {
-  const [text, setText] = useState("");
-  const [, navigate] = useLocation();
-  const queryClient = useQueryClient();
-  const hint = inputHint(text);
-  const [progress, setProgress] = useState<string | null>(null);
-  // Editing the input, a new submit or leaving the page stops the request in
-  // flight, so an abandoned one can't open its Change later.
-  const request = useLatestRequest();
-  const create = useMutation({
-    mutationFn: (input: string) => {
-      const signal = request.next();
-      setProgress(null);
-      return api.createChange(
-        { input },
-        {
-          onProgress: (step) => {
-            if (!signal.aborted) setProgress(step);
-          },
-          signal,
-        },
-      );
-    },
-    onSuccess: (detail) => {
-      queryClient.setQueryData(["change", detail.change.id], detail);
-      queryClient.invalidateQueries({ queryKey: ["changes"] });
-      navigate(`/changes/${detail.change.id}`);
-    },
-  });
-  return (
-    <section className="grid gap-3">
-      <h1 className="h1">Review a stack</h1>
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (hint?.ok) create.mutate(text.trim());
-        }}
-      >
-        <input
-          aria-label="PR or branch"
-          aria-describedby="new-change-hint"
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value);
-            request.stop();
-            create.reset();
-          }}
-          placeholder="PR URL, owner/repo#123 or owner/repo:branch"
-          spellCheck={false}
-          className="field flex-1 font-mono text-[12.5px]"
-        />
-        <button type="submit" disabled={!hint?.ok || create.isPending} className="btn primary h-8">
-          {create.isPending ? "Finding the stack…" : "Review"}
-        </button>
-      </form>
-      <p
-        id="new-change-hint"
-        role={create.error ? "alert" : undefined}
-        className={`-mt-1 min-h-5 text-[12px] ${create.error || hint?.ok === false ? "text-text" : "text-muted"}`}
-      >
-        {create.error
-          ? create.error.message
-          : create.isPending
-            ? (progress ??
-              "Reading the repo's PRs and fetching their branches. The first time for a repo takes longest.")
-            : (hint?.text ?? "Strata finds the whole stack around it, merged PRs included.")}
-      </p>
-    </section>
-  );
-}
-
-function BrowseStacks({ repos }: { repos: string[] }) {
-  const [repo, setRepo] = useState("");
-  const [, navigate] = useLocation();
-  const valid = REPO.test(repo.trim());
-  return (
-    <section className="grid gap-3">
-      <h2 className="h2">Browse a repo's stacks</h2>
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (valid) navigate(`/repos/${repo.trim()}`);
-        }}
-      >
-        <input
-          aria-label="Repository"
-          value={repo}
-          onChange={(event) => setRepo(event.target.value)}
-          placeholder="owner/repo"
-          spellCheck={false}
-          className="field flex-1 font-mono text-[12.5px]"
-        />
-        <button type="submit" disabled={!valid} className="btn h-8">
-          Show stacks
-        </button>
-      </form>
-      {repos.length > 0 && (
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-muted">
-          {repos.map((name) => (
-            <Link key={name} href={`/repos/${name}`} className="lnk font-mono text-[12px]">
-              {name}
-            </Link>
-          ))}
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -196,7 +103,8 @@ function WaitingOnYou({
   onSearch: () => void;
   searchError: string | null;
 }) {
-  if (status && status.repos.length === 0) return null;
+  // With no repos to search there's nothing to refresh, but the list still shows.
+  const searchable = !status || status.repos.length > 0;
   const repos = status?.repos.join(", ") ?? "";
   const note = searching
     ? (status?.progress ?? "Searching…")
@@ -210,35 +118,97 @@ function WaitingOnYou({
         <h2 id="waiting-h" className="h2 flex-1">
           Waiting on you
         </h2>
-        <button type="button" className="btn h-8" disabled={searching} onClick={onSearch}>
-          {searching ? "Searching…" : "Refresh"}
-        </button>
+        {searchable && (
+          <button type="button" className="btn h-8" disabled={searching} onClick={onSearch}>
+            {searching ? "Searching…" : "Refresh"}
+          </button>
+        )}
       </div>
-      <p className="-mt-1 text-[12px] text-muted" aria-live="polite">
-        {note}
-      </p>
+      {searchable && (
+        <p className="-mt-1 text-[12px] text-muted" aria-live="polite">
+          {note}
+        </p>
+      )}
       {problems.map((problem) => (
         <p key={problem} className="alert">
           {problem}
         </p>
       ))}
-      {changes && changes.length === 0 && !error ? (
-        <div className="empty">Nothing assigned to you right now.</div>
-      ) : (
-        <ChangeList changes={changes} error={error} />
-      )}
+      <ChangeList changes={changes} error={error} empty="Nothing assigned to you right now." />
     </section>
   );
 }
 
-/** Changes from PRs GitHub no longer lists for you. They stay, since a Change lives past merge. */
-function EarlierAssigned({ changes }: { changes: ChangeSummary[] | undefined }) {
-  if (!changes || changes.length === 0) return null;
+/**
+ * The repo's open stacks that aren't yours. They're only analysed once you
+ * choose Analyse on the stack, so most rows open the stack, not a Change.
+ */
+function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[] }) {
+  const stacks = useQuery({
+    queryKey: ["stacks", repo],
+    queryFn: () => api.stacks(repo),
+    refetchInterval: pollWhilePending,
+  });
+  const found = stacks.data && !isPending(stacks.data) ? stacks.data.stacks : null;
+  const progress = isPending(stacks.data) ? stacks.data.progress : null;
+  const covers = (stack: StackSummary, change: ChangeSummary) =>
+    stack.prs.some((pr) => pr.number === change.tipPr);
+  const yours = changes.filter((c) => c.yours.length > 0);
+  const others = (found ?? []).filter(
+    (stack) => stack.prs.some((pr) => pr.state === "open") && !yours.some((c) => covers(stack, c)),
+  );
+  const id = `others-${repo.replace("/", "-")}`;
   return (
-    <details className="grid gap-3">
-      <summary className="h2 cursor-pointer">Earlier assignments ({changes.length})</summary>
-      <ChangeList changes={changes} error={null} />
-    </details>
+    <section className="grid gap-3" aria-labelledby={id}>
+      <h2 id={id} className="h2">
+        Other stacks in {repo}
+      </h2>
+      <p className="-mt-1 text-[12px] text-muted">
+        Open stacks nobody has asked you about. Strata analyses one when you choose Analyse on it.
+      </p>
+      {stacks.error ? (
+        <p className="alert">{stacks.error.message}</p>
+      ) : !found ? (
+        <p role="status" className="text-[12px] text-muted">
+          Reading {repo}'s stacks…{progress ? ` ${progress}.` : ""}
+        </p>
+      ) : others.length === 0 ? (
+        <div className="empty">No other open stacks.</div>
+      ) : (
+        <ul className="list">
+          {others.map((stack) => {
+            const change = changes.find((c) => c.yours.length === 0 && covers(stack, c));
+            const root = stack.prs.find((pr) => pr.number === stack.root);
+            const authors = [...new Set(stack.prs.flatMap((pr) => (pr.author ? [pr.author] : [])))];
+            return (
+              <li key={stack.id}>
+                <Link
+                  href={change ? `/changes/${change.id}` : `/repos/${repo}#stack-${stack.root}`}
+                  className="lrow"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">{root?.title}</span>
+                    <span className="ml-2 text-[12px] text-muted">
+                      {countPrs(stack.prs)}
+                      {authors.length > 0 && ` by ${authors.join(", ")}`}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-mono text-[12px] text-faint">
+                    {repo}#{stack.root}
+                  </span>
+                  <span className="pill">
+                    {change?.status ? STATUS[change.status] : "Not analysed"}
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-[12px] text-faint">
+                    {ago(stack.updatedAt)}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -252,19 +222,15 @@ const STATUS: Record<RunStatus, string> = {
 function ChangeList({
   changes,
   error,
+  empty,
 }: {
   changes: ChangeSummary[] | undefined;
   error: string | null;
+  empty: string;
 }) {
   if (error) return <p className="alert">{error}</p>;
   if (!changes) return null;
-  if (changes.length === 0) {
-    return (
-      <div className="empty">
-        No Changes yet. Give Strata a PR above, or pick a stack from a repo.
-      </div>
-    );
-  }
+  if (changes.length === 0) return <div className="empty">{empty}</div>;
   return (
     <ul className="list">
       {changes.map((change) => (

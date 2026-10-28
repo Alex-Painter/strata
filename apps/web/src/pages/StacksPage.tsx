@@ -1,6 +1,6 @@
 import type { MeResponse, StackSummary } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { EvidenceList } from "../components/EvidenceList";
@@ -24,6 +24,12 @@ export function StacksPage({ me }: { me: MeResponse }) {
   });
   const found = stacks.data && !isPending(stacks.data) ? stacks.data : null;
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
+  // The home page links a stack as #stack-<root>; show it once the list is in.
+  const listed = Boolean(found);
+  useEffect(() => {
+    if (!listed || !window.location.hash) return;
+    document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "start" });
+  }, [listed]);
   return (
     <AppShell
       me={me}
@@ -96,7 +102,11 @@ function StackCard({ stack }: { stack: StackSummary }) {
   };
 
   return (
-    <article aria-label={`Stack from #${stack.root}`} className="rounded-lg border border-line">
+    <article
+      id={`stack-${stack.root}`}
+      aria-label={`Stack from #${stack.root}`}
+      className="scroll-mt-4 rounded-lg border border-line"
+    >
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{root?.title}</h2>
@@ -133,8 +143,13 @@ function StackCard({ stack }: { stack: StackSummary }) {
             disabled={open.isPending}
             className="btn primary"
           >
-            {open.isPending ? "Opening…" : `Review ${prCount(path.length)}`}
+            {open.isPending ? "Opening…" : `Analyse ${prCount(path.length)}`}
           </button>
+          {!open.error && (
+            <span className="text-[12px] text-muted">
+              Strata reads the diffs, and Claude writes the summary on repos you've opted in.
+            </span>
+          )}
           {open.error && (
             <span role="alert" className="text-text">
               {open.error.message}

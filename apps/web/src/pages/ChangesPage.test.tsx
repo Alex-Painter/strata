@@ -1,4 +1,9 @@
-import type { AssignedStatus, ChangeSummary } from "@strata/core/model";
+import type {
+  AssignedStatus,
+  ChangeSummary,
+  StackPrSummary,
+  StackSummary,
+} from "@strata/core/model";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -14,6 +19,8 @@ const change = (id: string, fields: Partial<ChangeSummary>): ChangeSummary => ({
   origin: "added",
   yours: [],
   waiting: false,
+  rootPr: Number(id),
+  tipPr: Number(id),
   createdAt: "2026-10-01T00:00:00Z",
   updatedAt: "2026-10-01T00:00:00Z",
   ...fields,
@@ -32,12 +39,29 @@ const list: ChangeSummary[] = [
       },
     ],
   }),
-  change("4", {}),
+  // Opened by hand from #20's stack.
+  change("20", { rootPr: 20, tipPr: 21 }),
   change("6", {
     origin: "assigned",
-    yours: [{ number: 6, reasons: [{ kind: "assignee" }], active: false, seenAt }],
+    yours: [{ number: 6, reasons: [{ kind: "reviewed" }], active: true, seenAt }],
   }),
 ];
+const pr = (number: number, fields: Partial<StackPrSummary> = {}) =>
+  ({ number, title: `PR ${number}`, author: "sam", state: "open", ...fields }) as StackPrSummary;
+const stack = (root: number, prs: StackPrSummary[]) =>
+  ({ id: `s${root}`, repo: "acme/app", root, prs, updatedAt: seenAt }) as unknown as StackSummary;
+const stacks = {
+  repo: "acme/app",
+  stacks: [
+    // #2-#3 is yours (waiting), #5-#6 too (reviewed): neither is listed again.
+    stack(2, [pr(2), pr(3)]),
+    stack(5, [pr(5), pr(6)]),
+    stack(20, [pr(20), pr(21)]),
+    stack(30, [pr(30, { author: "kim" }), pr(31)]),
+    // All merged: not open, so not listed.
+    stack(40, [pr(40, { state: "merged" }), pr(41, { state: "merged" })]),
+  ],
+};
 let status: AssignedStatus;
 const posts: string[] = [];
 
@@ -60,6 +84,7 @@ beforeEach(() => {
       }
       if (url === "/api/assigned") return Response.json(status);
       if (url === "/api/changes") return Response.json(list);
+      if (url === "/api/repos/acme/app/stacks") return Response.json(stacks);
       return Response.json({ error: "Not found." }, { status: 404 });
     }),
   );
@@ -71,7 +96,7 @@ afterEach(() => {
 
 const flush = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
 
-it("puts Changes waiting on you first, with your PRs and why, and searches on request", async () => {
+it("splits Changes by what they ask of you, lists the repo's other stacks, and searches on request", async () => {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -83,16 +108,29 @@ it("puts Changes waiting on you first, with your PRs and why, and searches on re
     ),
   );
   await flush();
+  await flush();
 
-  const waiting = container.querySelector('section[aria-labelledby="waiting-h"]') as HTMLElement;
-  expect(waiting.textContent).toContain("Change 3");
+  const section = (heading: string) =>
+    container.querySelector(`section[aria-labelledby="${heading}"]`) as HTMLElement;
+  const rows = (heading: string) =>
+    [...section(heading).querySelectorAll("a.lrow")].map((a) => [
+      a.getAttribute("href"),
+      a.textContent,
+    ]);
+
+  const waiting = section("waiting-h");
+  expect(rows("waiting-h")).toHaveLength(1);
   expect(waiting.textContent).toContain("#3 review requested from acme/backend");
   expect(waiting.textContent).toContain("acme/app#9: no luck");
-  expect(waiting.textContent).not.toContain("Change 4");
-  const earlier = container.querySelector("details") as HTMLElement;
-  expect(earlier.textContent).toContain("Earlier assignments (1)");
-  expect(earlier.textContent).toContain("#6 assigned");
-  expect(container.textContent).toContain("Change 4");
+
+  expect(rows("assigned-h")).toHaveLength(1);
+  expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
+
+  const others = rows("others-acme-app");
+  expect(others.map(([href]) => href)).toEqual(["/changes/20", "/repos/acme/app#stack-30"]);
+  expect(others[0]?.[1]).toContain("Analysed");
+  expect(others[1]?.[1]).toContain("Not analysed");
+  expect(others[1]?.[1]).toContain("by kim, sam");
 
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",

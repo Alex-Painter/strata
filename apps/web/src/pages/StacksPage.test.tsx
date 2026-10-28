@@ -133,7 +133,7 @@ it("opens only the path the card shows when the path changes while opening", asy
   await wait(50);
 
   act(() => button(/PR 7/).click());
-  act(() => button(/^Review/).click());
+  act(() => button(/^Analyse/).click());
   await wait(50);
   expect(button(/Opening/)).toBeDefined();
 
@@ -142,9 +142,9 @@ it("opens only the path the card shows when the path changes while opening", asy
   opened = true;
   await wait(3000);
   expect(window.location.pathname).toBe("/repos/acme/app");
-  expect(button(/^Review/).disabled).toBe(false);
+  expect(button(/^Analyse/).disabled).toBe(false);
 
-  act(() => button(/^Review/).click());
+  act(() => button(/^Analyse/).click());
   await wait(50);
   expect(window.location.pathname).toBe("/changes/chg_6");
   expect(leaves.at(-1)).toBe(6);
@@ -163,9 +163,9 @@ it("opens the path the card shows after the stack list changes under it", async 
   opened = true;
   const { root, button } = render(client);
   await wait(50);
-  expect(button(/^Review/).textContent).toBe("Review 3 PRs");
+  expect(button(/^Analyse/).textContent).toBe("Analyse 3 PRs");
 
-  act(() => button(/^Review/).click());
+  act(() => button(/^Analyse/).click());
   await wait(50);
   expect(leaves).toEqual([9]);
   act(() => root.unmount());
