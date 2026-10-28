@@ -38,7 +38,9 @@ export function ChangesPage({ me }: { me: MeResponse }) {
   const all = changes.data;
   const error = changes.error?.message ?? null;
   const repos = assigned.data?.repos ?? [];
-  const opened = all?.filter((c) => c.yours.length === 0) ?? [];
+  // A path the search made that no longer holds your PRs (they moved to a
+  // longer path) is one you were on before, not one you opened.
+  const opened = all?.filter((c) => c.yours.length === 0 && c.origin === "added") ?? [];
   return (
     <AppShell
       me={me}
@@ -64,7 +66,9 @@ export function ChangesPage({ me }: { me: MeResponse }) {
               Stacks you've reviewed already, or were on before.
             </p>
             <ChangeList
-              changes={all?.filter((c) => !c.waiting && c.yours.length > 0)}
+              changes={all?.filter(
+                (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
+              )}
               error={error}
               empty="Nothing here yet."
             />
@@ -239,7 +243,10 @@ function ChangeList({
                 <span className="ml-2 text-[12px] text-muted">{yoursLabel(change.yours)}</span>
               )}
             </span>
-            <span className="shrink-0 font-mono text-[12px] text-faint">{change.input}</span>
+            <span className="shrink-0 font-mono text-[12px] text-faint">
+              {change.repo}#{change.rootPr}
+              {change.tipPr !== change.rootPr && ` → #${change.tipPr}`}
+            </span>
             {change.status && <span className="pill">{STATUS[change.status]}</span>}
             <span className="w-16 shrink-0 text-right text-[12px] text-faint">
               {ago(change.updatedAt)}

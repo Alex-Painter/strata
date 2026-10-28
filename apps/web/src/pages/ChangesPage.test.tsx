@@ -45,6 +45,8 @@ const list: ChangeSummary[] = [
     origin: "assigned",
     yours: [{ number: 6, reasons: [{ kind: "reviewed" }], active: true, seenAt }],
   }),
+  // The search made #2 → #4 before #3's review moved to a longer path.
+  change("8", { origin: "assigned", rootPr: 2, tipPr: 4 }),
 ];
 const pr = (number: number, fields: Partial<StackPrSummary> = {}) =>
   ({ number, title: `PR ${number}`, author: "sam", state: "open", ...fields }) as StackPrSummary;
@@ -123,8 +125,9 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(waiting.textContent).toContain("#3 review requested from acme/backend");
   expect(waiting.textContent).toContain("acme/app#9: no luck");
 
-  expect(rows("assigned-h")).toHaveLength(1);
+  expect(rows("assigned-h").map(([href]) => href)).toEqual(["/changes/6", "/changes/8"]);
   expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
+  expect(section("assigned-h").textContent).toContain("acme/app#2 → #4");
 
   // #20's stack has a Change you opened, so it's listed there, not with the others.
   expect(rows("opened-h").map(([href]) => href)).toEqual(["/changes/20"]);
