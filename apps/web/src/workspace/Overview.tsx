@@ -19,7 +19,6 @@ import { EvidenceList } from "../components/EvidenceList";
 import { GuideView } from "../components/Guide";
 import { Icon, LAYER_ICON } from "../components/Icon";
 import { LayerMatrixView } from "../components/LayerMatrix";
-import { PathPicker } from "../components/PathPicker";
 import { StateBadge } from "../components/PrStatus";
 import {
   ago,
@@ -110,15 +109,11 @@ function RunAgain({ run }: { run: RunView }) {
 export function StackOverview({
   stack,
   summary,
-  onPickPath,
-  pickingPath,
   pickError,
   ...props
 }: OverviewProps & {
   stack: Stack;
   summary: StackSummary;
-  onPickPath?: (tip: number) => void;
-  pickingPath: number | null;
   pickError: string | null;
 }) {
   const { report } = props;
@@ -140,12 +135,6 @@ export function StackOverview({
           )}
         </p>
       </header>
-      <PathPicker
-        stack={summary}
-        current={path}
-        {...(onPickPath ? { onPick: onPickPath } : {})}
-        pending={pickingPath}
-      />
       {pickError && (
         <p role="alert" className="alert">
           {pickError}

@@ -19,6 +19,10 @@ const PAD = 11;
 
 const x = (lane: number) => PAD + lane * LANE;
 const y = (row: number, height: number) => row * height + height / 2;
+/** Where a lane's line runs. */
+export const laneX = x;
+/** How wide the drawing is for this many lanes. */
+export const gutterWidth = (lanes: number) => x(lanes - 1) + PAD + 4;
 
 /**
  * The stack drawn the way it grew: the trunk at the bottom, each PR on its own
@@ -48,7 +52,7 @@ export function StackMap({
   const widest = Math.max(1, ...[...(bars?.values() ?? [])].map((bar) => total(bar)));
   const prs = new Map(stack.prs.map((pr) => [pr.number, pr]));
   const onPath = (n: number) => !path || path.includes(n);
-  const gutter = x(layout.lanes - 1) + PAD + 4;
+  const gutter = gutterWidth(layout.lanes);
   const height = (layout.trunkRow + 1) * row;
 
   return (
@@ -247,7 +251,7 @@ function LayerBar({ bar, widest }: { bar: PrLayerBar | null; widest: number }) {
 
 const total = (bar: PrLayerBar) => bar.meaningful + bar.mechanical;
 
-function EdgeLine({ edge, dim, row }: { edge: StackMapEdge; dim: boolean; row: number }) {
+export function EdgeLine({ edge, dim, row }: { edge: StackMapEdge; dim: boolean; row: number }) {
   const fx = x(edge.from.lane);
   const fy = y(edge.from.row, row);
   const tx = x(edge.to.lane);
@@ -273,7 +277,17 @@ function EdgeLine({ edge, dim, row }: { edge: StackMapEdge; dim: boolean; row: n
   );
 }
 
-function Dot({ cx, cy, active, dim }: { cx: number; cy: number; active: boolean; dim: boolean }) {
+export function Dot({
+  cx,
+  cy,
+  active,
+  dim,
+}: {
+  cx: number;
+  cy: number;
+  active: boolean;
+  dim: boolean;
+}) {
   // Every PR is the same node; its state is a word on its row, never a colour.
   return (
     <g opacity={dim ? 0.5 : 1}>

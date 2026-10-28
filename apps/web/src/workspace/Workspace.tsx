@@ -1,11 +1,17 @@
-import type { ChangeReport, Claim, LayerId, MeResponse, YourPr } from "@strata/core/model";
+import type {
+  ChangeReport,
+  Claim,
+  LayerId,
+  MeResponse,
+  StackSummary,
+  YourPr,
+} from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
-import { reasonLabel } from "../lib/format";
 import { toggleTheme } from "../lib/theme";
 import { LayerView } from "./LayerView";
 import {
@@ -22,6 +28,7 @@ import {
 import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays";
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
 import { Panel, statusWord } from "./Panel";
+import { StackRail } from "./StackRail";
 
 /** Past this many PRs, the Pull requests section starts collapsed. */
 const MANY_PRS = 10;
@@ -347,6 +354,9 @@ export function Workspace({
             countIn={(id) => filesIn(diff, id).length}
             onNav={go}
             yours={yours}
+            summary={summary}
+            onPickPath={onPickPath}
+            pickingPath={pickingPath}
           />
         )
       }
@@ -439,8 +449,6 @@ export function Workspace({
                     {...overviewProps}
                     stack={stack}
                     summary={summary}
-                    {...(onPickPath ? { onPickPath } : {})}
-                    pickingPath={pickingPath}
                     pickError={pickError}
                   />
                 ) : (
@@ -490,6 +498,9 @@ function Sidebar({
   countIn,
   onNav,
   yours,
+  summary,
+  onPickPath,
+  pickingPath,
 }: {
   report: ChangeReport;
   layers: LayerId[];
@@ -498,10 +509,13 @@ function Sidebar({
   countIn: (layer: LayerId) => number;
   onNav: (nav: Partial<Nav>) => void;
   yours: YourPr[];
+  summary: StackSummary | null;
+  onPickPath: ((tip: number) => void) | undefined;
+  pickingPath: number | null;
 }) {
   const stack = report.stack;
   const path = stack?.selectedPath ?? [];
-  const [prsOpen, setPrsOpen] = useState(path.length <= MANY_PRS);
+  const [prsOpen, setPrsOpen] = useState((summary?.prs.length ?? 0) <= MANY_PRS);
   return (
     <>
       <button
@@ -536,7 +550,7 @@ function Sidebar({
           })}
         </div>
       )}
-      {stack && path.length > 0 && (
+      {summary && path.length > 0 && (
         <div className="sec">
           <button
             type="button"
@@ -547,40 +561,20 @@ function Sidebar({
           >
             <Icon name="chevd" />
             Pull requests
-            <span className="sn">{path.length}</span>
+            <span className="sn">{summary.prs.length}</span>
           </button>
           {prsOpen && (
-            <ul
-              id="prs-nav"
-              aria-label="Pull requests"
-              className="grid grid-cols-[minmax(0,1fr)] gap-px"
-            >
-              {path.map((n) => {
-                const node = stack.nodes.find((x) => x.pr.number === n);
-                const title = node?.pr.title ?? "";
-                const mine = yours.find((y) => y.number === n && y.active);
-                return (
-                  <li key={n} data-pr={n}>
-                    <button
-                      type="button"
-                      className="nrow pr"
-                      aria-label={`Show #${n} ${title}`}
-                      aria-current={pr === n ? "true" : undefined}
-                      title={`#${n} ${title}`}
-                      onClick={() => onNav({ pr: pr === n ? null : n })}
-                    >
-                      <span className="pid">{n}</span>
-                      <span className="nl">{title}</span>
-                      {mine && (
-                        <span className="nm" title={`Yours: ${reasonLabel(mine.reasons)}`}>
-                          yours
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div id="prs-nav">
+              <StackRail
+                stack={summary}
+                path={path}
+                pr={pr}
+                onScope={(to) => onNav({ pr: to })}
+                onPickPath={onPickPath}
+                pickingPath={pickingPath}
+                yours={yours}
+              />
+            </div>
           )}
         </div>
       )}

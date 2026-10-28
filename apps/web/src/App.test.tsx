@@ -72,6 +72,8 @@ const detail = (id: string, tip: number): ChangeDetail => ({
     origin: "added",
     yours: [],
     waiting: false,
+    rootPr: 5,
+    tipPr: tip,
     createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",
   },
@@ -145,9 +147,10 @@ it("forgets a path picked on one Change when the user goes back to another", asy
     ),
   );
   await wait(50);
+  // A PR on another branch of the stack opens its path.
   const pick = (tip: number) =>
-    [...container.querySelectorAll("fieldset button")].find((b) =>
-      b.textContent?.includes(`PR ${tip}`),
+    container.querySelector(
+      `ul[aria-label="Pull requests"] li[data-pr="${tip}"] button`,
     ) as HTMLButtonElement;
 
   act(() => pick(7).click());
