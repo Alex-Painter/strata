@@ -19,7 +19,7 @@ export async function readTemplate(file: string = TEMPLATE): Promise<string> {
     return await readFile(file, "utf8");
   } catch {
     throw new OutputError(
-      `The review page is built from the web app, and ${file} isn't there. ` +
+      `Strata makes the review page from the web app, but ${file} is not there. ` +
         "Build it with pnpm --filter @strata/web build.",
     );
   }
@@ -27,7 +27,8 @@ export async function readTemplate(file: string = TEMPLATE): Promise<string> {
 
 export function injectReport(template: string, report: ChangeReport): string {
   const at = template.indexOf("</head>");
-  if (at === -1) throw new Error("The web app's static build has no </head>; rebuild it.");
+  if (at === -1)
+    throw new Error("The web app's static build does not have </head>. Build it again.");
   // Escaping "<" means report text can never close the script tag or open a
   // comment; U+2028/2029 are escaped for older JavaScript parsers.
   const json = JSON.stringify(report)
@@ -80,8 +81,8 @@ export async function refuseCheckouts(files: string[]): Promise<void> {
     const checkout = await checkoutAround(file);
     if (checkout) {
       throw new OutputError(
-        `Strata won't write to ${path.resolve(file)}: it's inside the git checkout ${checkout}, ` +
-          "where it could be committed by accident. Choose a path outside it.",
+        `Strata does not write to ${path.resolve(file)}. It is in the git checkout ${checkout}, ` +
+          "where somebody can commit it by accident. Select a path outside the checkout.",
       );
     }
   }

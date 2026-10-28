@@ -120,7 +120,7 @@ export function requireUser({ config, db }: AppDeps): MiddlewareHandler<AppEnv> 
       if (found)
         user = { id: found.id, login: found.login, name: found.name, avatarUrl: found.avatarUrl };
     }
-    if (!user) return c.json({ error: "Sign in required." }, 401);
+    if (!user) return c.json({ error: "You must sign in." }, 401);
     c.set("user", user);
     await next();
   };

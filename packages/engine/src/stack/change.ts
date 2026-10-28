@@ -49,7 +49,7 @@ export async function resolveStackChange(
   const stack = await resolveStack(index, seed, cache.gitDir);
   if (input.kind === "stack" && stack.selectedPath.join(",") !== input.numbers.join(",")) {
     throw new StackInputError(
-      `${input.numbers.map((n) => `#${n}`).join(", ")} isn't a chain of branch links. ` +
+      `${input.numbers.map((n) => `#${n}`).join(", ")} is not a chain of branch links. ` +
         `The stack through #${input.numbers[0]} is ${describePath(stack.selectedPath)}.`,
     );
   }
@@ -152,19 +152,19 @@ function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
   const path = stack.selectedPath;
   if (!stack.base) {
     return [
-      `Strata couldn't tell where the stack left ${stack.trunk.name}, so there are no diffs.`,
+      `Strata cannot find where the stack left ${stack.trunk.name}. Thus there are no diffs.`,
     ];
   }
   if (!diffs.whole) {
     return [
-      `Strata couldn't put #${path[0]} on ${stack.trunk.name}, so there's no whole-stack diff.`,
+      `Strata cannot put #${path[0]} on ${stack.trunk.name}. Thus there is no whole-stack diff.`,
     ];
   }
   if (diffs.placed.length < path.length) {
     const left = path.filter((n) => !diffs.placed.includes(n));
     return [
       `The whole-stack diff covers ${describePath(diffs.placed)} only. ` +
-        `${describePrs(left)} ${left.length === 1 ? "isn't" : "aren't"} in it. The stack's issues say why.`,
+        `${describePrs(left)} ${left.length === 1 ? "is not" : "are not"} in it. The stack's issues give the cause.`,
     ];
   }
   return [];

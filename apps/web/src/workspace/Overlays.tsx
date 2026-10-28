@@ -52,12 +52,21 @@ export function DisplayPopover({
       {row(
         "matrix",
         "Layers by PR",
-        "Which PR touches which layer, on the overview.",
+        "Shows on the overview which PR changes which layer.",
         "M",
         !matrixAvailable,
       )}
-      {row("seams", "PR seams", "The PR each hunk came from, or which PR revised it.", "S")}
-      {row("fold", "Fold mechanical files", "Lockfiles, generated files and the like.")}
+      {row(
+        "seams",
+        "PR seams",
+        "Shows the PR that each hunk came from, or the PR that revised it.",
+        "S",
+      )}
+      {row(
+        "fold",
+        "Fold mechanical files",
+        "Lockfiles, generated files and other mechanical files.",
+      )}
     </div>
   );
 }
@@ -137,7 +146,7 @@ export function CommandMenu({ commands, onClose }: { commands: Command[]; onClos
           }}
         />
         <div id="cmdk-list" ref={listRef} role="listbox" aria-label="Results" className="cl">
-          {shown.length === 0 && <p className="px-3 py-4 text-faint">Nothing matches.</p>}
+          {shown.length === 0 && <p className="px-3 py-4 text-faint">No item matches.</p>}
           {shown.map((command, i) => {
             const heading = command.group !== group;
             group = command.group;
@@ -178,7 +187,7 @@ export const KEYS: Array<[keys: string[], action: string]> = [
   [["S"], "PR seams"],
   [["M"], "Layers by PR"],
   [["\\"], "Show or hide the side panel"],
-  [["Esc"], "Back out one step"],
+  [["Esc"], "Go back one step"],
 ];
 
 export function Shortcuts({ onClose }: { onClose: () => void }) {
@@ -218,7 +227,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
           ))}
         </dl>
         <p className="px-[18px] pb-4 text-[12px] text-faint">
-          Single keys never fire while you're typing.
+          Single keys do not operate while you type.
         </p>
       </div>
     </div>

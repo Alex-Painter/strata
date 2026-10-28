@@ -1,9 +1,9 @@
 import { Logo } from "../components/Icon";
 
 const AUTH_ERRORS: Record<string, string> = {
-  not_allowed: "That GitHub account isn't on this Strata's allowlist.",
-  invalid_state: "Sign-in expired or was interrupted. Try again.",
-  github_error: "GitHub didn't complete the sign-in. Try again.",
+  not_allowed: "That GitHub account is not on this Strata's allowlist.",
+  invalid_state: "The sign-in expired or stopped. Try again.",
+  github_error: "GitHub did not complete the sign-in. Try again.",
 };
 
 export function SignInPage() {
@@ -14,10 +14,10 @@ export function SignInPage() {
         <Logo />
         <div className="grid gap-1">
           <h1 className="h1">Strata</h1>
-          <p className="text-muted">Review the system change, not just the diff.</p>
+          <p className="text-muted">Review the system change, not only the diff.</p>
         </div>
         {error && (
-          <p className="alert w-full text-left">{AUTH_ERRORS[error] ?? "Sign-in failed."}</p>
+          <p className="alert w-full text-left">{AUTH_ERRORS[error] ?? "The sign-in failed."}</p>
         )}
         <a href="/auth/login" className="btn primary h-8 w-full justify-center">
           Sign in with GitHub

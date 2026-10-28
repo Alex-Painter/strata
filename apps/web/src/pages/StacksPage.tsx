@@ -43,14 +43,14 @@ export function StacksPage({ me }: { me: MeResponse }) {
           <header className="grid gap-1">
             <h1 className="h1">Stacks in {repo}</h1>
             <p className="text-muted">
-              PRs whose branches feed into each other, with at least one still open, from PRs
-              updated in the last 90 days.
+              PRs whose branches feed into each other. Each stack has one or more open PRs. Strata
+              reads the PRs that changed in the last 90 days.
               {found && <ReadAt readAt={found.readAt} refreshing={found.refreshing} />}
             </p>
           </header>
           {!stacks.error && (stacks.isPending || isPending(stacks.data)) && (
             <p role="status" className="text-muted">
-              Reading {repo}'s PRs and fetching their branches…
+              Strata reads the PRs in {repo} and fetches their branches…
               {progress && <span className="block">{progress}.</span>}
             </p>
           )}
@@ -69,7 +69,7 @@ export function StacksPage({ me }: { me: MeResponse }) {
           )}
           {found?.stacks.length === 0 && (
             <div className="empty">
-              No open stacks here: no open PR targets another PR's branch.
+              There are no open stacks here. No open PR targets the branch of another PR.
             </div>
           )}
           {found?.stacks.map((stack) => (
@@ -175,7 +175,7 @@ export function ReadAt({ readAt, refreshing }: { readAt: string; refreshing: boo
   return (
     <span className="block text-[12px] text-faint">
       Read {ago(readAt)}
-      {refreshing && ", checking for changes…"}
+      {refreshing && ". Strata looks for changes…"}
     </span>
   );
 }
@@ -200,7 +200,7 @@ function AnalyseButton({
       </button>
       {!error && (
         <span className="text-[12px] text-muted">
-          Strata reads the diffs, and Claude writes the summary on repos you've opted in.
+          Strata reads the diffs. On repos that you opted in, Claude writes the summary.
         </span>
       )}
       {error && (

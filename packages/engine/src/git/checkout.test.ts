@@ -53,7 +53,7 @@ describe("readCheckout", () => {
     try {
       await expect(readCheckout(elsewhere)).rejects.toThrow(CheckoutError);
       await expect(readCheckout(join(elsewhere, "missing"))).rejects.toThrow(
-        /missing isn't a git checkout/,
+        /missing is not a git checkout/,
       );
     } finally {
       await rm(elsewhere, { recursive: true, force: true });

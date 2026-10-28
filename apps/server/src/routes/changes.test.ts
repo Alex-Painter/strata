@@ -109,7 +109,7 @@ describe("GET /api/repos/:owner/:name/stacks", () => {
     const res = await app.request("/api/repos/acme/other/stacks");
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({
-      error: "GitHub has no repo acme/other, or the token can't see it.",
+      error: "GitHub does not have the repo acme/other, or the token cannot see it.",
     });
   });
 });
@@ -283,13 +283,13 @@ describe("Changes", () => {
   it("answers bad input with a reason", async () => {
     const { post } = setup();
     const cases: [unknown, number, RegExp][] = [
-      [{ input: "not a pr" }, 400, /Can't read "not a pr"/],
-      [{ input: "acme/app#1,3" }, 400, /isn't a chain of branch links/],
-      [{ input: "acme/app#99" }, 400, /#99 isn't in the PR index/],
+      [{ input: "not a pr" }, 400, /cannot read "not a pr"/],
+      [{ input: "acme/app#1,3" }, 400, /is not a chain of branch links/],
+      [{ input: "acme/app#99" }, 400, /#99 is not in the PR index/],
       [{ input: "acme/app#1,2", leaf: 3 }, 400, /leaf only applies/],
-      [{ input: "acme/app@main...b4" }, 501, /Commit ranges/],
-      [{ input: "acme/app#2", sources: [{ kind: "spec" }] }, 501, /Context sources/],
-      [{ nope: 1 }, 400, /Expected/],
+      [{ input: "acme/app@main...b4" }, 501, /commit ranges/],
+      [{ input: "acme/app#2", sources: [{ kind: "spec" }] }, 501, /context sources/],
+      [{ nope: 1 }, 400, /must be/],
     ];
     for (const [body, status, message] of cases) {
       const res = await post("/api/changes", body);

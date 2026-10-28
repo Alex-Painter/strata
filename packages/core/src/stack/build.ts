@@ -160,7 +160,7 @@ class Builder {
       this.issue(
         "missing-commit",
         [root.number],
-        `Couldn't tell where #${root.number} left ${trunkName}.`,
+        `Strata cannot find where #${root.number} left ${trunkName}.`,
         [prEvidence(root.number, `#${root.number}`)],
       );
     }
@@ -180,7 +180,7 @@ class Builder {
             "ambiguous-parent",
             [pr.number],
             `#${pr.number} could sit on #${parent.number} or #${other.number}. ` +
-              `Strata picked #${parent.number}, the newer one.`,
+              `Strata selected #${parent.number}, the newer PR.`,
             [
               prEvidence(pr.number, `#${pr.number} targets ${choice.ref}`),
               prEvidence(parent.number, `#${parent.number}'s head is ${parent.headRef}`),
@@ -229,7 +229,7 @@ class Builder {
   private resolveSeed(seed: StackSeed): StackPr {
     if ("pr" in seed) {
       const pr = this.byNumber.get(seed.pr);
-      if (!pr) throw new StackError(`#${seed.pr} isn't in the PR index for ${this.index.repo}.`);
+      if (!pr) throw new StackError(`#${seed.pr} is not in the PR index for ${this.index.repo}.`);
       return pr;
     }
     const onBranch = this.index.prs.filter(
@@ -271,7 +271,7 @@ class Builder {
         "cycle",
         numbers,
         `${numbers.map((n) => `#${n}`).join(", ")} target each other's branches. ` +
-          `Strata cut the link below #${newestChild.number}, the newest.`,
+          `Strata removed the link below #${newestChild.number}, the newest PR.`,
         numbers.map((n) => prEvidence(n, `#${n}`)),
       );
     }
@@ -398,8 +398,8 @@ class Builder {
           this.issue(
             "base-already-merged",
             [child.number, parent.number],
-            `#${child.number} was merged into ${ref} after #${parent.number} had merged, ` +
-              "so its changes never reached the trunk.",
+            `Someone merged #${child.number} into ${ref} after #${parent.number} merged. ` +
+              "Thus its changes did not go into the trunk.",
             evidence,
           );
         }
@@ -447,8 +447,8 @@ class Builder {
           "needs-restack",
           [child.number],
           link === "behind"
-            ? `#${parent.number} has commits that #${child.number} doesn't. #${child.number} needs a restack.`
-            : `#${child.number} sits on a head that #${parent.number} force-pushed away. #${child.number} needs a restack.`,
+            ? `#${parent.number} has commits that #${child.number} does not have. #${child.number} needs a restack.`
+            : `#${child.number} sits on a head that a force-push removed from #${parent.number}. #${child.number} needs a restack.`,
           evidence,
         );
       }
@@ -456,8 +456,8 @@ class Builder {
         this.issue(
           "base-already-merged",
           [child.number, parent.number],
-          `#${child.number} still targets ${ref}, but #${parent.number} has merged, ` +
-            "so merging it won't reach the trunk.",
+          `#${child.number} still targets ${ref}, but #${parent.number} merged. ` +
+            `Thus a merge of #${child.number} will not go into the trunk.`,
           evidence,
         );
       }
@@ -468,7 +468,7 @@ class Builder {
       this.issue(
         "missing-commit",
         [child.number],
-        `Couldn't tell where #${child.number}'s own changes start.`,
+        `Strata cannot find where the own changes of #${child.number} start.`,
         evidence,
       );
     }
@@ -599,7 +599,8 @@ class Builder {
     let tip: StackNode;
     if (leaf !== undefined) {
       const chosen = reachable.find((node) => node.pr.number === leaf);
-      if (!chosen) throw new StackError(`#${leaf} isn't at or above #${seed.number} in its stack.`);
+      if (!chosen)
+        throw new StackError(`#${leaf} is not at or above #${seed.number} in its stack.`);
       tip = chosen;
     } else {
       const tips = reachable.filter((node) => node.children.length === 0);

@@ -44,7 +44,7 @@ export function LayerView({
     return (
       <p className="text-muted">
         {diff.pr === null
-          ? `No ${LAYERS[layer].title} changes.`
+          ? `There are no ${LAYERS[layer].title} changes.`
           : `#${diff.pr} has no ${LAYERS[layer].title} changes.`}
       </p>
     );

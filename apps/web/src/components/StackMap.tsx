@@ -191,7 +191,7 @@ function PrRow({
             target="_blank"
             rel="noreferrer"
             className="relative font-mono hover:text-text"
-            title="The commit it landed as"
+            title="The commit that GitHub merged"
           >
             as {shortOid(pr.mergeCommitOid)}
           </a>
@@ -316,7 +316,7 @@ export function CopyMermaid({ stack }: { stack: StackSummary }) {
         setTimeout(() => setCopied(null), 1500);
       }}
     >
-      {copied === "yes" ? "Copied" : copied === "failed" ? "Couldn't copy" : "Copy as Mermaid"}
+      {copied === "yes" ? "Copied" : copied === "failed" ? "Cannot copy" : "Copy as Mermaid"}
     </button>
   );
 }

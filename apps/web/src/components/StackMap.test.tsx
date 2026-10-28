@@ -79,7 +79,7 @@ describe("StackMap", () => {
       const row = page.querySelector(`li[data-pr='${number}']`);
       expect(row?.querySelector(`a[href='${url}']`)?.textContent).toBe(`#${number}`);
     }
-    const landed = page.querySelector("li[data-pr='1'] a[title='The commit it landed as']");
+    const landed = page.querySelector("li[data-pr='1'] a[title='The commit that GitHub merged']");
     expect(landed?.getAttribute("href")).toBe(`https://github.com/acme/app/commit/${MERGED}`);
     expect(landed?.textContent).toBe("as 5555555");
   });

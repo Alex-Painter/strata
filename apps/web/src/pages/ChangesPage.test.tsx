@@ -137,7 +137,7 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
   expect(others[0]?.[1]).toContain("Not analysed");
   expect(others[0]?.[1]).toContain("by kim, sam");
-  expect(section("others-acme-app").textContent).toContain("checking for changes");
+  expect(section("others-acme-app").textContent).toContain("Strata looks for changes");
 
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",

@@ -301,7 +301,7 @@ export function Workspace({
           <Breadcrumb items={[...(me ? [{ label: "Changes", href: "/" }] : []), { label: name }]} />
           <span
             className="pill status ml-1.5"
-            title={report?.verdict?.headline ?? "Strata doesn't decide a verdict yet."}
+            title={report?.verdict?.headline ?? "Strata does not give a verdict at this time."}
           >
             {statusWord(report, run)}
           </span>
@@ -457,7 +457,7 @@ export function Workspace({
               ) : (
                 !run && (
                   <p className="text-muted">
-                    Nothing to show yet: this Change hasn't been analysed.
+                    There is nothing to show. Strata did not analyse this Change.
                   </p>
                 )
               )}

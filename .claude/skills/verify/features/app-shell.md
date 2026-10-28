@@ -23,7 +23,7 @@ Preconditions:
 
 - One instance from `strata-verify up` (bypass mode), passing `doctor`. `$B` stands for its RUN_ID and `URL` for its URL.
 
-- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"` with the text `Nothing assigned to you right now.` and `heading "Assigned to you, not waiting"` with `Nothing here yet.` (the assignment search is off without `--assigned`, so there's no Refresh). Also `link "Strata"`, the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
+- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"` with the text `Nobody assigned a stack to you at this time.` and `heading "Assigned to you, not waiting"` with `There are no stacks here at this time.` (the assignment search is off without `--assigned`, so there's no Refresh). Also `link "Strata"`, the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
 - **Missing Change.** `navigate` to `URL/changes/abc`. The page shows `Not found.` under a breadcrumb `Changes › Change`.
 - **Home link.** From that page, `find` "Strata" (the link) and click it. The URL becomes `URL/` and `heading "Waiting on you"` appears, with no full page reload needed.
 - **Not found.** `navigate` to `URL/nope`. The page shows `Page not found.`
@@ -35,4 +35,4 @@ Preconditions:
 
 - The workspace needs a real Change to show anything more; [stacks.md](./stacks.md) opens one against the fixture GitHub.
 - The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its Chat says `This page is a snapshot. Chat needs the Strata server.` [cli.md](./cli.md) writes one and compares it with the workspace.
-- If the page shows `Couldn't reach the Strata server: ...`, `/api/me` failed with something other than 401. Run `doctor`.
+- If the page shows `Strata cannot connect to its server: ...`, `/api/me` failed with something other than 401. Run `doctor`.

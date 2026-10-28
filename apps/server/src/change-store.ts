@@ -15,7 +15,7 @@ import { latestRun, type RunQueue } from "./runs.js";
 /** The PRs a resolved Change covers, bottom first. */
 export function pathOf(resolved: ResolvedChange): number[] {
   const path = resolved.stack?.selectedPath ?? [];
-  if (path.length === 0) throw new Error("A stack came back with no PRs.");
+  if (path.length === 0) throw new Error("Strata received a stack with no PRs.");
   return path;
 }
 

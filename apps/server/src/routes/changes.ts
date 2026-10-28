@@ -83,13 +83,14 @@ export function changeRoutes(deps: AppDeps) {
 
   app.post("/changes", async (c) => {
     const parsed = CreateChange.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: "Expected { input, leaf? }." }, 400);
+    if (!parsed.success) return c.json({ error: "The body must be { input, leaf? }." }, 400);
     const { input: raw, leaf, sources } = parsed.data;
-    if (sources?.length) return c.json({ error: "Context sources aren't supported yet." }, 501);
+    if (sources?.length)
+      return c.json({ error: "Strata cannot read context sources at this time." }, 501);
 
     let input = parseChangeInput(raw);
     if (input.kind === "range")
-      return c.json({ error: "Commit ranges aren't supported yet." }, 501);
+      return c.json({ error: "Strata cannot read commit ranges at this time." }, 501);
     if (leaf !== undefined) {
       if (input.kind !== "stack-of")
         return c.json({ error: "leaf only applies to one PR or branch." }, 400);

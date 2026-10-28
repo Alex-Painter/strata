@@ -43,7 +43,7 @@ export function formatReport(report: ChangeReport): string {
         `  ${`#${part.pr}`.padEnd(width)}  ${partLine(part)}  ${titles.get(part.pr) ?? ""}`,
       );
       if (part.github && !part.github.same) {
-        lines.push(`  ${" ".repeat(width)}  GitHub's diff differs: ${part.github.reason}`);
+        lines.push(`  ${" ".repeat(width)}  GitHub's diff is different: ${part.github.reason}`);
       }
       for (const claim of part.summary) lines.push(`  ${" ".repeat(width)}  ${sentence(claim)}`);
     }

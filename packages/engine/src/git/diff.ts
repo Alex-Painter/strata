@@ -175,7 +175,9 @@ export async function replay(
   }
   const [major, minor] = await gitVersion();
   if (major < 2 || (major === 2 && minor < 38)) {
-    throw new Error(`Replaying a PR needs git 2.38 or later, and this is git ${major}.${minor}.`);
+    throw new Error(
+      `Strata must have git 2.38 or later to replay a PR. This is git ${major}.${minor}.`,
+    );
   }
   throw new Error(`git merge-tree failed (${code}): ${stderr.trim()}`);
 }

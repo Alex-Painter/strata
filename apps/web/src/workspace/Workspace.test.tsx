@@ -163,7 +163,7 @@ describe("Workspace", () => {
     expect(to).toBe(`https://github.com/acme/app/commit/${head}`);
     expect(panel(page)?.textContent).toContain("Strata guessed nothing.");
     expect(page.querySelector("#summary-heading")?.parentElement?.textContent).toContain(
-      "Written by Claude from the range's diff alone.",
+      "Claude wrote this from the range's diff only.",
     );
     expect(page.textContent).toContain("Strata's groups of the range");
     expect(page.querySelectorAll("li[data-section]")).toHaveLength(2);
@@ -195,11 +195,8 @@ describe("Workspace", () => {
       act(() => root?.unmount());
       return text;
     };
-    expect(status("Reading PRs from GitHub: 350 so far")).toBe(
-      "Refreshing: reading PRs from GitHub: 350 so far…",
-    );
-    expect(status("Cloning GlyphicAI/app into Strata's cache")).toBe(
-      "Refreshing: cloning GlyphicAI/app into Strata's cache…",
+    expect(status("Strata reads PRs from GitHub: 350 at this time")).toBe(
+      "Strata refreshes the report. Strata reads PRs from GitHub: 350 at this time…",
     );
   });
 
@@ -311,7 +308,7 @@ describe("Workspace", () => {
     act(() => (page.querySelector("[data-claim] button") as HTMLButtonElement).click());
     const details = panel(page);
     expect(details?.querySelector("h2")?.textContent).toBe("Accounts get a forecast flag.");
-    expect(details?.textContent).toContain("Written by Claude from the range's diff");
+    expect(details?.textContent).toContain("Claude wrote this from the range's diff");
     expect(details?.querySelector(`[data-hunk="${model.id}"]`)?.textContent).toContain(
       "app/models/account.py",
     );

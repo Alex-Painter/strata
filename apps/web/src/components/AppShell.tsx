@@ -81,7 +81,7 @@ function SideFooter({ me }: { me: MeResponse | undefined }) {
           <span className="min-w-0 flex-1 truncate text-muted">{me.login}</span>
         </>
       ) : (
-        <span className="min-w-0 flex-1 truncate">Report written by the CLI</span>
+        <span className="min-w-0 flex-1 truncate">The CLI wrote this report</span>
       )}
       <button type="button" className="ib" aria-label="Switch theme" onClick={toggleTheme}>
         <Icon name="theme" />

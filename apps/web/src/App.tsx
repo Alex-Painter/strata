@@ -21,7 +21,9 @@ function ServerApp() {
   if (me.isPending) return null;
   if (me.error instanceof HttpError && me.error.status === 401) return <SignInPage />;
   if (me.error) {
-    return <p className="p-6 text-muted">Couldn't reach the Strata server: {me.error.message}</p>;
+    return (
+      <p className="p-6 text-muted">Strata cannot connect to its server: {me.error.message}</p>
+    );
   }
 
   return (

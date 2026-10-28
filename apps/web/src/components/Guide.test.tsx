@@ -101,7 +101,9 @@ describe("GuideView", () => {
         onClaim={onClaim}
       />,
     );
-    expect(page.textContent).toContain("Claude's reading order for the whole stack");
+    expect(page.textContent).toContain(
+      "The order in which Claude tells you to read the whole stack",
+    );
     const items = [...page.querySelectorAll("li[data-section]")];
     expect(items.map((li) => li.querySelector("button")?.textContent)).toEqual([
       "1Forecasts2 files · +4 −0",

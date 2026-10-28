@@ -43,7 +43,7 @@ describe("parseCommand", () => {
   it("takes the tip of a fork's path with --leaf", () => {
     expect(parseCommand(["analyze", "acme/app#5", "--leaf", "6"])).toMatchObject({ leaf: 6 });
     expect(() => parseCommand(["analyze", "acme/app#5", "--leaf", "six"])).toThrow(
-      '--leaf needs a PR number, got "six".',
+      '--leaf must have a PR number, not "six".',
     );
     expect(() => parseCommand(["stacks", "acme/app", "--leaf", "6"])).toThrow(UsageError);
   });
@@ -62,7 +62,7 @@ describe("parseCommand", () => {
   });
 
   it("rejects stacks without an owner/repo, or with analyze-only flags", () => {
-    expect(() => parseCommand(["stacks"])).toThrow(/needs an <owner\/repo>/);
+    expect(() => parseCommand(["stacks"])).toThrow(/must have an <owner\/repo>/);
     expect(() => parseCommand(["stacks", "acme/app#12"])).toThrow(/owner\/repo/);
     expect(() => parseCommand(["stacks", "acme/app", "--out", "x.html"])).toThrow(UsageError);
   });

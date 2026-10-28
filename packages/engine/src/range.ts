@@ -38,13 +38,13 @@ export async function resolveRangeChange(
   ] as const) {
     if (!oid) {
       throw new ChangeInputError(
-        `Strata's copy of ${repo} has no ${ref}. Use a branch, or a commit on one.`,
+        `Strata's copy of ${repo} has no ${ref}. Use a branch, or a commit on a branch.`,
       );
     }
   }
   const start = await mergeBase(cache.gitDir, base as string, head as string);
   if (!start) {
-    throw new ChangeInputError(`${input.base} and ${input.head} don't have one merge base.`);
+    throw new ChangeInputError(`${input.base} and ${input.head} do not have one merge base.`);
   }
   const label = `${input.base}...${input.head}`;
   return {

@@ -16,7 +16,7 @@ import { compareLayers, type LayerId } from "../model/layers.js";
 export const UNCLASSIFIED: LayerAssignment = {
   layer: "other",
   by: "default",
-  reason: "Layers aren't assigned yet.",
+  reason: "Strata did not assign layers at this time.",
   confidence: "low",
 };
 

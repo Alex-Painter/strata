@@ -91,7 +91,7 @@ export async function summarise(
   options: { onProgress?: (step: string) => void; signal?: AbortSignal },
 ): Promise<Summaries> {
   if (steps.ask) {
-    options.onProgress?.("Writing the summaries");
+    options.onProgress?.("Claude writes the summaries");
     return writeSummaries(whole, parts, steps.ask, options.signal);
   }
   const groups = whole ? guideGroups(whole) : [];
@@ -109,17 +109,17 @@ export function wholeNotes(repo: RepoRef, whole: DiffModel | null, steps: Claude
     const files = one ? "the layer of 1 file" : `the layers of ${guessed.length} files`;
     notes.push(
       steps.settings.sendCodeToAnthropic
-        ? `Strata guessed ${files}. This repo lets Claude sort ${one ? "it" : "them"}, but Strata has no Anthropic API key.`
-        : `Strata guessed ${files}. To place ${one ? "it" : "them"}, add layer rules or turn on ` +
+        ? `Strata guessed ${files}. This repo lets Claude sort ${one ? "it" : "them"}, but Strata does not have an Anthropic API key.`
+        : `Strata guessed ${files}. To put ${one ? "it" : "them"} in a layer, add layer rules or turn on ` +
             `sendCodeToAnthropic in ${settings}.`,
     );
   }
   if (!steps.ask) {
-    const without = "There's no summary, and the Guide shows Strata's own groups";
+    const without = "There is no summary, and the Guide shows Strata's own groups";
     notes.push(
       steps.settings.sendCodeToAnthropic
-        ? `${without}: this repo lets Claude write them, but Strata has no Anthropic API key.`
-        : `${without}. To have Claude write them, turn on sendCodeToAnthropic in ${settings}.`,
+        ? `${without}. This repo lets Claude write them, but Strata does not have an Anthropic API key.`
+        : `${without}. To let Claude write them, turn on sendCodeToAnthropic in ${settings}.`,
     );
   }
   return notes;

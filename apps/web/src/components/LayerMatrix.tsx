@@ -66,7 +66,7 @@ export function LayerMatrixView({
                     {LAYERS[row.layer].inspect && (
                       <span
                         className="text-[11px] text-faint"
-                        title="Inspect these changes closely."
+                        title="Examine these changes carefully."
                       >
                         Inspect
                       </span>
@@ -98,9 +98,9 @@ export function LayerMatrixView({
         </table>
       </div>
       <p className="sub">
-        Lines in meaningful hunks; +Nm counts mechanical lines apart.
+        Each number counts the lines in meaningful hunks. +Nm counts mechanical lines separately.
         {revised &&
-          " ↻ marks lines a later PR changed again, which is why the PR columns don't add up to Net."}
+          " ↻ marks lines that a later PR changed again. Thus the sum of the PR columns is not equal to Net."}
       </p>
       {selected && selected.files.length > 0 && (
         <CellFiles cell={selected} title={titles.get(selected.pr ?? -1)} onOpen={onOpen} />

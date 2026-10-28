@@ -46,7 +46,7 @@ export function linkLabel(
     case "merged-into-parent":
       return `Merged into #${parent}`;
     case "unknown":
-      return `Can't tell how it sits on #${parent}`;
+      return `Strata cannot find how it sits on #${parent}`;
     default:
       return null;
   }
@@ -54,15 +54,15 @@ export function linkLabel(
 
 /** One sentence on what a link state means, for the PR pane. */
 export const LINK_MEANING: Record<LinkState, string> = {
-  intact: "It contains its parent's head, so its own changes start there.",
+  intact: "It contains the head of its parent. Its own changes start there.",
   behind:
-    "Its parent got new commits after it branched, so its own changes start at the last parent commit it has.",
+    "Its parent received new commits after it branched. Its own changes start at the last parent commit that it contains.",
   stale:
-    "Its parent was force-pushed after it branched, so its own changes start at the old parent commit it sits on.",
+    "Someone force-pushed its parent after it branched. Its own changes start at the old parent commit that it sits on.",
   "re-anchored":
-    "It sits on its base branch now rather than on its parent, so its own changes start where it last met that branch.",
-  "merged-into-parent": "It was merged into its parent's branch rather than the trunk.",
-  unknown: "Git couldn't tell where its own changes start, usually because a commit is missing.",
+    "It now sits on its base branch, not on its parent. Its own changes start where it last met that branch.",
+  "merged-into-parent": "Someone merged it into the branch of its parent, not into the trunk.",
+  unknown: "Git cannot find where its own changes start. Usually, the cause is a missing commit.",
 };
 
 const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });

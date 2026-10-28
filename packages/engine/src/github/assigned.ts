@@ -69,7 +69,7 @@ const QUALIFIERS: Record<AssignedReason["kind"], string> = {
 export async function findAssigned(port: GitHubPort, repo: string): Promise<AssignedPrs> {
   splitRepo(repo);
   const viewer = (await port.graphql<ViewerPage>(VIEWER_QUERY, {})).viewer?.login;
-  if (!viewer) throw new GitHubError("GitHub didn't say who the token belongs to.");
+  if (!viewer) throw new GitHubError("GitHub did not give the owner of the token.");
   const found = new Map<number, { node: AssignedNode; kinds: Set<AssignedReason["kind"]> }>();
   for (const [kind, qualifier] of Object.entries(QUALIFIERS) as [
     AssignedReason["kind"],

@@ -39,7 +39,7 @@ Where GitHub data comes from (`--github`, bypass mode only):
 
 | Option           | Data                                                                                       | Use for                                                       |
 | ---------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| `none` (default) | none: stack routes answer `Finding stacks needs a GitHub token`                             | anything that doesn't touch a repo                            |
+| `none` (default) | none: stack routes answer `Strata must have a GitHub token`                             | anything that doesn't touch a repo                            |
 | `fixture`        | a stand-in GitHub (`apps/server/src/dev/fixture-github.ts`) serving the demo repo `acme/app` | stacks, Changes and the workspace, anywhere, with no token     |
 | `gh`             | real GitHub with the token from `gh auth token`, passed only to the server's environment    | a real repo on the developer's Mac; add `--checkouts owner/name=path` |
 

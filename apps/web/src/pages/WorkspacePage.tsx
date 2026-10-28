@@ -52,7 +52,7 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
   const pickPath = useMutation({
     mutationFn: (tip: number) => {
       const stack = detail.data?.report?.stack;
-      if (!stack) throw new Error("No stack to pick from.");
+      if (!stack) throw new Error("There is no stack to select from.");
       return api.createChange(
         { input: `${stack.repo}#${stack.root}`, leaf: tip },
         { signal: request.next() },

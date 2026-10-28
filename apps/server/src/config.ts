@@ -116,7 +116,9 @@ export function loadConfig(
     if (production) problems.push("SESSION_SECRET must be at least 32 characters in production.");
     else {
       sessionSecret = DEV_SESSION_SECRET;
-      warnings.push("SESSION_SECRET is unset or short; using a fixed development secret.");
+      warnings.push(
+        "SESSION_SECRET is not set or is too short. Strata uses a fixed development secret.",
+      );
     }
   }
 

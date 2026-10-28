@@ -81,7 +81,11 @@ export function StackRail({
                 className={`nrow pr ${here ? "" : "faint"}`}
                 aria-label={here ? `Show #${n} ${title}` : `Open the path through #${n} ${title}`}
                 aria-current={pr === n ? "true" : undefined}
-                title={here ? `#${n} ${title}` : `#${n} ${title}\nOn another branch: open its path`}
+                title={
+                  here
+                    ? `#${n} ${title}`
+                    : `#${n} ${title}\nThis PR is on another branch. Open its path`
+                }
                 disabled={!here && (!onPickPath || pickingPath !== null)}
                 onClick={() => (here ? onScope(pr === n ? null : n) : onPickPath?.(tip))}
               >

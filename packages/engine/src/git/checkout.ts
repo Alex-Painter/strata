@@ -26,7 +26,7 @@ export async function readCheckout(dir: string): Promise<Checkout> {
     top = { stdout: "", stderr: "", code: 1 };
   }
   if (top.code !== 0 || !top.stdout.trim()) {
-    throw new CheckoutError(`${dir} isn't a git checkout.`);
+    throw new CheckoutError(`${dir} is not a git checkout.`);
   }
   const root = top.stdout.trim();
   const head = await git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]);

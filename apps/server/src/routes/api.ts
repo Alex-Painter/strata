@@ -32,7 +32,8 @@ export function apiRoutes(deps: AppDeps) {
 
   app.route("/", changeRoutes(deps));
 
-  const notYet = (c: Context) => c.json({ error: "Not implemented yet (milestone 1)." }, 501);
+  const notYet = (c: Context) =>
+    c.json({ error: "Not available at this time (milestone 1)." }, 501);
   // Context sources: spec, ticket, design, notes.
   app.post("/changes/:id/sources", notYet);
   app.delete("/changes/:id/sources/:sourceId", notYet);

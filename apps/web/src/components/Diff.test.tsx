@@ -74,7 +74,7 @@ describe("FileList", () => {
       "Docs: Documentation: matches **/*.{md,mdx,rst,adoc,txt}",
     );
     expect(page.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
-      "Added · Logic: No rule matched, so it's taken as application code, a guess",
+      "Added · Logic: No rule matched. Thus Strata thinks that it is application code, a possible layer",
     );
     expect(page.querySelector('[data-file="bin/run"] p')?.textContent).toContain(
       "Mode 100644 → 100755",
@@ -99,7 +99,7 @@ describe("FileList", () => {
       "Access and permissions",
     );
     expect(file?.querySelector("p")?.textContent).toBe(
-      "Added · Logic: No rule matched, so it's taken as application code, a guess · " +
+      "Added · Logic: No rule matched. Thus Strata thinks that it is application code, a possible layer · " +
         'Inspect: Access and permissions: a word starting "session" in session.py',
     );
   });
@@ -132,7 +132,7 @@ describe("FileList", () => {
       />,
     );
     expect(document.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
-      "Added · Logic: A job that warms the cache, Claude's call",
+      "Added · Logic: A job that warms the cache, from Claude",
     );
   });
 
@@ -240,7 +240,7 @@ describe("fileFacts", () => {
       "app/jobs/warm.py": ["Added"],
       "bin/run": ["Mode 100644 → 100755"],
       "docs/new.md": ["Renamed from docs/old.md, 90% the same"],
-      "icon.png": ["Added", "Binary file, not shown"],
+      "icon.png": ["Added", "Binary file. Strata does not show it"],
       latest: ["Added", "Symlink"],
     });
   });

@@ -45,7 +45,7 @@ describe("loadPrIndex", () => {
     ]);
     expect(github.calls.filter((call) => call.query === "page")).toHaveLength(2);
     // Said after each page that has another after it.
-    expect(steps).toEqual(["Reading PRs from GitHub: 2 so far"]);
+    expect(steps).toEqual(["Strata reads PRs from GitHub: 2 at this time"]);
   });
 
   it("stops paging at the edge of the window and drops PRs that fall out of it", async () => {
@@ -109,7 +109,7 @@ describe("loadPrIndex", () => {
     const github = fakeGitHub("acme/app", []);
     await expect(
       loadPrIndex("acme/other", { port: github, dataDir, now: clock(0) }),
-    ).rejects.toThrow(/no repo acme\/other/);
+    ).rejects.toThrow(/does not have the repo acme\/other/);
     await expect(loadPrIndex("not a repo", { port: github, dataDir })).rejects.toThrow(
       /owner\/name/,
     );

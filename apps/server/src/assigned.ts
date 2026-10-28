@@ -94,11 +94,11 @@ export class AssignedSearch {
 
   private async searchRepo(userId: string, repo: string, state: UserState, errors: string[]) {
     const engine = this.engineFor(userId);
-    state.progress = `Searching ${repo}`;
+    state.progress = `Strata searches ${repo}`;
     const found = await engine.findAssigned(repo);
     const [owner, name] = repo.split("/") as [string, string];
     for (const pr of found.prs) {
-      state.progress = `Finding the stack for ${repo}#${pr.number}`;
+      state.progress = `Strata finds the stack for ${repo}#${pr.number}`;
       let changeId: string | null = null;
       let error: string | null = null;
       try {

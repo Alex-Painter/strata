@@ -53,17 +53,17 @@ async function run(command: Extract<Command, { kind: "analyze" }>, cwd: string):
     const give = "Give the input instead, such as owner/repo#123.";
     if (!found.repo) {
       throw new Error(
-        `${found.root} has no remote on GitHub, so Strata can't tell the repo. ${give}`,
+        `${found.root} does not have a remote on GitHub. Thus Strata cannot find the repo. ${give}`,
       );
     }
-    if (!found.branch) throw new Error(`${found.root} isn't on a branch. ${give}`);
+    if (!found.branch) throw new Error(`${found.root} is not on a branch. ${give}`);
     raw = `${found.repo}:${found.branch}`;
     checkout = found.root;
-    console.error(`… The stack around ${raw}, the branch checked out in ${found.root}`);
+    console.error(`… The stack around ${raw}, the branch that is checked out in ${found.root}`);
   }
   let input = parseChangeInput(raw, { localRepoPath: checkout ?? cwd });
   if (command.leaf !== undefined) {
-    if (input.kind !== "stack-of") throw new UsageError("--leaf needs a PR or branch input.");
+    if (input.kind !== "stack-of") throw new UsageError("--leaf must have a PR or branch input.");
     input = { ...input, seed: { ...input.seed, leaf: command.leaf } };
   }
   const checkouts =

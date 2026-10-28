@@ -195,7 +195,7 @@ export function createPathClassifier(
       return {
         layer: "logic",
         by: "default",
-        reason: "No rule matched, so it's taken as application code",
+        reason: "No rule matched. Thus Strata thinks that it is application code",
         confidence: "low",
       };
     }

@@ -69,7 +69,7 @@ describe("engine.resolveChange for stacks", () => {
     expect(chain.stack?.selectedPath).toEqual([1, 2, 3]);
 
     await expect(engine().resolveChange(parseChangeInput("acme/app#1,3"))).rejects.toThrow(
-      "#1, #3 isn't a chain of branch links. The stack through #1 is #1 → #2 → #3.",
+      "#1, #3 is not a chain of branch links. The stack through #1 is #1 → #2 → #3.",
     );
   });
 
@@ -106,15 +106,15 @@ describe("engine.analyzeChange for stacks", () => {
     ]);
     expect(report.parts.map((part) => part.summary)).toEqual([[], [], []]);
     expect(report.notes).toEqual([
-      "There's no summary, and the Guide shows Strata's own groups. To have Claude write them, " +
+      "There is no summary, and the Guide shows Strata's own groups. To let Claude write them, " +
         "turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     ]);
     expect(report.analysis.model).toBeUndefined();
     expect(steps).toEqual([
-      "Finding the stack",
-      "Cloning acme/app into Strata's cache (only the first time)",
-      "Fetching acme/app's branches and 3 PR heads",
-      "Building the diffs",
+      "Strata finds the stack",
+      "Strata clones acme/app into its cache (only one time)",
+      "Strata fetches the branches of acme/app and 3 PR heads",
+      "Strata makes the diffs",
     ]);
   });
 
@@ -173,10 +173,10 @@ describe("engine.analyzeChange summaries", () => {
     expect(report.summary).toEqual([]);
     expect(report.guide.by).toBe("rule");
     expect(report.notes).toEqual([
-      "There's no summary, and the Guide shows Strata's own groups: this repo lets Claude " +
-        "write them, but Strata has no Anthropic API key.",
+      "There is no summary, and the Guide shows Strata's own groups. This repo lets Claude " +
+        "write them, but Strata does not have an Anthropic API key.",
     ]);
-    expect(steps).not.toContain("Writing the summaries");
+    expect(steps).not.toContain("Claude writes the summaries");
   });
 
   it("never asks Claude about a repo that doesn't allow it, even with a key", async () => {
@@ -197,11 +197,11 @@ describe("engine.analyzeChange summaries", () => {
       { onProgress: (step) => steps.push(step) },
     );
     expect(steps).toEqual([
-      "Finding the stack",
-      "Cloning acme/app into Strata's cache (only the first time)",
-      "Fetching acme/app's branches and 3 PR heads",
-      "Building the diffs",
-      "Writing the summaries",
+      "Strata finds the stack",
+      "Strata clones acme/app into its cache (only one time)",
+      "Strata fetches the branches of acme/app and 3 PR heads",
+      "Strata makes the diffs",
+      "Claude writes the summaries",
     ]);
     expect(bodies).toHaveLength(4);
     expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);
@@ -247,7 +247,7 @@ describe("engine.analyzeChange summaries", () => {
     // How many PRs failed depends on the split, so a range of the same code never says it.
     expect(report.notes).toEqual([]);
     expect(report.stack?.notes).toEqual([
-      expect.stringMatching(/^Strata couldn't ask Claude to summarise 3 PRs: /),
+      expect.stringMatching(/^Strata cannot ask Claude to summarise 3 PRs\. Cause: /),
     ]);
   });
 });

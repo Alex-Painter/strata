@@ -15,7 +15,7 @@ export function inputHint(raw: string): InputHint | null {
     input = parseChangeInput(raw);
   } catch (error) {
     if (error instanceof ChangeInputError) {
-      return { ok: false, text: "Use a PR URL, owner/repo#123 or owner/repo:branch." };
+      return { ok: false, text: "Type a PR URL, owner/repo#123 or owner/repo:branch." };
     }
     throw error;
   }
@@ -37,6 +37,9 @@ export function inputHint(raw: string): InputHint | null {
         text: `The chain ${input.numbers.map((n) => `#${n}`).join(" → ")} in ${repo}.`,
       };
     case "range":
-      return { ok: false, text: "Commit ranges aren't supported yet. Give a PR or a branch." };
+      return {
+        ok: false,
+        text: "Strata cannot read commit ranges at this time. Type a PR or a branch.",
+      };
   }
 }

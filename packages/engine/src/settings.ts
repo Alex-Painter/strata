@@ -44,7 +44,7 @@ export async function loadRepoSettings(dataDir: string, repo: string): Promise<R
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    throw new SettingsError(`${path} isn't valid JSON: ${(error as Error).message}`);
+    throw new SettingsError(`${path} is not valid JSON: ${(error as Error).message}`);
   }
   return parseSettings(raw, path);
 }

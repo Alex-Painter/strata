@@ -41,7 +41,7 @@ describe("createGitHubPort", () => {
     });
     const error = await bad.graphql("q", {}).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(GitHubError);
-    expect(String(error)).toMatch(/rejected the token/);
+    expect(String(error)).toMatch(/did not accept the token/);
     expect(String(error)).not.toMatch(/secret-token/);
 
     const limited = createGitHubPort({
@@ -53,6 +53,6 @@ describe("createGitHubPort", () => {
         }),
       ),
     });
-    await expect(limited.graphql("q", {})).rejects.toThrow(/rate limit is used up until 2026/);
+    await expect(limited.graphql("q", {})).rejects.toThrow(/rate limit stops requests until 2026/);
   });
 });

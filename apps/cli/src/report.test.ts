@@ -37,8 +37,8 @@ describe("formatReport", () => {
         "",
         "  #1  direct    1 file     +1 -0        Add the forecast model",
         "  #2  direct    1 file     +1 -0        Add the forecast service",
-        "      GitHub's diff differs: #1 landed on main as a new commit, and #2 hasn't been " +
-          "rebased since, so GitHub's diff of #2 repeats #1's changes.",
+        "      GitHub's diff is different: #1 went into main as a new commit, and nobody " +
+          "rebased #2 after that. Thus GitHub's diff of #2 repeats the changes of #1.",
         "  #3  direct    1 file     +1 -0        Add the forecast route",
         "",
         "Whole stack: 3 files, +3 -0",
@@ -50,7 +50,7 @@ describe("formatReport", () => {
         "  Layers by PR     #1   #2   #3  Net",
         "    Docs            1    1    1    3",
         "",
-        "  - There's no summary, and the Guide shows Strata's own groups. To have Claude write " +
+        "  - There is no summary, and the Guide shows Strata's own groups. To let Claude write " +
           "them, turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
         "",
       ].join("\n"),
@@ -69,7 +69,7 @@ describe("formatReport", () => {
         "    A b2-3.txt  +1 -0",
         "    A b3-4.txt  +1 -0",
         "",
-        "  - There's no summary, and the Guide shows Strata's own groups. To have Claude write " +
+        "  - There is no summary, and the Guide shows Strata's own groups. To let Claude write " +
           "them, turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
         "",
       ].join("\n"),
@@ -83,7 +83,7 @@ describe("formatReport", () => {
       { kind: "needs-restack", prs: [6], message: "Elsewhere.", evidence: [] },
     );
     const text = formatReport(report);
-    expect(text).toContain("\n  ! On the path.\n  - There's no summary");
+    expect(text).toContain("\n  ! On the path.\n  - There is no summary");
     expect(text).not.toContain("Elsewhere.");
   });
 
@@ -91,7 +91,7 @@ describe("formatReport", () => {
     const report = await analyze("acme/app#3");
     report.stack?.notes.push("The whole-stack diff covers #1 only.");
     expect(formatReport(report)).toContain(
-      "\n  - The whole-stack diff covers #1 only.\n  - There's no summary",
+      "\n  - The whole-stack diff covers #1 only.\n  - There is no summary",
     );
   });
 

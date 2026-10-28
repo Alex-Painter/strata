@@ -28,7 +28,7 @@ import { ENGINE_VERSION } from "./version.js";
 export const createEngine: CreateEngine = (config) => {
   const llm = createLlm(config);
   config.log?.(
-    llm ? `LLM steps enabled (${llm.model})` : "LLM steps disabled: no Anthropic API key",
+    llm ? `LLM steps enabled (${llm.model})` : "LLM steps disabled: there is no Anthropic API key",
   );
 
   return {
@@ -73,19 +73,19 @@ export const createEngine: CreateEngine = (config) => {
           ...(llm ? { model: llm.model } : {}),
         };
         if (gh.kind === "range") {
-          options.onProgress?.("Finding the range");
+          options.onProgress?.("Strata finds the range");
           const resolved = await resolveRangeChange(
             gh,
             await openCache(config, repo, options.onProgress),
           );
           options.signal?.throwIfAborted();
-          options.onProgress?.("Building the diff");
+          options.onProgress?.("Strata makes the diff");
           return rangeReport(resolved, options, meta);
         }
-        options.onProgress?.("Finding the stack");
+        options.onProgress?.("Strata finds the stack");
         const resolved = await resolveStackInput(config, gh, options.onProgress);
         options.signal?.throwIfAborted();
-        options.onProgress?.("Building the diffs");
+        options.onProgress?.("Strata makes the diffs");
         return stackReport(resolved, options, meta);
       });
     },
@@ -121,7 +121,7 @@ function summaryAsk(config: EngineConfig, llm: LlmSettings): AskJson {
 function githubPort(config: EngineConfig): GitHubPort {
   if (config.githubPort) return config.githubPort;
   if (!config.githubToken)
-    throw new GitHubError("Finding stacks needs a GitHub token (GITHUB_TOKEN).");
+    throw new GitHubError("Strata must have a GitHub token (GITHUB_TOKEN) to find stacks.");
   return createGitHubPort({ token: config.githubToken });
 }
 
@@ -189,5 +189,5 @@ async function resolveStackInput(
 function githubInput(input: ChangeInput): GitHubInput {
   if (input.repo.kind === "github") return input as GitHubInput;
   if (input.kind === "range") throw new NotImplementedError("Ranges in a local checkout");
-  throw new StackInputError("Stacks come from GitHub; give the repo as owner/repo.");
+  throw new StackInputError("Stacks come from GitHub. Give the repo as owner/repo.");
 }

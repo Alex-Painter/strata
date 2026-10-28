@@ -28,7 +28,7 @@ describe("injectReport", () => {
   });
 
   it("refuses a template without </head>", () => {
-    expect(() => injectReport("<html></html>", report)).toThrow(/no <\/head>/);
+    expect(() => injectReport("<html></html>", report)).toThrow(/does not have <\/head>/);
   });
 });
 
@@ -86,7 +86,7 @@ describe("refusing to write inside a checkout", () => {
   it("refuses an output path inside a checkout, and allows one outside", async () => {
     const inside = path.join(dir, "work", "strata-report.html");
     await expect(refuseCheckouts([path.join(dir, "data", "page.html"), inside])).rejects.toThrow(
-      `Strata won't write to ${inside}: it's inside the git checkout ${path.join(dir, "work")}`,
+      `Strata does not write to ${inside}. It is in the git checkout ${path.join(dir, "work")}`,
     );
     await expect(refuseCheckouts([path.join(dir, "data", "page.html")])).resolves.toBeUndefined();
   });

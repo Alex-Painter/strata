@@ -52,18 +52,19 @@ export function createGitHubPort(options: GitHubPortOptions): GitHubPort {
           `GitHub GraphQL: ${body.errors.map((error) => error.message).join("; ")}`,
         );
       }
-      if (!body.data) throw new GitHubError("GitHub GraphQL returned no data.");
+      if (!body.data) throw new GitHubError("GitHub GraphQL did not return data.");
       return body.data;
     },
   };
 }
 
 async function failureMessage(response: Response): Promise<string> {
-  if (response.status === 401) return "GitHub rejected the token (401). Check GITHUB_TOKEN.";
+  if (response.status === 401)
+    return "GitHub did not accept the token (401). Examine GITHUB_TOKEN.";
   const reset = response.headers.get("x-ratelimit-reset");
   if (response.headers.get("x-ratelimit-remaining") === "0" && reset) {
     const at = new Date(Number(reset) * 1000).toISOString();
-    return `GitHub's rate limit is used up until ${at}.`;
+    return `GitHub's rate limit stops requests until ${at}.`;
   }
   const text = await response.text().catch(() => "");
   let message = text;

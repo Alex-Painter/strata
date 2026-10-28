@@ -73,7 +73,7 @@ export function mechanicalFile(
   }
   if (GENERATED_PATHS(file.path)) return { kind: "generated", reason: "Generated-code path" };
   if (hasGeneratedMarker(file)) {
-    return { kind: "generated", reason: "Says it's generated in its first lines" };
+    return { kind: "generated", reason: "Its first lines say that it is generated" };
   }
   if (file.status === "renamed" && file.hunks.length === 0) {
     return { kind: "rename", reason: `Renamed from ${file.oldPath}, unchanged` };

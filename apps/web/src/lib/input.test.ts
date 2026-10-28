@@ -20,11 +20,11 @@ describe("inputHint", () => {
   it("turns away what the server can't review yet, or can't read", () => {
     expect(inputHint("acme/app@main...b4")).toEqual({
       ok: false,
-      text: "Commit ranges aren't supported yet. Give a PR or a branch.",
+      text: "Strata cannot read commit ranges at this time. Type a PR or a branch.",
     });
     expect(inputHint("PR 10")).toEqual({
       ok: false,
-      text: "Use a PR URL, owner/repo#123 or owner/repo:branch.",
+      text: "Type a PR URL, owner/repo#123 or owner/repo:branch.",
     });
     expect(inputHint("acme/app#3,3")).toMatchObject({ ok: false });
   });

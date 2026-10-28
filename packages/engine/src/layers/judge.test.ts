@@ -106,9 +106,9 @@ describe("the Anthropic layer judge", () => {
 
   it("fails clearly on a refusal, a cut-off answer or bad JSON, and caches none of them", async () => {
     const cases: Array<[Partial<Anthropic.Message>, string]> = [
-      [{ stop_reason: "refusal" }, "Claude declined to answer."],
-      [{ stop_reason: "max_tokens" }, "Claude's answer was cut off."],
-      [{ content: [{ type: "text", text: "{", citations: null }] }, "wasn't valid JSON"],
+      [{ stop_reason: "refusal" }, "Claude did not answer."],
+      [{ stop_reason: "max_tokens" }, "Claude's answer is not complete."],
+      [{ content: [{ type: "text", text: "{", citations: null }] }, "is not valid JSON"],
     ];
     for (const [reply, message] of cases) {
       const judge = createLlmLayerJudge(fakeClaude(() => reply).llm, cacheDir);
@@ -192,7 +192,7 @@ describe("judgeLayers", () => {
     expect(sizes).toEqual([40, 5]);
     expect(judged.size).toBe(40);
     expect(notes).toEqual([
-      "Strata couldn't ask Claude about 5 files, so their layers are still guesses: Overloaded",
+      "Strata cannot ask Claude about 5 files. Thus their layers are still guesses. Cause: Overloaded",
     ]);
   });
 

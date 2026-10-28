@@ -64,14 +64,14 @@ export function ChangesPage({ me }: { me: MeResponse }) {
               Assigned to you, not waiting
             </h2>
             <p className="-mt-1 text-[12px] text-muted">
-              Stacks you've reviewed already, or were on before.
+              Stacks that you reviewed before, or that you were on before.
             </p>
             <ChangeList
               changes={all?.filter(
                 (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
               )}
               error={error}
-              empty="Nothing here yet."
+              empty="There are no stacks here at this time."
             />
           </section>
           {opened.length > 0 && (
@@ -80,7 +80,7 @@ export function ChangesPage({ me }: { me: MeResponse }) {
                 Opened by you
               </h2>
               <p className="-mt-1 text-[12px] text-muted">
-                Stacks you chose to analyse that nobody asked you about.
+                Stacks that you selected for analysis. Nobody asked you to review them.
               </p>
               <ChangeList changes={opened} error={null} empty="" />
             </section>
@@ -117,7 +117,7 @@ function WaitingOnYou({
     ? (status?.progress ?? "Searching…")
     : status?.lastFinishedAt
       ? `Searched ${repos} ${ago(status.lastFinishedAt)}`
-      : `Searches ${repos} for PRs assigned to you or asking for your review`;
+      : `Strata searches ${repos} for PRs that are assigned to you or that ask for your review`;
   const problems = [...(searchError ? [searchError] : []), ...(status?.errors ?? [])];
   return (
     <section className="grid gap-3" aria-labelledby="waiting-h">
@@ -141,7 +141,11 @@ function WaitingOnYou({
           {problem}
         </p>
       ))}
-      <ChangeList changes={changes} error={error} empty="Nothing assigned to you right now." />
+      <ChangeList
+        changes={changes}
+        error={error}
+        empty="Nobody assigned a stack to you at this time."
+      />
     </section>
   );
 }
@@ -172,18 +176,18 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
         Other stacks in {repo}
       </h2>
       <p className="-mt-1 text-[12px] text-muted">
-        Open stacks nobody has asked you about, not analysed yet. Choose one to see it and analyse
-        it.
+        Open stacks that nobody asked you to review. Strata did not analyse them. Select a stack to
+        see and analyse it.
         {list && <ReadAt readAt={list.readAt} refreshing={list.refreshing} />}
       </p>
       {stacks.error ? (
         <p className="alert">{stacks.error.message}</p>
       ) : !found ? (
         <p role="status" className="text-[12px] text-muted">
-          Reading {repo}'s stacks…{progress ? ` ${progress}.` : ""}
+          Strata reads the stacks in {repo}…{progress ? ` ${progress}.` : ""}
         </p>
       ) : others.length === 0 ? (
-        <div className="empty">No other open stacks.</div>
+        <div className="empty">There are no other open stacks.</div>
       ) : (
         <ul className="list">
           {others.map((stack) => {

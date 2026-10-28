@@ -57,18 +57,15 @@ export interface OverviewProps {
 /** Says what a run is doing, or why there's no report, above whatever's on the canvas. */
 export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean }) {
   const { info } = run;
-  if (run.loading) return <p className="text-muted">Loading the Change…</p>;
+  if (run.loading) return <p className="text-muted">Strata loads the Change…</p>;
   if (!info) return null;
   if (info.status === "queued" || info.status === "running") {
     const step =
       info.status === "queued"
-        ? "Waiting for another run to finish"
-        : (info.progress ?? "Analysing");
-    // With a report on screen, a run is a refresh of it. Steps name repos and
-    // products ("Reading PRs from GitHub"), so only a plain first word is lowered.
-    const text = hasReport
-      ? `Refreshing: ${/^[A-Z][a-z]/.test(step) ? step.charAt(0).toLowerCase() + step.slice(1) : step}`
-      : step;
+        ? "Another run must finish first"
+        : (info.progress ?? "Strata analyses the Change");
+    // With a report on screen, a run is a refresh of it.
+    const text = hasReport ? `Strata refreshes the report. ${step}` : step;
     return (
       <p className="text-muted" role="status">
         {text}…
@@ -78,7 +75,7 @@ export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean
   if (info.status === "done" && !hasReport) {
     return (
       <div role="status" className="note grid justify-items-start gap-2 text-text">
-        <p>This Change was analysed by an older version of Strata. Run it again to see it.</p>
+        <p>An older version of Strata analysed this Change. Run it again to see it.</p>
         <RunAgain run={run} />
       </div>
     );
@@ -89,7 +86,7 @@ export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean
         <p>
           The last run failed{info.finishedAt ? ` ${ago(info.finishedAt)}` : ""}: {info.error}
         </p>
-        {hasReport && <p className="text-muted">Showing the last report that worked.</p>}
+        {hasReport && <p className="text-muted">This is the last report that worked.</p>}
         <RunAgain run={run} />
       </div>
     );
@@ -200,8 +197,8 @@ function WholeSummary({
               Summary
             </h2>
             <p className="sub">
-              Written by Claude from the {of === "stack" ? "whole-stack diff" : "range's diff"}{" "}
-              alone. Each sentence names the hunks it rests on.
+              Claude wrote this from the {of === "stack" ? "whole-stack diff" : "range's diff"}{" "}
+              only. Each sentence names the hunks that it rests on.
             </p>
           </div>
           <ClaimList
@@ -355,7 +352,7 @@ export function PrOverview({
               after <CommitLink repo={stack.repo} oid={node.anchor} />
             </>
           ) : (
-            <span className="text-muted">Unknown: git couldn't tell.</span>
+            <span className="text-muted">Unknown. Git cannot find it.</span>
           )}
         </Fact>
         {pr.state === "merged" && pr.mergedAt && (
@@ -406,13 +403,13 @@ function PartSummary({ stack, part, ...props }: OverviewProps & { stack: Stack; 
   );
   const how =
     part.how === "replayed"
-      ? "Strata put this PR's changes on the stack below it, as a restack would."
+      ? "Strata put the changes of this PR on the stack below it, as a restack does."
       : part.how === "apart"
         ? conflicted
-          ? "Its changes conflict with the stack below it, so this is its diff from where its changes start to its head. It isn't in the whole-stack diff."
-          : "A PR below it couldn't be put on the stack, so this is its diff from where its changes start to its head. It isn't in the whole-stack diff."
+          ? "Its changes conflict with the stack below it. Thus this is its diff from where its changes start to its head. This diff is not in the whole-stack diff."
+          : "Strata cannot put a PR below it on the stack. Thus this is its diff from where its changes start to its head. This diff is not in the whole-stack diff."
         : part.how === "unknown"
-          ? "Git couldn't tell where its changes start, so there's no diff."
+          ? "Git cannot find where its changes start. Thus there is no diff."
           : null;
   return (
     <>
@@ -426,7 +423,7 @@ function PartSummary({ stack, part, ...props }: OverviewProps & { stack: Stack; 
             <h2 id="part-summary-heading" className="h2">
               What it changes
             </h2>
-            <p className="sub">Written by Claude from this PR's own diff.</p>
+            <p className="sub">Claude wrote this from this PR's own diff only.</p>
           </div>
           <ClaimList
             claims={part.summary}
@@ -459,8 +456,8 @@ function RevisedLater({
   const total = later.reduce((sum, item) => sum + item.lines, 0);
   return (
     <p role="note" aria-label="Revised later">
-      {total === 1 ? "1 line" : `${total} lines`} this PR added {total === 1 ? "was" : "were"}{" "}
-      changed again later, in{" "}
+      Later PRs changed {total === 1 ? "1 line" : `${total} lines`} that this PR added. The changes
+      are in{" "}
       {later.map((item, i) => (
         <span key={item.pr}>
           {i > 0 && (i === later.length - 1 ? " and " : ", ")}
@@ -482,7 +479,7 @@ function RevisedLater({
 function GitHubDiffers({ repo, pr, check }: { repo: string; pr: number; check: GitHubDiffCheck }) {
   return (
     <section aria-label="GitHub's diff" className="note grid gap-1 text-text">
-      <p className="font-medium">GitHub's diff of #{pr} is different from this one.</p>
+      <p className="font-medium">The GitHub diff of #{pr} is different from this diff.</p>
       {check.reason && <p>{check.reason}</p>}
       {check.onlyOnGitHub.length > 0 && (
         <PathList label="Only on GitHub" paths={check.onlyOnGitHub} />

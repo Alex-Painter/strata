@@ -126,7 +126,7 @@ function FileBlock({
             <span
               key={flag.rule}
               className="shrink-0 rounded border border-line px-1 text-[11px] text-muted"
-              title={`${flag.reason}. Changes here must be right first time, so inspect them closely.`}
+              title={`${flag.reason}. Changes here must be correct the first time. Examine them carefully.`}
             >
               {flag.title}
             </span>
@@ -336,7 +336,7 @@ export function fileFacts(file: FileChange): string[] {
   }
   const mode = file.newMode ?? file.oldMode;
   if (mode === "120000") facts.push("Symlink");
-  if (file.binary) facts.push("Binary file, not shown");
+  if (file.binary) facts.push("Binary file. Strata does not show it");
   return facts;
 }
 
@@ -344,7 +344,7 @@ export function fileFacts(file: FileChange): string[] {
 export function layerFact(file: FileChange): string {
   const { layer } = file;
   const who =
-    layer.by === "llm" ? ", Claude's call" : layer.confidence === "low" ? ", a guess" : "";
+    layer.by === "llm" ? ", from Claude" : layer.confidence === "low" ? ", a possible layer" : "";
   return `${LAYERS[layer.layer].title}: ${layer.reason}${who}`;
 }
 

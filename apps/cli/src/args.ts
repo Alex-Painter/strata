@@ -8,25 +8,28 @@ import { parseArgs } from "node:util";
 export const USAGE = `Usage: strata analyze [input] [options]
        strata stacks <owner/repo> [options]
 
-analyze: [input] is a PR (owner/repo#123 or its URL) or a branch
-(owner/repo:feature/x), meaning the whole stack around it; an explicit
-chain (owner/repo#12,13,14); or a commit range (owner/repo@main...feature).
-With no input, it's the stack around the branch checked out in --repo-path,
-or in the current folder. It prints the stack in brief, then writes the
-review page and the full report as JSON. Needs GITHUB_TOKEN.
+analyze: [input] is one of these:
+  - A PR (owner/repo#123 or its URL) or a branch (owner/repo:feature/x).
+    Strata uses the whole stack around it.
+  - A chain of PRs (owner/repo#12,13,14).
+  - A commit range (owner/repo@main...feature).
+If you do not give an input, Strata uses the stack around the branch that
+is checked out in --repo-path, or in the current folder. The command prints
+a short form of the stack. Then it writes the review page and the full
+report as JSON. You must set GITHUB_TOKEN.
 
-stacks: lists every stack among the PRs updated in the last 90 days. A
-stack is a set of PRs whose branches feed into each other. Needs
+stacks: lists all stacks in the PRs that changed in the last 90 days. A
+stack is a set of PRs whose branches feed into each other. You must set
 GITHUB_TOKEN.
 
-Strata never writes inside a git checkout, so a page of work code can't be
-committed by accident.
+Strata does not write in a git checkout. Thus nobody can commit a page of
+work code by accident.
 
 Options:
-  --repo-path <dir>     Local checkout of the repo, which Strata only reads:
-                        it borrows its objects, and its branch when there's
-                        no input
-  --leaf <n>            For a stack that forks: the tip PR of the path to take
+  --repo-path <dir>     Local checkout of the repo. Strata only reads it:
+                        Strata uses its objects, and its branch when you
+                        do not give an input
+  --leaf <n>            For a stack that forks: the tip PR of the path to use
   --source <file>       Intent source (spec, ticket, notes); repeatable
   --out <file>          Review page to write (default: in reports/ in the
                         data folder)
@@ -64,17 +67,18 @@ export function parseCommand(argv: string[]): Command {
 
   const [command, input, ...extra] = positionals;
   if (command !== "analyze" && command !== "stacks") {
-    throw new UsageError(`Unknown command "${command}".`);
+    throw new UsageError(`Strata does not know the command "${command}".`);
   }
-  if (extra.length > 0) throw new UsageError(`Unexpected arguments: ${extra.join(" ")}`);
+  if (extra.length > 0)
+    throw new UsageError(`Strata does not know these arguments: ${extra.join(" ")}`);
 
   if (command === "stacks") {
-    if (!input) throw new UsageError("stacks needs an <owner/repo>.");
+    if (!input) throw new UsageError("stacks must have an <owner/repo>.");
     if (!/^[\w.-]+\/[\w.-]+$/.test(input)) {
-      throw new UsageError(`stacks needs a GitHub repo as owner/repo, got "${input}".`);
+      throw new UsageError(`stacks must have a GitHub repo as owner/repo, not "${input}".`);
     }
     if (values.source || values.out || values.leaf) {
-      throw new UsageError("stacks takes no --source, --out or --leaf.");
+      throw new UsageError("stacks does not accept --source, --out or --leaf.");
     }
     return {
       kind: "stacks",
@@ -87,7 +91,7 @@ export function parseCommand(argv: string[]): Command {
 
   const leaf = values.leaf === undefined ? undefined : Number(values.leaf);
   if (leaf !== undefined && !(Number.isInteger(leaf) && leaf > 0)) {
-    throw new UsageError(`--leaf needs a PR number, got "${values.leaf}".`);
+    throw new UsageError(`--leaf must have a PR number, not "${values.leaf}".`);
   }
   return {
     kind: "analyze",

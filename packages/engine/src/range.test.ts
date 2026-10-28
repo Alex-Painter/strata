@@ -46,10 +46,10 @@ describe("ranges", () => {
       onProgress: (step) => steps.push(step),
     });
     expect(steps).toEqual([
-      "Finding the range",
-      "Cloning acme/app into Strata's cache (only the first time)",
-      "Fetching acme/app's branches",
-      "Building the diff",
+      "Strata finds the range",
+      "Strata clones acme/app into its cache (only one time)",
+      "Strata fetches the branches of acme/app",
+      "Strata makes the diff",
     ]);
     expect(range.stack).toBeNull();
     expect(range.parts).toEqual([]);
@@ -77,7 +77,7 @@ describe("ranges", () => {
     const missing = engine().resolveChange(parseChangeInput("acme/app@main...nope"));
     await expect(missing).rejects.toBeInstanceOf(ChangeInputError);
     await expect(missing).rejects.toThrow(
-      "Strata's copy of acme/app has no nope. Use a branch, or a commit on one.",
+      "Strata's copy of acme/app has no nope. Use a branch, or a commit on a branch.",
     );
   });
 });

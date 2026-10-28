@@ -53,6 +53,6 @@ describe("repo settings", () => {
       'unknown setting "layerRule".',
     );
     await write("{ nope");
-    await expect(loadRepoSettings(dataDir, "acme/app")).rejects.toThrow("isn't valid JSON");
+    await expect(loadRepoSettings(dataDir, "acme/app")).rejects.toThrow("is not valid JSON");
   });
 });

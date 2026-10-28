@@ -69,8 +69,8 @@ describe("each PR's diff", () => {
       onlyOnGitHub: ["b1-2.txt"],
       onlyHere: [],
       reason:
-        "#1 landed on main as a new commit, and #2 hasn't been rebased since, " +
-        "so GitHub's diff of #2 repeats #1's changes.",
+        "#1 went into main as a new commit, and nobody rebased #2 after that. " +
+        "Thus GitHub's diff of #2 repeats the changes of #1.",
     });
     // Strata's own commits aren't on GitHub, so the evidence names real ones.
     expect(two?.github?.evidence).toEqual([
@@ -195,8 +195,8 @@ describe("each PR's diff", () => {
       same: false,
       onlyOnGitHub: ["a.txt"],
       reason:
-        "#1 landed on main as a new commit, and #2 wasn't rebased before it merged, " +
-        "so GitHub's diff of #2 repeats #1's changes.",
+        "#1 went into main as a new commit, and nobody rebased #2 before it merged. " +
+        "Thus GitHub's diff of #2 repeats the changes of #1.",
     });
   });
 
@@ -232,7 +232,7 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["b.txt"],
         reason:
-          "#2 was merged into b1, so its changes are in #1's diff here, " +
+          "Someone merged #2 into b1. Thus its changes are in the diff of #1 here, " +
           "and GitHub's diff of #2 shows them as its own.",
       });
     });
@@ -265,8 +265,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#1 landed on main as a new commit, and #2 wasn't rebased before it merged, " +
-          "so GitHub's diff of #2 repeats #1's changes.",
+          "#1 went into main as a new commit, and nobody rebased #2 before it merged. " +
+          "Thus GitHub's diff of #2 repeats the changes of #1.",
       });
     });
 
@@ -287,8 +287,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#1 was force-pushed after #2 branched from it, so GitHub's diff of #2 " +
-          "repeats the old #1 commits it sits on, and Strata's starts at #1's head now.",
+          "Someone force-pushed #1 after #2 branched from it. Thus GitHub's diff of #2 " +
+          "repeats the old #1 commits that #2 sits on. Strata's diff starts at the current head of #1.",
       });
     });
 
@@ -316,8 +316,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#2 didn't sit on #1's head but targeted b1, so GitHub's diff of #2 " +
-          "also shows the commits it sits on that b1 doesn't have.",
+          "#2 did not sit on the head of #1, but targeted b1. Thus GitHub's diff of #2 " +
+          "also shows the commits below #2 that b1 does not have.",
       });
     });
 
@@ -340,8 +340,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#2 was retargeted to main, which doesn't have all of #1's commits, " +
-          "so GitHub's diff of #2 repeats the ones it sits on.",
+          "Someone retargeted #2 to main. That branch does not have all the commits of #1. " +
+          "Thus GitHub's diff of #2 repeats the commits that #2 sits on.",
       });
     });
 
@@ -370,8 +370,8 @@ describe("each PR's diff", () => {
         base: h1a,
         same: false,
         reason:
-          "#2 is behind #1, so GitHub diffs it from where it left #1, " +
-          "and Strata from #1's head now.",
+          "#2 is behind #1. Thus GitHub diffs it from where it left #1, " +
+          "and Strata diffs it from the current head of #1.",
       });
     });
 
@@ -394,8 +394,8 @@ describe("each PR's diff", () => {
         base: m0,
         same: false,
         reason:
-          "#2 no longer sits on #1's head but still targets b1, so GitHub diffs it " +
-          "from where it meets b1, and Strata from the stack below it.",
+          "#2 does not sit on the head of #1, but still targets b1. Thus GitHub diffs it " +
+          "from where it meets b1, and Strata diffs it from the stack below it.",
       });
     });
 
@@ -438,8 +438,8 @@ describe("each PR's diff", () => {
         base: later,
         same: false,
         reason:
-          "#3 was merged into b2 after #2 landed, so GitHub diffs it from b2 as it " +
-          "was then, and Strata from the stack below it.",
+          "Someone merged #3 into b2 after #2 went into the trunk. Thus GitHub diffs it from b2 as it " +
+          "was at that time, and Strata diffs it from the stack below it.",
       });
     });
 
@@ -475,8 +475,8 @@ describe("each PR's diff", () => {
         base: h2,
         same: false,
         reason:
-          "A PR below #3 was replayed onto newer code, so Strata diffs #3 from that, " +
-          "and GitHub from b2.",
+          "Strata replayed a PR below #3 onto newer code. Thus Strata diffs #3 from that code, " +
+          "and GitHub diffs it from b2.",
       });
     });
 
@@ -514,8 +514,8 @@ describe("each PR's diff", () => {
       expect(report.parts[2]?.github).toMatchObject({
         same: false,
         reason:
-          "A PR below #3 was replayed onto newer code, so Strata diffs #3 from that, " +
-          "and GitHub from b2.",
+          "Strata replayed a PR below #3 onto newer code. Thus Strata diffs #3 from that code, " +
+          "and GitHub diffs it from b2.",
       });
     });
 
@@ -544,8 +544,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#1 landed on main as a new commit, and #2 hasn't been rebased since, " +
-          "so GitHub's diff of #2 repeats #1's changes.",
+          "#1 went into main as a new commit, and nobody rebased #2 after that. " +
+          "Thus GitHub's diff of #2 repeats the changes of #1.",
       });
     });
 
@@ -574,8 +574,8 @@ describe("each PR's diff", () => {
         same: false,
         onlyOnGitHub: ["a.txt"],
         reason:
-          "#2 was retargeted to develop, which doesn't have all of #1's commits, " +
-          "so GitHub's diff of #2 repeats the ones it sits on.",
+          "Someone retargeted #2 to develop. That branch does not have all the commits of #1. " +
+          "Thus GitHub's diff of #2 repeats the commits that #2 sits on.",
       });
     });
   });
@@ -615,7 +615,7 @@ describe("each PR's diff", () => {
     expect(conflict).toMatchObject({
       prs: [2],
       message:
-        "#2's changes conflict with the stack below it (a.txt), so the whole-stack diff stops at #1.",
+        "#2's changes conflict with the stack below it (a.txt). Thus the whole-stack diff stops at #1.",
     });
     expect(conflict?.evidence.slice(0, 2)).toEqual([
       { anchor: { source: { kind: "commit", oid: h1 } }, label: "where #2's changes start" },
@@ -623,10 +623,10 @@ describe("each PR's diff", () => {
     ]);
     // What the split left out is a note on the stack, not on the whole-stack view.
     expect(report.stack?.notes).toEqual([
-      "The whole-stack diff covers #1 only. #2 and #3 aren't in it. The stack's issues say why.",
+      "The whole-stack diff covers #1 only. #2 and #3 are not in it. The stack's issues give the cause.",
     ]);
     expect(report.notes).toEqual([
-      "There's no summary, and the Guide shows Strata's own groups. To have Claude write them, " +
+      "There is no summary, and the Guide shows Strata's own groups. To let Claude write them, " +
         "turn on sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     ]);
 
@@ -708,7 +708,7 @@ describe("each PR's diff", () => {
     expect(requests).toEqual([]);
     expect(off.change.files.find((f) => f.path === "app/billing.py")?.layer.by).toBe("default");
     expect(off.notes).toContain(
-      "Strata guessed the layer of 1 file. To place it, add layer rules or turn on " +
+      "Strata guessed the layer of 1 file. To put it in a layer, add layer rules or turn on " +
         "sendCodeToAnthropic in settings/acme/app.json in Strata's data folder.",
     );
 
@@ -795,7 +795,7 @@ describe("each PR's diff", () => {
     await writeSettings({ sendCodeToAnthropic: true });
     const report = await analyze(fakeGitHub("acme/app", [prNode(1, h1)]), "acme/app#1");
     expect(report.notes).toContain(
-      "Strata guessed the layer of 1 file. This repo lets Claude sort it, but Strata has no Anthropic API key.",
+      "Strata guessed the layer of 1 file. This repo lets Claude sort it, but Strata does not have an Anthropic API key.",
     );
   });
 });

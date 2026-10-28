@@ -43,8 +43,8 @@ export function GuideView({
         </h2>
         <p className="sub">
           {guide.by === "llm"
-            ? `Claude's reading order for ${of}: the core of the change first, glue and mechanical changes last.`
-            : `Strata's groups of ${of}: by layer, then mechanical kind, then directory.`}
+            ? `The order in which Claude tells you to read ${of}: first the core of the change, last the glue code and mechanical changes.`
+            : `Strata's groups of ${of}, sorted by layer, then by mechanical kind, then by directory.`}
         </p>
       </div>
       <ol className="list">

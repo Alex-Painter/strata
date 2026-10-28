@@ -63,7 +63,7 @@ export async function loadPrIndex(repo: string, options: PrIndexOptions): Promis
   for (;;) {
     const page: PrPage = await options.port.graphql<PrPage>(PR_PAGE_QUERY, { owner, name, cursor });
     if (!page.repository)
-      throw new GitHubError(`GitHub has no repo ${repo}, or the token can't see it.`);
+      throw new GitHubError(`GitHub does not have the repo ${repo}, or the token cannot see it.`);
     defaultBranch = page.repository.defaultBranchRef?.name ?? defaultBranch;
     const { nodes, pageInfo } = page.repository.pullRequests;
     let reachedOld = false;
@@ -76,7 +76,7 @@ export async function loadPrIndex(repo: string, options: PrIndexOptions): Promis
       fetched.push(toStackPr(node, await allEvents(options.port, owner, name, node)));
     }
     if (reachedOld || !pageInfo.hasNextPage) break;
-    options.onProgress?.(`Reading PRs from GitHub: ${fetched.length} so far`);
+    options.onProgress?.(`Strata reads PRs from GitHub: ${fetched.length} at this time`);
     cursor = pageInfo.endCursor;
   }
   if (!defaultBranch) throw new GitHubError(`${repo} has no default branch.`);
@@ -103,7 +103,7 @@ export async function loadPrIndex(repo: string, options: PrIndexOptions): Promis
 
 export function splitRepo(repo: string): [owner: string, name: string] {
   const match = /^([\w.-]+)\/([\w.-]+)$/.exec(repo);
-  if (!match) throw new Error(`Expected owner/name, got "${repo}".`);
+  if (!match) throw new Error(`The repo must be owner/name, not "${repo}".`);
   return [match[1] as string, match[2] as string];
 }
 

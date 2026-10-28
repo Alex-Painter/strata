@@ -143,8 +143,8 @@ function conflictIssue(
     prs: [n],
     message:
       below === undefined
-        ? `#${n}'s changes conflict with where the stack left the trunk (${files}), so there's no whole-stack diff.`
-        : `#${n}'s changes conflict with the stack below it (${files}), so the whole-stack diff stops at #${below}.`,
+        ? `#${n}'s changes conflict with the point where the stack left the trunk (${files}). Thus there is no whole-stack diff.`
+        : `#${n}'s changes conflict with the stack below it (${files}). Thus the whole-stack diff stops at #${below}.`,
     evidence: [
       commitEvidence(node.anchor as string, `where #${n}'s changes start`),
       commitEvidence(node.pr.headOid, `#${n}'s head`),
@@ -258,7 +258,7 @@ function differsBecause(
   const open = node.pr.state === "open";
   const ended = node.pr.state === "merged" ? "merged" : "closed";
   if (part.how === "apart") {
-    return `${n} couldn't be put on the stack below it, so Strata shows its changes since it branched, and GitHub diffs it from ${baseRef}.`;
+    return `Strata cannot put ${n} on the stack below it. Thus Strata shows its changes since it branched, and GitHub diffs it from ${baseRef}.`;
   }
   const parent = edge ? stack.nodes.find((other) => other.pr.number === edge.parent) : undefined;
   const p = parent ? `#${parent.pr.number}` : null;
@@ -267,48 +267,50 @@ function differsBecause(
   if (edge?.via === "retarget" && repeats && (link === "intact" || link === "behind")) {
     // The parent landed on that same branch as a new commit, such as a squash.
     if (parent?.pr.state === "merged" && parent.pr.baseRef === baseRef) {
-      const since = open ? "hasn't been rebased since" : `wasn't rebased before it ${ended}`;
-      return `${p} landed on ${baseRef} as a new commit, and ${n} ${since}, so GitHub's diff of ${n} repeats ${p}'s changes.`;
+      const since = open
+        ? `nobody rebased ${n} after that`
+        : `nobody rebased ${n} before it ${ended}`;
+      return `${p} went into ${baseRef} as a new commit, and ${since}. Thus GitHub's diff of ${n} repeats the changes of ${p}.`;
     }
-    return `${n} was retargeted to ${baseRef}, which doesn't have all of ${p}'s commits, so GitHub's diff of ${n} repeats the ones it sits on.`;
+    return `Someone retargeted ${n} to ${baseRef}. That branch does not have all the commits of ${p}. Thus GitHub's diff of ${n} repeats the commits that ${n} sits on.`;
   }
   switch (link) {
     case "behind":
       // GitHub diffs it from where it left the parent only while its base holds that.
       if (base !== node.anchor) break;
       return open
-        ? `${n} is behind ${p}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`
-        : `${n} was behind ${p} when it ${ended}, so GitHub diffs it from where it left ${p}, and Strata from ${p}'s head now.`;
+        ? `${n} is behind ${p}. Thus GitHub diffs it from where it left ${p}, and Strata diffs it from the current head of ${p}.`
+        : `${n} was behind ${p} when it ${ended}. Thus GitHub diffs it from where it left ${p}, and Strata diffs it from the current head of ${p}.`;
     case "stale":
       if (!repeats) break;
-      return `${p} was force-pushed after ${n} branched from it, so GitHub's diff of ${n} repeats the old ${p} commits it sits on, and Strata's starts at ${p}'s head now.`;
+      return `Someone force-pushed ${p} after ${n} branched from it. Thus GitHub's diff of ${n} repeats the old ${p} commits that ${n} sits on. Strata's diff starts at the current head of ${p}.`;
     case "re-anchored":
       if (node.pr.baseRef === edge?.ref) {
         // It still targets the parent's branch, but sits somewhere else.
-        const moved = `${n} ${open ? "no longer sits" : "didn't sit"} on ${p}'s head but ${open ? "still targets" : "targeted"} ${baseRef}`;
+        const moved = `${n} ${open ? "does not sit" : "did not sit"} on the head of ${p}, but ${open ? "still targets" : "targeted"} ${baseRef}`;
         return repeats
-          ? `${moved}, so GitHub's diff of ${n} also shows the commits it sits on that ${baseRef} doesn't have.`
-          : `${moved}, so GitHub diffs it from where it meets ${baseRef}, and Strata from the stack below it.`;
+          ? `${moved}. Thus GitHub's diff of ${n} also shows the commits below ${n} that ${baseRef} does not have.`
+          : `${moved}. Thus GitHub diffs it from where it meets ${baseRef}, and Strata diffs it from the stack below it.`;
       }
-      return `${n} ${open ? "now sits" : "sat"} on ${baseRef} rather than on ${p}, so GitHub diffs it from ${baseRef}, and Strata from the stack below it.`;
+      return `${n} ${open ? "now sits" : "sat"} on ${baseRef}, not on ${p}. Thus GitHub diffs it from ${baseRef}, and Strata diffs it from the stack below it.`;
     case "merged-into-parent": {
       if (inParent) {
-        return `${n} was merged into ${baseRef}, so its changes are in ${p}'s diff here, and GitHub's diff of ${n} shows them as its own.`;
+        return `Someone merged ${n} into ${baseRef}. Thus its changes are in the diff of ${p} here, and GitHub's diff of ${n} shows them as its own.`;
       }
       // Merged after the parent landed, onto a branch that had moved on since.
       const late = stack.issues.some(
         (issue) => issue.kind === "base-already-merged" && issue.prs[0] === node.pr.number,
       );
       if (late && base !== parent?.pr.headOid) {
-        return `${n} was merged into ${baseRef} after ${p} landed, so GitHub diffs it from ${baseRef} as it was then, and Strata from the stack below it.`;
+        return `Someone merged ${n} into ${baseRef} after ${p} went into the trunk. Thus GitHub diffs it from ${baseRef} as it was at that time, and Strata diffs it from the stack below it.`;
       }
       break;
     }
   }
   if (part.how === "replayed") {
-    return `A PR below ${n} was replayed onto newer code, so Strata diffs ${n} from that, and GitHub from ${baseRef}.`;
+    return `Strata replayed a PR below ${n} onto newer code. Thus Strata diffs ${n} from that code, and GitHub diffs it from ${baseRef}.`;
   }
-  return `GitHub diffs ${n} from where it meets ${baseRef}, and Strata from the stack below it.`;
+  return `GitHub diffs ${n} from where it meets ${baseRef}, and Strata diffs it from the stack below it.`;
 }
 
 function commitEvidence(oid: string, label: string): Evidence {

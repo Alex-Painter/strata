@@ -72,7 +72,7 @@ export function parseChangeInput(
   }
 
   throw new ChangeInputError(
-    `Can't read "${text}". Use owner/repo#123, a PR URL, owner/repo:branch, ` +
+    `Strata cannot read "${text}". Use owner/repo#123, a PR URL, owner/repo:branch, ` +
       "owner/repo#12,13,14, owner/repo@base...head, or base...head inside a local checkout.",
   );
 }

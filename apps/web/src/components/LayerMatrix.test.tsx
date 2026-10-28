@@ -113,7 +113,7 @@ describe("LayerMatrixView", () => {
       ["logic", "2↻1", "2", "2"],
       ["config", "", "0+1m", "0+1m"],
     ]);
-    expect(page.textContent).toContain("↻ marks lines a later PR changed again");
+    expect(page.textContent).toContain("↻ marks lines that a later PR changed again");
     const logic = page.querySelector('button[aria-label^="Logic in #1"]');
     expect(logic?.getAttribute("aria-label")).toBe(
       "Logic in #1: 2 lines, 1 line changed again later, 1 file",

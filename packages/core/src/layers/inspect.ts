@@ -249,7 +249,7 @@ type Entry = (
  */
 export function parseInspectWord(entry: string): Entry {
   if (!/^(name:[a-z0-9]+|(file:)?([a-z0-9]+(\*|( [a-z0-9]+)*)|\*[a-z0-9]+\*))$/.test(entry)) {
-    throw new Error(`Can't read the inspect word "${entry}".`);
+    throw new Error(`Strata cannot read the inspect word "${entry}".`);
   }
   if (entry.startsWith("name:")) return { kind: "name", text: entry.slice(5), fileOnly: false };
   const fileOnly = entry.startsWith("file:");

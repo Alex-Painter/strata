@@ -87,7 +87,7 @@ export const LAYERS: Record<LayerId, LayerDefinition> = {
   other: {
     id: "other",
     title: "Other",
-    description: "Files no rule recognised. Each one is a gap in the layer rules.",
+    description: "Files that no rule recognised. Each file shows a gap in the layer rules.",
     order: 80,
     inspect: false,
   },

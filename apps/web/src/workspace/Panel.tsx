@@ -87,7 +87,7 @@ export function Panel({
         <div className="grid gap-1">
           <h2 className="ot prose">{selection.claim.text}</h2>
           <p className="okind">
-            Written by Claude from {selection.by} · {selection.claim.confidence} confidence
+            Claude wrote this from {selection.by} · {selection.claim.confidence} confidence
           </p>
         </div>
         <Section title="Evidence" count={cited.length}>
@@ -105,8 +105,8 @@ export function Panel({
           </div>
           {cited.length < citedIds(selection.claim).length && (
             <p className="sub">
-              {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} aren't in this
-              diff.
+              {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} are not in
+              this diff.
             </p>
           )}
         </Section>
@@ -125,7 +125,7 @@ export function Panel({
           aria-selected="false"
           disabled
           className="ptab"
-          title="Asking about a selection isn't built yet."
+          title="Questions about a selection are not available at this time."
         >
           Ask
         </button>
@@ -154,7 +154,9 @@ function Overview({
   run: RunView | null;
 }) {
   if (!report) {
-    return <p className="text-muted">{run?.loading ? "Loading…" : "No report yet."}</p>;
+    return (
+      <p className="text-muted">{run?.loading ? "Loading…" : "There is no report at this time."}</p>
+    );
   }
   const stack = report.stack;
   const path = stack?.selectedPath ?? [];
@@ -168,7 +170,9 @@ function Overview({
       <Section title="Properties">
         <dl className="props">
           <Prop term="Status">
-            <span title={report.verdict?.headline ?? "Strata doesn't decide a verdict yet."}>
+            <span
+              title={report.verdict?.headline ?? "Strata does not give a verdict at this time."}
+            >
               {statusWord(report, run)}
             </span>
           </Prop>
@@ -387,7 +391,7 @@ function Provenance({
           </button>
         ))}
       </div>
-      <p className="sub">From git blame over Strata's chain of commits.</p>
+      <p className="sub">Strata got this from git blame on its chain of commits.</p>
     </Section>
   );
 }
