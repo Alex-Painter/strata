@@ -13,9 +13,9 @@ import { ago, countPrs, yoursLabel } from "../lib/format";
 
 /**
  * The home page, by how much each Change asks of you: waiting on you (from
- * your GitHub assignments), assigned or reviewed but not waiting, and the
- * rest of each searched repo's stacks. Strata analyses the first two by
- * itself; the others only when you choose Analyse on their stack.
+ * your GitHub assignments), assigned or reviewed but not waiting, ones you
+ * opened yourself, and the rest of each searched repo's open stacks. Strata
+ * analyses the first two by itself; a stack only once you choose Analyse.
  */
 export function ChangesPage({ me }: { me: MeResponse }) {
   const queryClient = useQueryClient();
@@ -38,8 +38,7 @@ export function ChangesPage({ me }: { me: MeResponse }) {
   const all = changes.data;
   const error = changes.error?.message ?? null;
   const repos = assigned.data?.repos ?? [];
-  // Your own Changes in repos Strata doesn't search have no stack list to sit in.
-  const elsewhere = all?.filter((c) => c.yours.length === 0 && !repos.includes(c.repo)) ?? [];
+  const opened = all?.filter((c) => c.yours.length === 0) ?? [];
   return (
     <AppShell
       me={me}
@@ -70,18 +69,21 @@ export function ChangesPage({ me }: { me: MeResponse }) {
               empty="Nothing here yet."
             />
           </section>
+          {opened.length > 0 && (
+            <section className="grid gap-3" aria-labelledby="opened-h">
+              <h2 id="opened-h" className="h2">
+                Opened by you
+              </h2>
+              <p className="-mt-1 text-[12px] text-muted">
+                Stacks you chose to analyse that nobody asked you about.
+              </p>
+              <ChangeList changes={opened} error={null} empty="" />
+            </section>
+          )}
           {all &&
             repos.map((repo) => (
               <OtherStacks key={repo} repo={repo} changes={all.filter((c) => c.repo === repo)} />
             ))}
-          {elsewhere.length > 0 && (
-            <section className="grid gap-3" aria-labelledby="elsewhere-h">
-              <h2 id="elsewhere-h" className="h2">
-                Other Changes
-              </h2>
-              <ChangeList changes={elsewhere} error={null} empty="" />
-            </section>
-          )}
         </div>
       </main>
     </AppShell>
@@ -140,8 +142,8 @@ function WaitingOnYou({
 }
 
 /**
- * The repo's open stacks that aren't yours. They're only analysed once you
- * choose Analyse on the stack, so most rows open the stack, not a Change.
+ * The repo's open stacks with no Change yet. They're only analysed once you
+ * choose Analyse on the stack; then they move up to your Changes.
  */
 function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[] }) {
   const stacks = useQuery({
@@ -153,9 +155,9 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
   const covers = (stack: StackSummary, change: ChangeSummary) =>
     stack.prs.some((pr) => pr.number === change.tipPr);
-  const yours = changes.filter((c) => c.yours.length > 0);
   const others = (found ?? []).filter(
-    (stack) => stack.prs.some((pr) => pr.state === "open") && !yours.some((c) => covers(stack, c)),
+    (stack) =>
+      stack.prs.some((pr) => pr.state === "open") && !changes.some((c) => covers(stack, c)),
   );
   const id = `others-${repo.replace("/", "-")}`;
   return (
@@ -164,7 +166,8 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
         Other stacks in {repo}
       </h2>
       <p className="-mt-1 text-[12px] text-muted">
-        Open stacks nobody has asked you about. Strata analyses one when you choose Analyse on it.
+        Open stacks nobody has asked you about, not analysed yet. Choose one to see it and analyse
+        it.
       </p>
       {stacks.error ? (
         <p className="alert">{stacks.error.message}</p>
@@ -177,15 +180,11 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
       ) : (
         <ul className="list">
           {others.map((stack) => {
-            const change = changes.find((c) => c.yours.length === 0 && covers(stack, c));
             const root = stack.prs.find((pr) => pr.number === stack.root);
             const authors = [...new Set(stack.prs.flatMap((pr) => (pr.author ? [pr.author] : [])))];
             return (
               <li key={stack.id}>
-                <Link
-                  href={change ? `/changes/${change.id}` : `/repos/${repo}#stack-${stack.root}`}
-                  className="lrow"
-                >
+                <Link href={`/repos/${repo}#stack-${stack.root}`} className="lrow">
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{root?.title}</span>
                     <span className="ml-2 text-[12px] text-muted">
@@ -196,9 +195,7 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
                   <span className="shrink-0 font-mono text-[12px] text-faint">
                     {repo}#{stack.root}
                   </span>
-                  <span className="pill">
-                    {change?.status ? STATUS[change.status] : "Not analysed"}
-                  </span>
+                  <span className="pill">Not analysed</span>
                   <span className="w-16 shrink-0 text-right text-[12px] text-faint">
                     {ago(stack.updatedAt)}
                   </span>

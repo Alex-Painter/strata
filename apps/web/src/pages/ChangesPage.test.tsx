@@ -126,11 +126,12 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(rows("assigned-h")).toHaveLength(1);
   expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
 
+  // #20's stack has a Change you opened, so it's listed there, not with the others.
+  expect(rows("opened-h").map(([href]) => href)).toEqual(["/changes/20"]);
   const others = rows("others-acme-app");
-  expect(others.map(([href]) => href)).toEqual(["/changes/20", "/repos/acme/app#stack-30"]);
-  expect(others[0]?.[1]).toContain("Analysed");
-  expect(others[1]?.[1]).toContain("Not analysed");
-  expect(others[1]?.[1]).toContain("by kim, sam");
+  expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
+  expect(others[0]?.[1]).toContain("Not analysed");
+  expect(others[0]?.[1]).toContain("by kim, sam");
 
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",

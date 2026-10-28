@@ -83,8 +83,8 @@ The look follows the Cross-Section design: Linear-like, dark first with a light 
 
 Every page sits in `components/AppShell.tsx`: a sidebar on the chrome (the home link, the page's navigation, the reader's login, the theme switch and Sign out) and one inset card with a 44 px top bar holding a breadcrumb. Below 960 px the sidebar is a drawer behind the menu button. Routes:
 
-- `/`: full width, by what each Change asks of the user: "Waiting on you" (assigned, or review requested) with Refresh, "Assigned to you, not waiting" (reviewed already, or no longer listed), and "Other stacks in <repo>" for each searched repo: its open stacks that aren't theirs, unanalysed until they choose Analyse on the stack. The sidebar lists the repos they've reviewed.
-- `/repos/:owner/:name`: the repo's stacks, each with its map (`components/StackMap.tsx`, drawn from core's layout: HTML rows, SVG edges), a path picker for forks and an Analyse button, which makes the path's Change and runs it. `#stack-<root>` scrolls to a stack.
+- `/`: full width, by what each Change asks of the user: "Waiting on you" (assigned, or review requested) with Refresh, "Assigned to you, not waiting" (reviewed already, or no longer listed), "Opened by you" (Changes they made themselves), and "Other stacks in <repo>" for each searched repo: its open stacks with no Change yet, unanalysed until they choose Analyse on the stack. The sidebar lists the repos they've reviewed.
+- `/repos/:owner/:name`: the repo's stacks, each with its map (`components/StackMap.tsx`, drawn from core's layout: HTML rows, SVG edges), a path picker for forks and an Analyse button, which makes the path's Change and runs it (Open instead, when the path already has one). `#stack-<root>` scrolls to a stack.
 - `/changes/:id`: the workspace (`workspace/`). Where the reader is lives in the URL: `?pr=N` scopes to one PR of the path, `?layer=api` shows a layer. A CLI page keeps the same in memory.
 
 The workspace (`workspace/Workspace.tsx`) has three parts:

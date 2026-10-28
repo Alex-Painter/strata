@@ -1,7 +1,7 @@
-import type { MeResponse, StackSummary } from "@strata/core/model";
+import type { ChangeSummary, MeResponse, StackSummary } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { EvidenceList } from "../components/EvidenceList";
 import { PathPicker } from "../components/PathPicker";
@@ -22,6 +22,7 @@ export function StacksPage({ me }: { me: MeResponse }) {
     refetchInterval: pollWhilePending,
     refetchIntervalInBackground: true,
   });
+  const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
   const found = stacks.data && !isPending(stacks.data) ? stacks.data : null;
   const progress = isPending(stacks.data) ? stacks.data.progress : null;
   // The home page links a stack as #stack-<root>; show it once the list is in.
@@ -68,7 +69,7 @@ export function StacksPage({ me }: { me: MeResponse }) {
             <div className="empty">No stacks here: no recent PR targets another PR's branch.</div>
           )}
           {found?.stacks.map((stack) => (
-            <StackCard key={stack.id} stack={stack} />
+            <StackCard key={stack.id} stack={stack} changes={changes.data ?? []} />
           ))}
         </div>
       </main>
@@ -76,7 +77,7 @@ export function StacksPage({ me }: { me: MeResponse }) {
   );
 }
 
-function StackCard({ stack }: { stack: StackSummary }) {
+function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSummary[] }) {
   const [tip, setTip] = useState(stack.defaultPath[stack.defaultPath.length - 1] as number);
   // A refreshed list can end the chosen path elsewhere; the card then shows the default.
   const path = stack.paths.find((p) => p[p.length - 1] === tip) ?? stack.defaultPath;
@@ -94,6 +95,10 @@ function StackCard({ stack }: { stack: StackSummary }) {
     },
   });
   const root = stack.prs.find((pr) => pr.number === stack.root);
+  // The Change for the path on show, if you or the assignment search made one.
+  const existing = changes.find(
+    (c) => c.repo === stack.repo && c.rootPr === path[0] && c.tipPr === path[path.length - 1],
+  );
   // Opening a path the card no longer shows would take the user to the wrong Change.
   const choose = (next: number) => {
     request.stop();
@@ -137,26 +142,58 @@ function StackCard({ stack }: { stack: StackSummary }) {
           </div>
         ))}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => open.mutate(path[path.length - 1] as number)}
-            disabled={open.isPending}
-            className="btn primary"
-          >
-            {open.isPending ? "Opening…" : `Analyse ${prCount(path.length)}`}
-          </button>
-          {!open.error && (
-            <span className="text-[12px] text-muted">
-              Strata reads the diffs, and Claude writes the summary on repos you've opted in.
-            </span>
-          )}
-          {open.error && (
-            <span role="alert" className="text-text">
-              {open.error.message}
-            </span>
+          {existing ? (
+            <>
+              <Link href={`/changes/${existing.id}`} className="btn primary">
+                Open
+              </Link>
+              <span className="text-[12px] text-muted">
+                {existing.status ? `${RUN_STATUS[existing.status]} ` : ""}
+                {ago(existing.updatedAt)}. This path already has a Change.
+              </span>
+            </>
+          ) : (
+            <AnalyseButton
+              label={open.isPending ? "Opening…" : `Analyse ${prCount(path.length)}`}
+              disabled={open.isPending}
+              onClick={() => open.mutate(path[path.length - 1] as number)}
+              error={open.error?.message ?? null}
+            />
           )}
         </div>
       </footer>
     </article>
+  );
+}
+
+const RUN_STATUS = { queued: "Queued", running: "Running", done: "Analysed", failed: "Failed" };
+
+function AnalyseButton({
+  label,
+  disabled,
+  onClick,
+  error,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  error: string | null;
+}) {
+  return (
+    <>
+      <button type="button" onClick={onClick} disabled={disabled} className="btn primary">
+        {label}
+      </button>
+      {!error && (
+        <span className="text-[12px] text-muted">
+          Strata reads the diffs, and Claude writes the summary on repos you've opted in.
+        </span>
+      )}
+      {error && (
+        <span role="alert" className="text-text">
+          {error}
+        </span>
+      )}
+    </>
   );
 }

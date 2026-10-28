@@ -1,5 +1,5 @@
 import { summarizeStack } from "@strata/core";
-import type { Stack, StackPr } from "@strata/core/model";
+import type { ChangeSummary, Stack, StackPr } from "@strata/core/model";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -70,10 +70,12 @@ const grown: Stack = {
 
 let listed = stack;
 let opened = false;
+let changes: ChangeSummary[] = [];
 const leaves: number[] = [];
 beforeEach(() => {
   listed = stack;
   opened = false;
+  changes = [];
   leaves.length = 0;
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.stubGlobal(
@@ -86,6 +88,7 @@ beforeEach(() => {
           ? Response.json({ change: { id: `chg_${leaf}` }, run: null, report: null, sources: [] })
           : new Response(JSON.stringify({ pending: true, progress: null }), { status: 202 });
       }
+      if (url === "/api/changes") return Response.json(changes);
       if (url.endsWith("/stacks")) {
         return Response.json({ repo: "acme/app", stacks: [summarizeStack(listed)] });
       }
@@ -168,5 +171,32 @@ it("opens the path the card shows after the stack list changes under it", async 
   act(() => button(/^Analyse/).click());
   await wait(50);
   expect(leaves).toEqual([9]);
+  act(() => root.unmount());
+});
+
+it("opens the Change a path already has instead of analysing it again", async () => {
+  window.history.replaceState(null, "", "/repos/acme/app");
+  changes = [
+    {
+      id: "chg_56",
+      title: "Email admins",
+      repo: "acme/app",
+      input: "acme/app#5",
+      status: "done",
+      origin: "added",
+      yours: [],
+      waiting: false,
+      rootPr: 5,
+      tipPr: 6,
+      createdAt: "2026-10-01T00:00:00Z",
+      updatedAt: "2026-10-01T00:00:00Z",
+    },
+  ];
+  const { root, button } = render(new QueryClient());
+  await wait(50);
+  const open = [...document.querySelectorAll("a")].find((a) => a.textContent === "Open");
+  expect(open?.getAttribute("href")).toBe("/changes/chg_56");
+  expect(document.body.textContent).toContain("This path already has a Change.");
+  expect(button(/^Analyse/)).toBeUndefined();
   act(() => root.unmount());
 });
