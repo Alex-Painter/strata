@@ -121,7 +121,11 @@ export interface MechanicalVerdict {
 }
 
 export interface Hunk {
-  /** Content-derived: same path and same lines give the same id. */
+  /**
+   * Content-derived: same path and same lines give the same id, whatever the
+   * line numbers. So a PR's copy of a hunk can share the whole stack's id
+   * but not its numbers: look an id up in the diff that cited it.
+   */
   id: string;
   path: string;
   /** The `@@ -a,b +c,d @@` numbers. */
