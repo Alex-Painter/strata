@@ -23,9 +23,9 @@ Preconditions:
 
 - One instance from `strata-verify up` (bypass mode), passing `doctor`. `$B` stands for its RUN_ID and `URL` for its URL.
 
-- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Review a stack"` with `textbox "PR or branch"` and a disabled `button "Review"`, `heading "Browse a repo's stacks"` with `textbox "Repository"`, and `heading "Changes"` with the text `No Changes yet. Give Strata a PR above, or pick a stack from a repo.` Also `link "Strata"`, the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
+- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"` with the text `Nothing assigned to you right now.` and `heading "Assigned to you, not waiting"` with `Nothing here yet.` (the assignment search is off without `--assigned`, so there's no Refresh). Also `link "Strata"`, the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
 - **Missing Change.** `navigate` to `URL/changes/abc`. The page shows `Not found.` under a breadcrumb `Changes › Change`.
-- **Home link.** From that page, `find` "Strata" (the link) and click it. The URL becomes `URL/` and `heading "Review a stack"` appears, with no full page reload needed.
+- **Home link.** From that page, `find` "Strata" (the link) and click it. The URL becomes `URL/` and `heading "Waiting on you"` appears, with no full page reload needed.
 - **Not found.** `navigate` to `URL/nope`. The page shows `Page not found.`
 - **Server side of routing.** `strata-verify http $B app-shell/deep-link GET /changes/abc` returns `200`, `cache-control: no-cache` and a body containing `<title>Strata</title>`.
 - **Asset caching.** Take an `/assets/...js` path from the body of `/`, then `strata-verify http $B app-shell/asset GET /assets/<file>.js`. Expect `200` and `cache-control: public, max-age=31536000, immutable`.

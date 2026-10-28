@@ -4,11 +4,10 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 
 ## Sub-features
 
-- `new-change`: the "Review a stack" box on the home page reads back what it will look up, then opens the Change.
-- `stack-list`: `/repos/<owner>/<name>` lists the repo's stacks, newest activity first, each with its map and a Review button.
+- `stack-list`: `/repos/<owner>/<name>` lists the repo's stacks, newest activity first, each with its map and an Analyse button, which makes the path's Change and runs it. `#stack-<root>` scrolls to that stack.
 - `stack-map`: on each stack list card. Every PR links to GitHub, merged PRs link to the commit they landed as, and an open PR that needs a restack has a dashed edge and says so (a merged or closed one can't be restacked, so it doesn't).
 - `pr-scope`: choosing a PR in the sidebar shows its branches, how it sits on its parent with commit evidence, where its own changes start, and its issues. The URL gets `?pr=<n>`.
-- `path-picker`: a fork offers one choice per path. Picking another path opens that path's Change.
+- `path-picker`: in the workspace sidebar, the Pull requests graph draws the whole stack; on a fork, the other branch's PRs are dimmed and choosing one opens that path's Change. The stack list's cards still have a picker.
 - `diffs`: a layer's view lists its files by path, each with its hunks under it; big files start closed and mechanical ones folded. The whole stack shows the whole-stack diff; a PR shows its own, says when Strata replayed it onto the stack below, and shows a `GitHub's diff` banner when GitHub's diff differs.
 - `summaries`: three to six sentences about the whole stack and one to three per PR, each with a button that shows the hunks it rests on in the side panel.
 - `guide`: the whole stack's sections in reading order, each opening to its files, which open in their layer; Claude's when the repo allows it, Strata's groups otherwise.
@@ -17,8 +16,8 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 
 ## How to get to it (user POV)
 
-- On the home page, paste a PR URL, `owner/repo#123` or `owner/repo:branch` into "Review a stack" and choose Review.
-- On the home page, type `owner/repo` under "Browse a repo's stacks" and choose Show stacks, or open `/repos/<owner>/<name>`.
+- On the home page, choose a stack under "Other stacks in <repo>", or a repo under "Stacks by repo" in the sidebar, or open `/repos/<owner>/<name>`. Choose Analyse on a stack.
+- `POST /api/changes` with `{"input":"owner/repo#123"}` still makes the Change for any PR or branch.
 - In a Change, choose a PR on the map, or "Whole stack" above it.
 
 ## Driving it with strata-verify
@@ -53,7 +52,7 @@ Web (`URL` is the run's URL):
 - **PR scope.** Choose `button "Show #10 Warm the forecast cache nightly"`. The URL gets `?pr=10` and the pane shows `How it arrived`, `#10 Warm the forecast cache nightly`, `Review required`, `Checks running`, `Branch b10 into b9`, the link `Behind #9: needs a restack.` with commit evidence, `Changes start after <sha>` and `Stacked on it #11`, then `Strata put this PR's changes on the stack below it, as a restack would.` and `note "Revised later"`: `2 lines this PR added were changed again later, in #11.` The view bar has an `Only #10` chip and reads `3 files +11 −0`; its layers are `Logic` (`app/jobs/warm_cache.py`, whose hunk has a `revised in #11` chip with seams on; choosing it goes to `?pr=11`), `Tests` and `Config & infra`, and the sidebar dims the layers it doesn't touch. There's no `GitHub's diff` banner: GitHub diffs #10 from where it left #9 and gets the same files. Choose `button "Whole stack"` to go back.
 - **GitHub banner.** Review `acme/app#2` and choose `button "Show #2 Add the forecast service"`. `region "GitHub's diff"` reads `GitHub's diff of #2 is different from this one.`, `#1 landed on main as a new commit, and #2 hasn't been rebased since, so GitHub's diff of #2 repeats #1's changes.`, `Only on GitHub: b1-2.txt`, with two commit links. Its layers hold only `b2-3.txt`.
 - **Stack list.** `navigate` to `URL/repos/acme/app`. Expect `heading "Stacks in acme/app"` and the articles `Stack from #9`, `Stack from #5` and `Stack from #1`. In `Stack from #1`, the `#1` row reads `Merged` and links `as <sha>` to the commit.
-- **Fork.** In `Stack from #5`, the buttons `#5 → #6 Show admins in settings` and `#5 → #7 Email admins` (pressed) pick a path, and `#6` is dimmed until it's on the picked path. Choose `button "Review 2 PRs"`. The workspace shows the same two choices under `This stack forks into 2 paths. Each one is its own Change.`; choosing the other one opens a different `/changes/` id.
+- **Fork.** In `Stack from #5`, the buttons `#5 → #6 Show admins in settings` and `#5 → #7 Email admins` (pressed) pick a path, and `#6` is dimmed until it's on the picked path. Choose `button "Analyse 2 PRs"`. The workspace's Pull requests graph shows #5, #6 and #7 over `main`, with #6 dimmed; choosing `button "Open the path through #6 Show admins in settings"` opens a different `/changes/` id.
 - **Mermaid.** `button "Copy as Mermaid"` reads `Copied` for a moment. The clipboard starts `flowchart BT`.
 
 With the stand-in Claude (`strata-verify up --github fixture --claude fixture`, `$C` its RUN_ID): it answers from Strata's own prompts, the same way every time. Review `https://github.com/acme/app/pull/10` as above.

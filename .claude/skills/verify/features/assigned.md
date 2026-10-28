@@ -7,7 +7,8 @@ Strata searches the repos it's told to (`STRATA_ASSIGNED_REPOS`, GlyphicAI/maver
 - `waiting` lists the Changes with a PR GitHub still lists for you, saying which PR and why.
 - `whole-path` means a PR in the middle of a stack gives the Change for the whole path.
 - `refresh` starts a search now and shows its progress.
-- `earlier` keeps Changes GitHub no longer lists for you under "Earlier assignments".
+- `not-waiting` lists Changes with a PR you've reviewed already, or that GitHub no longer lists for you, under "Assigned to you, not waiting". They're analysed too.
+- `other-stacks` lists the searched repo's other open stacks under "Other stacks in <repo>", unanalysed until you choose Analyse on the stack page.
 - `yours-marker` tags your PRs in the workspace's Pull requests list, and the workspace still opens on the whole stack.
 
 ## How to get to it (user POV)
@@ -19,16 +20,17 @@ Strata searches the repos it's told to (`STRATA_ASSIGNED_REPOS`, GlyphicAI/maver
 
 Preconditions:
 
-- One instance from `strata-verify up --github fixture --assigned acme/app`, passing `doctor`. `$R` is its RUN_ID. The fixture lists `#4` as assigned to `verify-bot` and asks for its review on `#10` through the team `acme/backend`. Without `--assigned`, the search is off and the section is hidden.
+- One instance from `strata-verify up --github fixture --assigned acme/app`, passing `doctor`. `$R` is its RUN_ID. The fixture lists `#4` as assigned to `verify-bot`, asks for its review on `#10` through the team `acme/backend`, and has it as a reviewer of `#3`. Without `--assigned`, the search is off and the section is hidden.
 
 - **Search status.** `strata-verify http $R assigned/status GET /api/assigned`. A few seconds after start, expect `200` with `"repos":["acme/app"]`, `"running":false`, a `lastFinishedAt` and `"errors":[]`.
 - **Waiting on you.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"`, `button "Refresh"`, the text `Searched acme/app`, and two rows: `Cache forecasts per account` with `#10 review requested from acme/backend`, and `Fix a typo` with `#4 assigned`, each with `Analysed` once their runs finish. Save it with `strata-verify note $R assigned/home.aria.txt`.
 - **Whole path.** `strata-verify http $R assigned/changes GET /api/changes`, take the id of the Change whose `input` is `acme/app#10`, then `strata-verify http $R assigned/change GET /api/changes/<id>`. Its `report.stack.selectedPath` is `[9,10,11]`.
 - **Yours marker.** `navigate` to `URL/changes/<id>`. `button "Whole stack"` is current, and the Pull requests list row `Show #10 Warm the forecast cache nightly` contains the text `yours`, titled `Yours: review requested from acme/backend`.
+- **Not waiting, and other stacks.** On the same page, `heading "Assigned to you, not waiting"` lists `Add the forecast model` with `#3 reviewed by you`. `heading "Other stacks in acme/app"` lists `Add billing admins` (`3 PRs: 3 open by dev`, `Not analysed`), linking to `/repos/acme/app#stack-5`; the stacks from #9 and #1 aren't listed again. Choosing it scrolls the Stacks page to `Stack from #5`, whose `button "Analyse 2 PRs"` makes and runs the Change; back home, the row then shows its status and opens that Change.
 - **Refresh.** Choose `Refresh`. The note under the heading shows a search step, such as `Searching acme/app`, then `Searched acme/app just now`. No new rows appear and nothing runs again, since no head moved.
 
 ## Gotchas
 
 - The search reads GitHub as the token's user, which isn't always the signed-in login. Under the fixture both are `verify-bot`.
 - A Change typed in by hand stays under "Changes" (origin `added`) even if it's also assigned. It shows in "Waiting on you" while one of its PRs is listed for you.
-- A stack that grows a new PR on top gives a new, longer Change on the next search. The shorter one moves to "Earlier assignments".
+- A stack that grows a new PR on top gives a new, longer Change on the next search. The shorter one moves to "Assigned to you, not waiting".
