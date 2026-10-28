@@ -3,7 +3,13 @@
  * the real one does: newest-updated first, in pages, with cursors. It records
  * each query so tests can check how much was asked for.
  */
-import { ASSIGNED_QUERY, type AssignedNode, type AssignedPage } from "../github/assigned.js";
+import {
+  ASSIGNED_QUERY,
+  type AssignedNode,
+  type AssignedPage,
+  VIEWER_QUERY,
+  type ViewerPage,
+} from "../github/assigned.js";
 import {
   PR_PAGE_QUERY,
   PR_TIMELINE_QUERY,
@@ -47,6 +53,10 @@ export function fakeGitHub(
     viewer: options.viewer ?? "reviewer",
     requests: {},
     async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+      if (query === VIEWER_QUERY) {
+        const page: ViewerPage = { viewer: { login: fake.viewer } };
+        return page as T;
+      }
       if (query === ASSIGNED_QUERY) {
         fake.calls.push({ query: "search", variables });
         return search(fake, repo, String(variables.q), variables.cursor, pageSize) as T;
@@ -95,7 +105,7 @@ export function fakeGitHub(
   return fake;
 }
 
-/** Understands only the searches findAssigned sends. */
+/** Understands only the searches findAssigned sends, for the viewer's own login. */
 function search(
   fake: FakeGitHub,
   repo: string,
@@ -103,17 +113,17 @@ function search(
   cursor: unknown,
   pageSize: number,
 ): AssignedPage {
-  const terms = q.split(/\s+/);
+  const terms = q.toLowerCase().split(/\s+/);
   const me = fake.viewer.toLowerCase();
   const matches = fake.prs.filter((pr) => {
     const asks = fake.requests[pr.number] ?? {};
     const has = (list: string[] | undefined) => (list ?? []).some((l) => l.toLowerCase() === me);
-    if (!terms.includes(`repo:${repo}`)) return false;
+    if (!terms.includes(`repo:${repo.toLowerCase()}`)) return false;
     if (terms.includes("is:open") && pr.state !== "OPEN") return false;
-    if (terms.includes("-author:@me") && pr.author?.login.toLowerCase() === me) return false;
-    if (terms.includes("assignee:@me") && !has(asks.assignees)) return false;
+    if (terms.includes(`-author:${me}`) && pr.author?.login.toLowerCase() === me) return false;
+    if (terms.includes(`assignee:${me}`) && !has(asks.assignees)) return false;
     if (
-      terms.includes("review-requested:@me") &&
+      terms.includes(`review-requested:${me}`) &&
       !has(asks.reviewers) &&
       !(asks.teams ?? []).some((team) => has(team.members))
     )
@@ -147,7 +157,6 @@ function search(
   });
   const end = start + nodes.length;
   return {
-    viewer: { login: fake.viewer },
     search: { pageInfo: { hasNextPage: end < sorted.length, endCursor: String(end) }, nodes },
   };
 }

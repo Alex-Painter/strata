@@ -47,8 +47,8 @@ describe("findAssigned", () => {
     const queries = github.calls.map((call) => call.variables.q);
     expect(new Set(queries)).toEqual(
       new Set([
-        "repo:acme/app is:pr is:open assignee:@me -author:@me",
-        "repo:acme/app is:pr is:open review-requested:@me -author:@me",
+        "repo:acme/app is:pr is:open assignee:alex -author:alex",
+        "repo:acme/app is:pr is:open review-requested:alex -author:alex",
       ]),
     );
   });

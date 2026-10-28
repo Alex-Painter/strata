@@ -2,16 +2,21 @@
  * Open PRs in a repo that GitHub lists for the token's user: assigned to
  * them, or with their review requested directly or through a team they're
  * on. Their own PRs are left out. Two searches, since GitHub's search can't
- * OR the two qualifiers.
+ * OR the two qualifiers, after asking whose token it is.
  */
 import type { AssignedPr, AssignedPrs, AssignedReason } from "@strata/core";
 import type { PageInfo } from "./graphql.js";
 import { GitHubError, type GitHubPort } from "./port.js";
 import { splitRepo } from "./pr-index.js";
 
+/** Whose token this is: the searches name them, rather than trusting `@me` in GraphQL. */
+export const VIEWER_QUERY = `
+query StrataViewer {
+  viewer { login }
+}`;
+
 export const ASSIGNED_QUERY = `
 query StrataAssigned($q: String!, $cursor: String) {
-  viewer { login }
   search(query: $q, type: ISSUE, first: 50, after: $cursor) {
     pageInfo { hasNextPage endCursor }
     nodes {
@@ -45,30 +50,33 @@ export interface AssignedNode {
   reviewRequests: { nodes: ({ requestedReviewer: Reviewer | null } | null)[] };
 }
 
-export interface AssignedPage {
+export interface ViewerPage {
   viewer: { login: string };
+}
+
+export interface AssignedPage {
   search: { pageInfo: PageInfo; nodes: (AssignedNode | { __typename: string } | null)[] };
 }
 
-/** The search qualifiers behind each reason. */
-export const ASSIGNED_SEARCHES = {
-  assignee: "assignee:@me",
-  "review-requested": "review-requested:@me",
-} as const;
+/** The search qualifier behind each reason. review-requested includes the user's teams. */
+const QUALIFIERS: Record<AssignedReason["kind"], string> = {
+  assignee: "assignee",
+  "review-requested": "review-requested",
+};
 
 export async function findAssigned(port: GitHubPort, repo: string): Promise<AssignedPrs> {
   splitRepo(repo);
-  let viewer: string | null = null;
+  const viewer = (await port.graphql<ViewerPage>(VIEWER_QUERY, {})).viewer?.login;
+  if (!viewer) throw new GitHubError("GitHub didn't say who the token belongs to.");
   const found = new Map<number, { node: AssignedNode; kinds: Set<AssignedReason["kind"]> }>();
-  for (const [kind, qualifier] of Object.entries(ASSIGNED_SEARCHES) as [
+  for (const [kind, qualifier] of Object.entries(QUALIFIERS) as [
     AssignedReason["kind"],
     string,
   ][]) {
-    const q = `repo:${repo} is:pr is:open ${qualifier} -author:@me`;
+    const q = `repo:${repo} is:pr is:open ${qualifier}:${viewer} -author:${viewer}`;
     let cursor: string | null = null;
     for (;;) {
       const page: AssignedPage = await port.graphql<AssignedPage>(ASSIGNED_QUERY, { q, cursor });
-      viewer = page.viewer.login;
       for (const node of page.search.nodes) {
         if (node?.__typename !== "PullRequest") continue;
         const pr = node as AssignedNode;
@@ -82,12 +90,10 @@ export async function findAssigned(port: GitHubPort, repo: string): Promise<Assi
       cursor = page.search.pageInfo.endCursor;
     }
   }
-  if (viewer === null) throw new GitHubError("GitHub didn't say who the token belongs to.");
-  const login = viewer;
   const prs = [...found.values()]
-    .map(({ node, kinds }) => toAssignedPr(node, kinds, login))
+    .map(({ node, kinds }) => toAssignedPr(node, kinds, viewer))
     .sort((a, b) => a.number - b.number);
-  return { viewer: login, prs };
+  return { viewer, prs };
 }
 
 function toAssignedPr(
