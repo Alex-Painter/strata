@@ -34,7 +34,7 @@ Dependencies only point downwards: `web → core`, `server → engine → core`,
 `packages/core/src/model/` holds the domain model:
 
 - `change.ts`: a **Change** is built from the net diff between the merge base and the head. PR boundaries are kept as `ChangeHint`s and never used to group or order anything, which is what makes shape invariance possible.
-- `layers.ts`: the semantic layers (data model, API, logic, UI, tests, config, docs, other), their order, and which ones need mandatory inspection.
+- `layers.ts`: the semantic layers (data model, API, logic, UI, tests, config, docs, other), their order, and which ones need mandatory inspection; the rules that flag a single file for inspection in any layer, and the flag on `FileChange.inspect`.
 - `anchors.ts`: the anchor model (below).
 - `report.ts`: the `ChangeReport` with progressive disclosure (verdict, summary, evidence, raw). A `Claim` without evidence can't be shown.
 - `stack.ts`: a **stack** is a tree of ordinary PRs linked by branch (a PR targets, or used to target, the head branch of the PR below). Each bottom-to-tip path is one Change. `stack/build.ts` builds it purely from PR metadata plus git facts it asks the engine for. A `PrPart` is one PR's own diff on the path, with how it compares with GitHub's.
@@ -98,7 +98,7 @@ It polls while a run is going. The stack list and new Changes ask again each sec
 
 ### cli
 
-`src/main.ts` parses the command (`args.ts`), runs the engine (`engine.ts`, which also reads the server's `DEV_` settings for stand-ins), prints the report (`report.ts`) and writes the page and JSON (`html.ts`): the web app's `dist-static/index.html` with the report embedded, in `reports/<owner>/<name>/` in the data folder by default. `html.ts` refuses any path inside a git checkout, found by the nearest `.git` above it with symlinks resolved. `scripts/stack-vs-range.ts` is the shape-invariance check on a real stack, comparing canonical reports and printing where they differ (`compare.ts`, places only, never code), or that it could compare only the PRs in the whole-stack diff.
+`src/main.ts` parses the command (`args.ts`), runs the engine (`engine.ts`, which also reads the server's `DEV_` settings for stand-ins), prints the report (`report.ts`, with each flagged file's reason, every flagged file even past the 40-file cut, and a rename as `R old → new`) and writes the page and JSON (`html.ts`): the web app's `dist-static/index.html` with the report embedded, in `reports/<owner>/<name>/` in the data folder by default. `html.ts` refuses any path inside a git checkout, found by the nearest `.git` above it with symlinks resolved. `scripts/stack-vs-range.ts` is the shape-invariance check on a real stack, comparing canonical reports and printing where they differ (`compare.ts`, places only, never code), or that it could compare only the PRs in the whole-stack diff.
 
 ## Highlight and chat
 
@@ -110,7 +110,7 @@ The workspace shows all of a Change's context together and lets the reviewer hig
 
 ## Shape invariance
 
-The benchmark from SPEC.md runs in `packages/engine/src/shape-invariance.test.ts`. One maverick-like feature (`engine/src/testing/feature-shapes.ts`) is built as one PR, as four chained PRs, with the bottom PR squash-merged while main moves on, with the second PR then rebased, as a fork, and merged all at once after main moves on (each PR lands on main as one new commit while GitHub keeps the branch below as its base). Every shape but the fork must give the same whole-stack patch-id, files, hunks, layers and canonical report, and ask Claude (fakes that record their questions) the same question about the files no rule matched, and the same summary question, byte for byte, with no PR numbers, titles, branches or commits in it. Their summaries and Guides must match too, and so must the stack's code given as a plain range, with the same questions to Claude. `packages/core/src/layers.test.ts` holds the layer rules as a table of paths.
+The benchmark from SPEC.md runs in `packages/engine/src/shape-invariance.test.ts`. One maverick-like feature (`engine/src/testing/feature-shapes.ts`) is built as one PR, as four chained PRs, with the bottom PR squash-merged while main moves on, with the second PR then rebased, as a fork, and merged all at once after main moves on (each PR lands on main as one new commit while GitHub keeps the branch below as its base). Every shape but the fork must give the same whole-stack patch-id, files, hunks, layers, inspect flags and canonical report, and ask Claude (fakes that record their questions) the same question about the files no rule matched, and the same summary question, byte for byte, with no PR numbers, titles, branches or commits in it. Their summaries and Guides must match too, and so must the stack's code given as a plain range, with the same questions to Claude. `packages/core/src/layers.test.ts` holds the layer rules and the inspect rules as tables of paths, near misses (`BlogIndex.tsx`, Ansible's `roles/`, an `archive/` folder of old scripts) included.
 
 PR descriptions are shown as context but never feed the intent ledger, because they depend on how the work was split.
 
@@ -122,7 +122,7 @@ Narrowed to PR stacks (plan: "Strata milestone 1: the stack view"). In order:
 2. Store one Change per path and run it on the server. Done.
 3. The stack map, the stack list and the path picker in the web app, from PR metadata only. Done.
 4. Each PR's own diff and the whole-stack diff, parsed into files and hunks, with a banner when GitHub's diff of a PR differs. Done, in the web app and `strata analyze`.
-5. Layers: path rules, repo rules, `.gitattributes`, mechanical changes, then Claude for the rest when a repo allows it. Done, in the web app and `strata analyze`. The maverick paths in the rule table still need checking against the real repo.
+5. Layers: path rules, repo rules, `.gitattributes`, mechanical changes, then Claude for the rest when a repo allows it, and per-file inspect flags for access and deletion. Done, in the web app and `strata analyze`. The maverick paths in the rule table still need checking against the real repo.
 6. Which PR introduced or revised each hunk, and the layer by PR matrix. Done, with hunk chips and layer bars, in the web app and `strata analyze`.
 7. The Guide and summaries, from the whole-stack diff only, and a summary per PR. Done, in the web app and `strata analyze`. Real answers still need a key and a real stack.
 8. The CLI's static page, and the shape-invariance check on a real stack against the same code as a plain range. Done: `strata analyze` writes the page and JSON to the data folder, ranges on GitHub repos work in the engine, the CLI and the page, and `apps/cli/scripts/stack-vs-range.ts` makes the check. It still needs running on a real stack.

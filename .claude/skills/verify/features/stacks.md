@@ -26,7 +26,7 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 Preconditions:
 
 - Stacks need GitHub data, and a plain `up` has none. Use one of:
-  - `strata-verify up --github fixture` (no token, no network). A stand-in GitHub serves `acme/app`: a three-PR stack #9 → #10 → #11 where #10 is behind #9 and #11 is a draft; a fork #5 → {#6, #7}; a chain #1 → #2 → #3 whose bottom PR was squash-merged; a lone #4; and a fork-repo PR #8. The rest of this recipe uses it.
+  - `strata-verify up --github fixture` (no token, no network). A stand-in GitHub serves `acme/app`: a three-PR stack #9 → #10 → #11 where #10 is behind #9 and #11 is a draft; a fork #5 → {#6, #7}; a chain #1 → #2 → #3 whose bottom PR was squash-merged; a lone #4; and a fork-repo PR #8. It also has a branch with no PR, `inspect-demo`, for the inspect flags (`cli.md`). The rest of this recipe uses it.
   - `strata-verify up --github gh --checkouts GlyphicAI/maverick-backend=$HOME/workspace/maverick-backend` on the developer's Mac, for a real repo. It passes the token from `gh auth token` to the server's environment only. Compare what you see with the hand-written trees of the proving stacks.
 - Run `doctor` and require exit 0. With the fixture it also checks the stand-in GitHub is alive.
 
