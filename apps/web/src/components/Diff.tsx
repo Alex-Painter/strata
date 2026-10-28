@@ -125,7 +125,7 @@ function FileBlock({
           {file.inspect.map((flag) => (
             <span
               key={flag.rule}
-              className="shrink-0 rounded border border-warn/40 px-1 text-[11px] text-warn"
+              className="shrink-0 rounded border border-line px-1 text-[11px] text-muted"
               title={`${flag.reason}. Changes here must be right first time, so inspect them closely.`}
             >
               {flag.title}
@@ -149,11 +149,13 @@ function FileBlock({
         )}
       </div>
       {(facts.length > 0 || file.inspect.length > 0 || (open && hunks.length > 0)) && (
-        <p className="px-1 text-[12px] text-muted">{[
+        <p className="px-1 text-[12px] text-muted">
+          {[
             ...facts,
             layerFact(file),
             ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
-          ].join(" · ")}</p>
+          ].join(" · ")}
+        </p>
       )}
       {open &&
         hunks.map((hunk) => (

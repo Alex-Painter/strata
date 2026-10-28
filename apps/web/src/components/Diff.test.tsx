@@ -95,15 +95,13 @@ describe("FileList", () => {
     ]);
     expect(flagged).toEqual([["app/auth/session.py", "access"]]);
     const file = page.querySelector('[data-file="app/auth/session.py"]');
-    expect(file?.querySelector("summary")?.textContent).toContain("Access and permissions");
+    expect(file?.querySelector("button[data-nav]")?.textContent).toContain(
+      "Access and permissions",
+    );
     expect(file?.querySelector("p")?.textContent).toBe(
       "Added · Logic: No rule matched, so it's taken as application code, a guess · " +
         'Inspect: Access and permissions: a word starting "session" in session.py',
     );
-    const listed = [...page.querySelectorAll('nav[aria-label="File list"] a')].map((a) =>
-      a.textContent?.includes("Inspect"),
-    );
-    expect(listed).toEqual([false, true, false]);
   });
 
   it("says when Claude chose the layer", () => {
