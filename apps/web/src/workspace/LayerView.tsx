@@ -3,7 +3,15 @@ import { LAYERS } from "@strata/core/model";
 import { ClaimList } from "../components/Claims";
 import { FileList } from "../components/Diff";
 import { GuideView } from "../components/Guide";
-import { citedIds, type Display, filesIn, hunksOf, type ScopedDiff, type Selection } from "./model";
+import {
+  citedIds,
+  type Display,
+  filesIn,
+  guideIn,
+  hunksOf,
+  type ScopedDiff,
+  type Selection,
+} from "./model";
 
 /**
  * One layer of the diff in scope. The canvas has a slot at the top for the
@@ -50,9 +58,7 @@ export function LayerView({
     );
   }
   // The Guide is about the whole stack; a PR's scope has its own summary.
-  const sections = part
-    ? []
-    : report.guide.sections.filter((section) => section.paths.some((path) => paths.has(path)));
+  const sections = part ? [] : guideIn(report.guide.sections, paths, diff.byId);
   const prClaims = part
     ? part.summary.filter((item) =>
         citedIds(item).some((id) => paths.has(diff.byId.get(id)?.path ?? "")),

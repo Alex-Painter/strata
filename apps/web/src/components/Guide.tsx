@@ -1,4 +1,5 @@
 import type { Claim, FileChange, Guide, GuideSection, Hunk } from "@strata/core/model";
+import { LAYERS } from "@strata/core/model";
 import { useId, useState } from "react";
 import { lineCount } from "../lib/format";
 import { ClaimList } from "./Claims";
@@ -28,13 +29,14 @@ export function GuideView({
   onClaim: (claim: Claim) => void;
   /** What the guide is to: "the whole stack" or "the range". */
   of?: string;
-  /** The sections to show, when it's only some of them. */
+  /** The sections to show, when it's only some of them (or only a layer's part of them). */
   sections?: GuideSection[];
   heading?: string;
 }) {
   if (sections.length === 0) return null;
   const byPath = new Map(files.map((file) => [file.path, file]));
-  const all = sections.length === guide.sections.length;
+  const all =
+    sections.length === guide.sections.length && sections.every((s, i) => s === guide.sections[i]);
   return (
     <section aria-labelledby="guide-heading" className="grid gap-3">
       <div className="grid gap-0.5">
@@ -51,7 +53,7 @@ export function GuideView({
         {sections.map((section) => (
           <GuideItem
             key={section.id}
-            n={guide.sections.indexOf(section) + 1}
+            n={guide.sections.findIndex((s) => s.id === section.id) + 1}
             section={section}
             byPath={byPath}
             hunks={hunks}
@@ -89,6 +91,8 @@ function GuideItem({
   const id = useId();
   const files = section.paths.map((path) => byPath.get(path)).filter((file) => file !== undefined);
   const counts = meaningful(files, hunks);
+  // A section can span layers; then each file says which layer it is in.
+  const mixed = new Set(files.map((file) => file.layer.layer)).size > 1;
   return (
     <li data-section={section.id} className="grid gap-1 px-3 py-2.5">
       <button
@@ -123,6 +127,11 @@ function GuideItem({
               >
                 {file.path}
               </button>
+              {mixed && (
+                <span className="shrink-0 text-[12px] text-faint">
+                  {LAYERS[file.layer.layer].title}
+                </span>
+              )}
               {file.mechanical && (
                 <span className="shrink-0 text-[12px] text-faint">{file.mechanical.reason}</span>
               )}

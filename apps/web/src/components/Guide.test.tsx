@@ -3,6 +3,7 @@ import type { Claim, Hunk } from "@strata/core/model";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { guideIn } from "../workspace/model";
 import { ClaimList } from "./Claims";
 import { GuideView } from "./Guide";
 
@@ -146,5 +147,67 @@ describe("GuideView", () => {
       "2Logic: app/services/1 file · +2 −0",
       "3Config & infra: lockfiles1 file · mechanical",
     ]);
+  });
+
+  it("names each file's layer in a section that spans layers", () => {
+    const guide = assembleGuide(groups, [
+      { title: "Forecasts", groupIds: [groups[1]?.id ?? "", groups[0]?.id ?? ""], about: [] },
+    ]);
+    const page = mount(
+      <GuideView
+        guide={guide}
+        files={whole.files}
+        hunks={hunks}
+        onFile={() => {}}
+        selected={null}
+        onClaim={() => {}}
+      />,
+    );
+    act(() => (page.querySelector("li[data-section] > button") as HTMLButtonElement).click());
+    const rows = page.querySelectorAll('ul[aria-label="Files in Forecasts"] li');
+    expect([...rows].map((li) => li.textContent)).toEqual([
+      "app/services/forecasts.pyLogic",
+      "app/models/account.pyData model",
+    ]);
+  });
+
+  it("shows only a layer's own files and sentences on that layer's page", () => {
+    const guide = assembleGuide(groups, [
+      {
+        title: "Forecasts",
+        groupIds: [groups[1]?.id ?? "", groups[0]?.id ?? ""],
+        about: [
+          claim("The service reads the flag.", service),
+          claim("The model has a flag.", model),
+        ],
+      },
+      { title: "Lockfile", groupIds: [groups[2]?.id ?? ""], about: [] },
+    ]);
+    const paths = new Set(["app/models/account.py"]);
+    const sections = guideIn(guide.sections, paths, hunks);
+    expect(sections.map((s) => [s.title, s.paths, s.hunkIds])).toEqual([
+      ["Forecasts", ["app/models/account.py"], [model.id]],
+    ]);
+    const page = mount(
+      <GuideView
+        guide={guide}
+        files={whole.files}
+        hunks={hunks}
+        onFile={() => {}}
+        selected={null}
+        onClaim={() => {}}
+        sections={sections}
+        heading="In the Guide"
+      />,
+    );
+    const item = page.querySelector("li[data-section]") as HTMLElement;
+    expect(item.querySelector("button")?.textContent).toBe("1Forecasts1 file · +2 −0");
+    expect([...item.querySelectorAll("[data-claim]")].map((li) => li.textContent)).toEqual([
+      "The model has a flag. 1 hunk",
+    ]);
+    // It opens, since it is only a part of the Guide; the file has no layer label.
+    expect(item.querySelector('ul[aria-label="Files in Forecasts"]')?.textContent).toBe(
+      "app/models/account.py",
+    );
   });
 });

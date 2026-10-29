@@ -2,6 +2,7 @@ import type {
   ChangeReport,
   Claim,
   FileChange,
+  GuideSection,
   Hunk,
   LayerId,
   PrPart,
@@ -75,6 +76,32 @@ export function filesIn(diff: ScopedDiff, layer: LayerId): FileChange[] {
   return diff.files
     .filter((file) => file.layer.layer === layer)
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+/**
+ * The Guide's sections cut down to one layer's files. A section groups files
+ * by reading order, not by layer, so it can span layers: on a layer page each
+ * section keeps only the layer's files and hunks, and only the sentences that
+ * cite one of those hunks. A section with none of the layer's files goes.
+ */
+export function guideIn(
+  sections: GuideSection[],
+  paths: Set<string>,
+  byId: Map<string, Hunk>,
+): GuideSection[] {
+  const inLayer = (id: string) => paths.has(byId.get(id)?.path ?? "");
+  return sections.flatMap((section) => {
+    const kept = section.paths.filter((path) => paths.has(path));
+    if (kept.length === 0) return [];
+    return [
+      {
+        ...section,
+        paths: kept,
+        hunkIds: section.hunkIds.filter(inLayer),
+        about: section.about.filter((claim) => citedIds(claim).some(inLayer)),
+      },
+    ];
+  });
 }
 
 export function hunksOf(file: FileChange, diff: ScopedDiff): Hunk[] {
