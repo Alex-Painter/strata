@@ -31,6 +31,16 @@ const list: ChangeSummary[] = [
   change("3", {
     origin: "assigned",
     waiting: true,
+    rootPr: 2,
+    prs: [2, 3].map((number) => ({
+      number,
+      author: "sam",
+      createdAt: seenAt,
+      state: "open" as const,
+      draft: false,
+      review: null,
+      checks: null,
+    })),
     yours: [
       {
         number: 3,
@@ -52,7 +62,14 @@ const list: ChangeSummary[] = [
 const pr = (number: number, fields: Partial<StackPrSummary> = {}) =>
   ({ number, title: `PR ${number}`, author: "sam", state: "open", ...fields }) as StackPrSummary;
 const stack = (root: number, prs: StackPrSummary[]) =>
-  ({ id: `s${root}`, repo: "acme/app", root, prs, updatedAt: seenAt }) as unknown as StackSummary;
+  ({
+    id: `s${root}`,
+    repo: "acme/app",
+    root,
+    prs,
+    defaultPath: prs.map((pr) => pr.number),
+    updatedAt: seenAt,
+  }) as unknown as StackSummary;
 const stacks = {
   repo: "acme/app",
   readAt: seenAt,
@@ -127,6 +144,9 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(rows("waiting-h")).toHaveLength(1);
   expect(waiting.textContent).toContain("#3 review requested from acme/backend");
   expect(waiting.textContent).toContain("Needs your review");
+  expect(waiting.querySelector('td[title="#3 is PR 2 of 2 in the stack."]')?.textContent).toBe(
+    "2/2",
+  );
   expect(waiting.textContent).toContain("acme/app#9: no luck");
 
   expect(rows("assigned-h").map(([href]) => href)).toEqual(["/changes/6", "/changes/8"]);
@@ -140,6 +160,7 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(others[0]?.[1]).toContain("Not analysed");
   expect(others[0]?.[1]).toContain("kim, sam");
   expect(others[0]?.[1]).toContain("Needs review");
+  expect(others[0]?.[1]).toContain("1/2");
   const github = section("others-acme-app").querySelector('a[aria-label="Open #30 on GitHub"]');
   expect(github?.getAttribute("href")).toBe("https://github.com/acme/app/pull/30");
   expect(github?.getAttribute("target")).toBe("_blank");

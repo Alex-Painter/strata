@@ -206,6 +206,7 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
               tipPr: null,
               prs: stack.prs,
               githubPr: stack.root,
+              place: placeOf([stack.root], stack.defaultPath),
               status: reviewStatus(stack.prs, { waiting: false, reviewed: false }),
               strata: "Not analysed",
             };
@@ -238,7 +239,10 @@ function ChangeList({
   return (
     <ChangeTable
       rows={changes.map((change) => {
-        const active = change.yours.find((pr) => pr.active);
+        const path = change.prs.map((pr) => pr.number);
+        // Your PRs that GitHub still lists for you, bottom first; the button opens the lowest.
+        const mine = path.filter((n) => change.yours.some((pr) => pr.active && pr.number === n));
+        const active = mine[0] ?? change.yours.find((pr) => pr.active)?.number;
         return {
           key: change.id,
           href: `/changes/${change.id}`,
@@ -248,7 +252,8 @@ function ChangeList({
           rootPr: change.rootPr,
           tipPr: change.tipPr,
           prs: change.prs,
-          githubPr: active?.number ?? change.rootPr,
+          githubPr: active ?? change.rootPr,
+          place: placeOf(mine.length > 0 ? mine : [active ?? change.rootPr], path),
           status: reviewStatus(change.prs, {
             waiting: change.waiting,
             reviewed: change.yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
@@ -271,8 +276,23 @@ interface Row {
   prs: PathPr[];
   /** The PR the GitHub button opens. */
   githubPr: number;
+  /** Where the row's PRs sit in the path, as "2/4" or "2, 3/4". */
+  place: { label: string; detail: string } | null;
   status: ReviewStatus | null;
   strata: string | null;
+}
+
+/** Where `prs` sit on `path`, bottom first, counted from 1. */
+function placeOf(prs: number[], path: number[]): Row["place"] {
+  const at = prs.filter((n) => path.includes(n));
+  if (at.length === 0) return null;
+  const positions = at.map((n) => path.indexOf(n) + 1);
+  return {
+    label: `${positions.join(", ")}/${path.length}`,
+    detail: at
+      .map((n, i) => `#${n} is PR ${positions[i]} of ${path.length} in the stack.`)
+      .join(" "),
+  };
 }
 
 const TONE: Record<ReviewStatusKind, string> = {
@@ -296,6 +316,7 @@ function ChangeTable({ rows }: { rows: Row[] }) {
         <colgroup>
           <col />
           <col className="w-44" />
+          <col className="w-20" />
           <col className="w-24" />
           <col className="w-40" />
           <col className="w-28" />
@@ -305,6 +326,7 @@ function ChangeTable({ rows }: { rows: Row[] }) {
           <tr className="border-b border-line">
             <th className="px-3 py-1.5 font-normal">Change</th>
             <th className="px-3 py-1.5 font-normal">Author</th>
+            <th className="px-3 py-1.5 font-normal">In stack</th>
             <th className="px-3 py-1.5 font-normal">Opened</th>
             <th className="px-3 py-1.5 font-normal">Status</th>
             <th className="px-3 py-1.5 font-normal">Strata</th>
@@ -345,6 +367,12 @@ function ChangeTable({ rows }: { rows: Row[] }) {
                   title={authors.join(", ")}
                 >
                   {authors.join(", ")}
+                </td>
+                <td
+                  className="px-3 py-1.5 font-mono text-[12px] text-muted"
+                  title={row.place?.detail}
+                >
+                  {row.place?.label}
                 </td>
                 <td className="px-3 py-1.5 text-[12px] text-muted" title={opened}>
                   {opened ? ago(opened) : ""}
