@@ -1,10 +1,18 @@
-import type { ChangeReport, FileChange, Hunk, VerdictStatus } from "@strata/core/model";
+import type {
+  ChangeReport,
+  FileChange,
+  Hunk,
+  PathPr,
+  VerdictStatus,
+  YourPr,
+} from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import type { ReactNode } from "react";
 import { citedHunks } from "../components/Claims";
 import { Counts, HunkCard, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { ago, countPrs, describePath, FILE_STATUS, stateLabel } from "../lib/format";
+import { reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
 import { CommitLink, type RunView } from "./Overview";
 
@@ -34,6 +42,8 @@ export function Panel({
   report,
   diff,
   run,
+  yours = [],
+  prs: fresh = [],
   selection,
   onReveal,
   onSelect,
@@ -43,6 +53,10 @@ export function Panel({
   report: ChangeReport | null;
   diff: ScopedDiff | null;
   run: RunView | null;
+  /** Your PRs on the path, from the assignment search. */
+  yours?: YourPr[];
+  /** The path's PRs from the last assignment search, when Strata has them. */
+  prs?: PathPr[];
   selection: Selection;
   /** Shows a file or hunk on the canvas, in its layer. */
   onReveal: (selection: Selection) => void;
@@ -51,7 +65,9 @@ export function Panel({
   onClose: () => void;
 }) {
   const titles = new Map(report?.stack?.nodes.map((node) => [node.pr.number, node.pr.title]));
-  let body: ReactNode = <Overview report={report} diff={diff} run={run} />;
+  let body: ReactNode = (
+    <Overview report={report} diff={diff} run={run} yours={yours} fresh={fresh} />
+  );
   if (report && diff && selection?.kind === "file") {
     const file = diff.byPath.get(selection.path);
     if (file) {
@@ -148,10 +164,14 @@ function Overview({
   report,
   diff,
   run,
+  yours,
+  fresh,
 }: {
   report: ChangeReport | null;
   diff: ScopedDiff | null;
   run: RunView | null;
+  yours: YourPr[];
+  fresh: PathPr[];
 }) {
   if (!report) {
     return (
@@ -165,17 +185,38 @@ function Overview({
   const scoped = diff?.pr != null ? prs.find((node) => node.pr.number === diff.pr) : null;
   const notes = [...(stack?.notes ?? []), ...report.notes];
   const counts = diff ? meaningful(diff.files, diff.byId) : null;
+  // Until Strata gives a verdict, the status is GitHub's, by the home page's rules.
+  const github = report.verdict
+    ? null
+    : reviewStatus(fresh.length > 0 ? fresh : prs.map(({ pr }) => pr), {
+        waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
+        reviewed: yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
+      });
   return (
     <>
       <Section title="Properties">
         <dl className="props">
-          <Prop term="Status">
-            <span
-              title={report.verdict?.headline ?? "Strata does not give a verdict at this time."}
-            >
-              {statusWord(report, run)}
-            </span>
-          </Prop>
+          {github ? (
+            <>
+              <Prop term="Status">
+                <span>{github.label}</span>
+                <span className="block text-[12px] text-muted">{github.detail}</span>
+              </Prop>
+              <Prop term="Strata">
+                <span title="Strata does not give a verdict at this time.">
+                  {statusWord(report, run)}
+                </span>
+              </Prop>
+            </>
+          ) : (
+            <Prop term="Status">
+              <span
+                title={report.verdict?.headline ?? "Strata does not give a verdict at this time."}
+              >
+                {statusWord(report, run)}
+              </span>
+            </Prop>
+          )}
           {stack && (
             <Prop term="Stack">
               {countPrs(prs.map((node) => node.pr))}

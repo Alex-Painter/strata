@@ -3,6 +3,7 @@ import type {
   Claim,
   LayerId,
   MeResponse,
+  PathPr,
   StackSummary,
   YourPr,
 } from "@strata/core/model";
@@ -51,11 +52,14 @@ export function Workspace({
   pickingPath = null,
   pickError = null,
   yours = [],
+  prs = [],
 }: {
   me?: MeResponse | undefined;
   title?: string | undefined;
   /** Your PRs on this Change, from your GitHub assignments; marked in the PR list. */
   yours?: YourPr[];
+  /** The path's PRs as the last assignment search saw them; fresher than the report's. */
+  prs?: PathPr[];
   report: ChangeReport | null;
   run: RunView | null;
   nav: Nav;
@@ -470,6 +474,8 @@ export function Workspace({
             report={report}
             diff={diff}
             run={run}
+            yours={yours}
+            prs={prs}
             selection={selection}
             onReveal={reveal}
             onSelect={setSelection}
