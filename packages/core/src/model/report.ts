@@ -113,7 +113,7 @@ export interface ChangeReport {
   };
 }
 
-/** Drops claims that have no evidence, enforcing CLAUDE.md's evidence rule. */
+/** Drops claims that have no evidence, enforcing AGENTS.md's evidence rule. */
 export function evidenced<T extends { evidence: readonly unknown[] }>(items: readonly T[]): T[] {
   return items.filter((item) => item.evidence.length > 0);
 }

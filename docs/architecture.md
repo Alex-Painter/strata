@@ -12,7 +12,7 @@ This describes the scaffold and the shape milestone 1 will fill in. [SPEC.md](..
 | Web         | Vite + React SPA                                   | Fast dev loop; the same build also produces a single-file page the CLI can fill with a report.                                         |
 | Sign-in     | GitHub OAuth via Arctic, server-side sessions      | One user for now, gated by an allowlist.                                                                                               |
 | Storage     | SQLite (better-sqlite3) with Drizzle               | One file on a volume; no database service to run.                                                                                      |
-| LLM         | Anthropic SDK, only for the fuzzy parts            | Deterministic analysis first (CLAUDE.md).                                                                                              |
+| LLM         | Anthropic SDK, only for the fuzzy parts            | Deterministic analysis first (AGENTS.md).                                                                                              |
 | Tests       | vitest projects                                    | One `pnpm test` across every package.                                                                                                  |
 | Lint/format | Biome                                              | One tool, fast.                                                                                                                        |
 | Hosting     | Railway, one Dockerfile service, volume at `/data` |                                                                                                                                        |

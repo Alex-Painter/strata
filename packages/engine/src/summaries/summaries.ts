@@ -9,7 +9,7 @@
  *
  * Claude cites hunks by labels (h1, h2, ...) and groups by labels (g1, g2,
  * ...). A sentence citing a label that wasn't in the request is dropped, and
- * so is one citing nothing: no evidence, no claim (CLAUDE.md).
+ * so is one citing nothing: no evidence, no claim (AGENTS.md).
  *
  * This runs only for repos whose settings turn on sendCodeToAnthropic, since
  * it sends file paths and changed lines to the Anthropic API.
