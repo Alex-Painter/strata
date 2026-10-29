@@ -22,6 +22,10 @@ Read `SPEC.md` before doing anything. It is the source of truth for what we're b
 - TypeScript by default; Python is fine for analysis tooling if it's clearly the better fit. Justify the choice in the plan.
 - Small, reviewable commits with clear messages.
 
+## UI rules
+
+- Everything clickable (buttons, links, rows that open something, checkboxes, toggles) shows `cursor: pointer`, whatever a UI library or Tailwind's preflight sets by default. A disabled control shows `not-allowed`. The base rule is in `apps/web/src/styles.css`; a new clickable element that it does not match gets `cursor-pointer`.
+
 ## Write all user-facing text in ASD-STE100
 
 Strata writes all text that a person reads in ASD-STE100 Simplified Technical English (STE). This applies to:
