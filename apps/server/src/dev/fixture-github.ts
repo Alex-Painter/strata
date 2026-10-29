@@ -20,7 +20,7 @@
  */
 import { createServer } from "node:http";
 import { demoRepo, prNode, StackRepo } from "@strata/engine/testing";
-import { fixtureClaude } from "./fixture-claude.js";
+import { fixtureChat, fixtureClaude, sseOf } from "./fixture-claude.js";
 
 const remote = await StackRepo.create();
 const demo = await demoRepo(remote);
@@ -193,7 +193,12 @@ const server = createServer(async (req, res) => {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   if (req.url === "/v1/messages") {
-    const answer = fixtureClaude(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (body.stream) {
+      res.writeHead(200, { "content-type": "text/event-stream" }).end(sseOf(fixtureChat(body)));
+      return;
+    }
+    const answer = fixtureClaude(body);
     res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
     return;
   }

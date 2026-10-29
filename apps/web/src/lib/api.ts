@@ -7,9 +7,13 @@ import type {
   AssignedStatus,
   ChangeDetail,
   ChangeSummary,
+  ChatMessage,
+  ChatStreamEvent,
+  ChatThread,
   CreateChangeRequest,
   MeResponse,
   PendingResponse,
+  PostChatMessageRequest,
   RepoSettingsResponse,
   RunInfo,
   StacksResponse,
@@ -128,4 +132,52 @@ export const api = {
     ),
   runAgain: (id: string) =>
     request<RunInfo>(`/api/changes/${encodeURIComponent(id)}/runs`, post({})),
+  threads: (changeId: string) =>
+    request<ChatThread[]>(`/api/changes/${encodeURIComponent(changeId)}/threads`),
+  createThread: (changeId: string) =>
+    request<ChatThread>(`/api/changes/${encodeURIComponent(changeId)}/threads`, post({})),
+  messages: (threadId: string) =>
+    request<ChatMessage[]>(`/api/threads/${encodeURIComponent(threadId)}/messages`),
+  ask,
 };
+
+/**
+ * Posts a question and reads the answer as it streams: each server-sent
+ * event goes to `onEvent`. Resolves when the stream ends.
+ */
+async function ask(
+  threadId: string,
+  body: PostChatMessageRequest,
+  onEvent: (event: ChatStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`/api/threads/${encodeURIComponent(threadId)}/messages`, {
+    method: "POST",
+    headers: { Accept: "text/event-stream", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    ...(signal ? { signal } : {}),
+  });
+  if (!res.ok || !res.body) {
+    const error = (await res.json().catch(() => null)) as ApiError | null;
+    throw new HttpError(res.status, error?.error ?? `${res.status} ${res.statusText}`);
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    let end = buffer.indexOf("\n\n");
+    while (end !== -1) {
+      const data = buffer
+        .slice(0, end)
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      buffer = buffer.slice(end + 2);
+      if (data) onEvent(JSON.parse(data) as ChatStreamEvent);
+      end = buffer.indexOf("\n\n");
+    }
+  }
+}

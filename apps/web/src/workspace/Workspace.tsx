@@ -1,12 +1,22 @@
-import type { ChangeReport, Claim, LayerId, MeResponse, PathPr, YourPr } from "@strata/core/model";
+import type {
+  Anchor,
+  ChangeReport,
+  Claim,
+  LayerId,
+  MeResponse,
+  PathPr,
+  YourPr,
+} from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
+import { selectionAnchor } from "../lib/selection";
 import { useStored } from "../lib/stored";
 import { toggleTheme } from "../lib/theme";
+import { Ask } from "./Ask";
 import { LayerView } from "./LayerView";
 import {
   changeLayers,
@@ -21,7 +31,7 @@ import {
 } from "./model";
 import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays";
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
-import { Panel, statusWord } from "./Panel";
+import { Panel, type PanelTab, statusWord } from "./Panel";
 import { StackRail } from "./StackRail";
 
 /**
@@ -43,6 +53,7 @@ export function Workspace({
   yours = [],
   prs = [],
   pageNav = null,
+  changeId = null,
 }: {
   me?: MeResponse | undefined;
   title?: string | undefined;
@@ -50,6 +61,8 @@ export function Workspace({
   yours?: YourPr[];
   /** The app's own page links, for the sidebar. */
   pageNav?: ReactNode;
+  /** The Change's id on the server, which chat needs. Null on the CLI's page. */
+  changeId?: string | null;
   /** The path's PRs as the last assignment search saw them; fresher than the report's. */
   prs?: PathPr[];
   report: ChangeReport | null;
@@ -78,6 +91,37 @@ export function Workspace({
   const [overlay, setOverlay] = useState<"cmdk" | "help" | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<PanelTab>("details");
+  /** Highlights waiting to go with the next question. */
+  const [asking, setAsking] = useState<Anchor[]>([]);
+  /** The Ask button next to a text selection on a diff. */
+  const [pop, setPop] = useState<{ anchor: Anchor; x: number; y: number } | null>(null);
+
+  // A selection on a surface that can be highlighted shows the Ask button.
+  useEffect(() => {
+    if (!changeId) return;
+    const check = () => {
+      const selection = window.getSelection();
+      const anchor = selectionAnchor(selection);
+      if (!anchor || !selection) return setPop(null);
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      setPop({
+        anchor,
+        x: Math.min(rect.right, window.innerWidth - 80),
+        y: Math.min(rect.bottom + 6, window.innerHeight - 36),
+      });
+    };
+    const hide = () => setPop(null);
+    document.addEventListener("mouseup", check);
+    document.addEventListener("keyup", check);
+    const scroller = canvas.current;
+    scroller?.addEventListener("scroll", hide, { passive: true });
+    return () => {
+      document.removeEventListener("mouseup", check);
+      document.removeEventListener("keyup", check);
+      scroller?.removeEventListener("scroll", hide);
+    };
+  }, [changeId]);
 
   const go = useCallback(
     (next: Partial<Nav>, select: Selection = null) => {
@@ -98,6 +142,19 @@ export function Workspace({
       if (file) go({ layer: file.layer.layer, pr: to }, target);
     },
     [report, diff, pr, go],
+  );
+
+  /** Opens a cited hunk: in the whole stack when it is there, else in its PR. */
+  const cite = useCallback(
+    (id: string) => {
+      if (!report) return;
+      if (report.change.hunks.some((hunk) => hunk.id === id)) {
+        return reveal({ kind: "hunk", id }, null);
+      }
+      const owner = report.parts.find((part) => part.hunks.some((hunk) => hunk.id === id));
+      if (owner) reveal({ kind: "hunk", id }, owner.pr);
+    },
+    [report, reveal],
   );
 
   // Keep the selection in view, wherever it was chosen from.
@@ -517,7 +574,40 @@ export function Workspace({
             onSelect={setSelection}
             onScope={scope}
             onClose={() => setPanel(false)}
+            tab={tab}
+            onTab={setTab}
+            ask={
+              changeId ? (
+                <Ask
+                  changeId={changeId}
+                  report={report}
+                  anchors={asking}
+                  onRemoveAnchor={(index) => setAsking(asking.filter((_, i) => i !== index))}
+                  onClearAnchors={() => setAsking([])}
+                  onCite={cite}
+                />
+              ) : null
+            }
           />
+        )}
+        {pop && (
+          <button
+            type="button"
+            className="btn primary sm ask-pop"
+            style={{ left: pop.x, top: pop.y }}
+            aria-label="Ask Claude about the selection"
+            // Keep the text selected while the button is pressed.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setAsking((now) => [...now, pop.anchor].slice(-10));
+              setTab("ask");
+              setPanel(true);
+              setPop(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            Ask
+          </button>
         )}
       </div>
       {overlay === "cmdk" && <CommandMenu commands={commands} onClose={() => setOverlay(null)} />}

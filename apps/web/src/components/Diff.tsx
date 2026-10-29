@@ -284,6 +284,17 @@ export function HunkCard({
 
 const MARK: Record<DiffLine["kind"], string> = { add: "+", del: "-", context: " " };
 
+/** A hunk by id: the whole-stack diff first, then each PR's own diff. */
+export function findHunk(
+  report: { change: { hunks: Hunk[] }; parts: Array<{ hunks: Hunk[] }> },
+  id: string,
+): Hunk | undefined {
+  return (
+    report.change.hunks.find((hunk) => hunk.id === id) ??
+    report.parts.flatMap((part) => part.hunks).find((hunk) => hunk.id === id)
+  );
+}
+
 export function hunkSource(hunkId: string, pr?: number): SourceRef {
   return pr === undefined ? { kind: "hunk", hunkId } : { kind: "pr-hunk", pr, hunkId };
 }

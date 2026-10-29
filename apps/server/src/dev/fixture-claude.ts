@@ -10,6 +10,9 @@
  *   groups first, then the data model; the other groups are left for Strata
  *   to place.
  * - One PR: a sentence per file, three at most.
+ * - Chat (a streamed request with tools): first it reads the first hunk the
+ *   system prompt lists, then it answers in one sentence that cites that hunk
+ *   and a hunk that does not exist, which Strata must drop.
  */
 
 interface MessageBody {
@@ -105,4 +108,92 @@ function parseGroups(text: string): Group[] {
     current.hunks.push(...(file[2] as string).split(" ").filter((label) => /^h\d+$/.test(label)));
   }
   return groups;
+}
+
+interface ChatBody {
+  model: string;
+  system: Array<{ text: string }>;
+  messages: Array<{ role: string; content: unknown }>;
+}
+
+type Block =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown };
+
+/** One chat turn: a tool call first, then the answer once a tool result came back. */
+export function fixtureChat(body: ChatBody): { model: string; content: Block[]; stop: string } {
+  // The digest is the last system block; the first holds an example id.
+  const digest = body.system.at(-1)?.text ?? "";
+  const hunk = /hunk_[0-9a-f]{16}/.exec(digest)?.[0] ?? "hunk_0000000000000000";
+  const last = body.messages.at(-1)?.content;
+  const answered = Array.isArray(last) && last.some((b) => b?.type === "tool_result");
+  if (!answered) {
+    return {
+      model: body.model,
+      stop: "tool_use",
+      content: [{ type: "tool_use", id: "toolu_fixture", name: "read_hunk", input: { id: hunk } }],
+    };
+  }
+  return {
+    model: body.model,
+    stop: "end_turn",
+    content: [
+      {
+        type: "text",
+        text: `The fixture Claude read one hunk. It cites it [${hunk}]. It also cites a hunk that does not exist [hunk_ffffffffffffffff].`,
+      },
+    ],
+  };
+}
+
+/** A turn as the Messages API streams it: server-sent events. */
+export function sseOf(turn: { model: string; content: Block[]; stop: string }): string {
+  const event = (type: string, data: unknown) =>
+    `event: ${type}\ndata: ${JSON.stringify({ type, ...(data as object) })}\n\n`;
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  const out = [
+    event("message_start", {
+      message: {
+        id: "msg_fixture",
+        type: "message",
+        role: "assistant",
+        model: turn.model,
+        content: [],
+        stop_reason: null,
+        stop_sequence: null,
+        usage,
+      },
+    }),
+  ];
+  turn.content.forEach((block, index) => {
+    if (block.type === "text") {
+      out.push(event("content_block_start", { index, content_block: { type: "text", text: "" } }));
+      // Two pieces, so the stream is seen to arrive in parts.
+      const half = Math.ceil(block.text.length / 2);
+      for (const piece of [block.text.slice(0, half), block.text.slice(half)]) {
+        out.push(
+          event("content_block_delta", { index, delta: { type: "text_delta", text: piece } }),
+        );
+      }
+    } else {
+      out.push(
+        event("content_block_start", {
+          index,
+          content_block: { type: "tool_use", id: block.id, name: block.name, input: {} },
+        }),
+      );
+      out.push(
+        event("content_block_delta", {
+          index,
+          delta: { type: "input_json_delta", partial_json: JSON.stringify(block.input) },
+        }),
+      );
+    }
+    out.push(event("content_block_stop", { index }));
+  });
+  out.push(
+    event("message_delta", { delta: { stop_reason: turn.stop, stop_sequence: null }, usage }),
+  );
+  out.push(event("message_stop", {}));
+  return out.join("");
 }

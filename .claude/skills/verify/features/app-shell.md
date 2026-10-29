@@ -36,5 +36,5 @@ Preconditions:
 ## Gotchas
 
 - The workspace needs a real Change to show anything more; [stacks.md](./stacks.md) opens one against the fixture GitHub.
-- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its Chat says `This page is a snapshot. Chat needs the Strata server.` [cli.md](./cli.md) writes one and compares it with the workspace.
+- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its `tab "Ask"` is disabled, titled `This page is a snapshot. Questions need the Strata server.` [cli.md](./cli.md) writes one and compares it with the workspace.
 - If the page shows `Strata cannot connect to its server: ...`, `/api/me` failed with something other than 401. Run `doctor`.

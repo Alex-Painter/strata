@@ -100,6 +100,7 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       yours={data?.change.yours ?? []}
       prs={data?.change.prs ?? []}
       pageNav={<HomeNav current={null} />}
+      changeId={id}
       report={data?.report ?? null}
       run={{
         info: data?.run ?? null,

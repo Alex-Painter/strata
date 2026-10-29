@@ -33,6 +33,8 @@ function RunAgainLine({ run }: { run: RunView | null }) {
   );
 }
 
+export type PanelTab = "details" | "ask";
+
 export const VERDICT_LABEL: Record<VerdictStatus, string> = {
   blocked: "Blocked",
   "needs-review": "Needs review",
@@ -66,6 +68,9 @@ export function Panel({
   onSelect,
   onScope,
   onClose,
+  tab = "details",
+  onTab = () => {},
+  ask = null,
 }: {
   report: ChangeReport | null;
   diff: ScopedDiff | null;
@@ -80,6 +85,10 @@ export function Panel({
   onSelect: (selection: Selection) => void;
   onScope: (pr: number | null) => void;
   onClose: () => void;
+  tab?: PanelTab;
+  onTab?: (tab: PanelTab) => void;
+  /** The Ask tab's content. Null where chat cannot run, such as the CLI's page. */
+  ask?: ReactNode;
 }) {
   const titles = new Map(report?.stack?.nodes.map((node) => [node.pr.number, node.pr.title]));
   let body: ReactNode = (
@@ -149,21 +158,30 @@ export function Panel({
   return (
     <aside aria-label="Details" className="panel">
       <div className="ptabs" role="tablist" aria-label="Side panel">
-        <button type="button" role="tab" aria-selected="true" className="ptab">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "details"}
+          className="ptab"
+          onClick={() => onTab("details")}
+        >
           Details
         </button>
         <button
           type="button"
           role="tab"
-          aria-selected="false"
-          disabled
+          aria-selected={tab === "ask"}
+          disabled={ask === null}
           className="ptab"
-          title="Questions about a selection are not available at this time."
+          title={
+            ask === null ? "This page is a snapshot. Questions need the Strata server." : undefined
+          }
+          onClick={() => onTab("ask")}
         >
           Ask
         </button>
         <span className="flex-1" />
-        {selection && (
+        {selection && tab === "details" && (
           <button type="button" className="btn ghost sm" onClick={() => onSelect(null)}>
             Overview
           </button>
@@ -172,7 +190,7 @@ export function Panel({
           <Icon name="x" />
         </button>
       </div>
-      <div className="insp">{body}</div>
+      <div className="insp">{tab === "ask" && ask !== null ? ask : body}</div>
     </aside>
   );
 }
