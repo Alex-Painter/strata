@@ -14,6 +14,7 @@ import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, yoursLabel } from "../lib/format";
 import { prUrl } from "../lib/github";
 import { type ReviewStatus, type ReviewStatusKind, reviewStatus } from "../lib/status";
+import { useStored } from "../lib/stored";
 import { ReadAt } from "./StacksPage";
 
 /**
@@ -40,7 +41,9 @@ export function ChangesPage({ me }: { me: MeResponse }) {
     mutationFn: api.searchAssigned,
     onSuccess: (status) => queryClient.setQueryData(["assigned"], status),
   });
-  const all = changes.data;
+  const [showTeams, setShowTeams] = useStored("strata-show-team-requests", true);
+  const hidden = changes.data?.filter(teamOnly).length ?? 0;
+  const all = showTeams ? changes.data : changes.data?.filter((c) => !teamOnly(c));
   const error = changes.error?.message ?? null;
   const repos = assigned.data?.repos ?? [];
   // A path the search made that no longer holds your PRs (they moved to a
@@ -62,6 +65,7 @@ export function ChangesPage({ me }: { me: MeResponse }) {
             searching={search.isPending || Boolean(assigned.data?.running)}
             onSearch={() => search.mutate()}
             searchError={search.error?.message ?? assigned.error?.message ?? null}
+            teams={{ show: showTeams, hidden, onChange: setShowTeams }}
           />
           <section className="grid gap-3" aria-labelledby="assigned-h">
             <h2 id="assigned-h" className="h2">
@@ -106,6 +110,7 @@ function WaitingOnYou({
   searching,
   onSearch,
   searchError,
+  teams,
 }: {
   changes: ChangeSummary[] | undefined;
   error: string | null;
@@ -113,6 +118,7 @@ function WaitingOnYou({
   searching: boolean;
   onSearch: () => void;
   searchError: string | null;
+  teams: { show: boolean; hidden: number; onChange: (show: boolean) => void };
 }) {
   // With no repos to search there's nothing to refresh, but the list still shows.
   const searchable = !status || status.repos.length > 0;
@@ -129,6 +135,15 @@ function WaitingOnYou({
         <h2 id="waiting-h" className="h2 flex-1">
           Waiting on you
         </h2>
+        <label className="flex items-center gap-1.5 text-[12px] text-muted">
+          <input
+            type="checkbox"
+            checked={teams.show}
+            onChange={(event) => teams.onChange(event.target.checked)}
+          />
+          Show team requests
+          {!teams.show && teams.hidden > 0 && ` (${teams.hidden} hidden)`}
+        </label>
         {searchable && (
           <button type="button" className="btn h-8" disabled={searching} onClick={onSearch}>
             {searching ? "Searching…" : "Refresh"}
@@ -214,6 +229,18 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
         />
       )}
     </section>
+  );
+}
+
+/**
+ * True when GitHub asks for your review only through a team: no PR on the
+ * path names you directly, as assignee or as reviewer.
+ */
+function teamOnly(change: ChangeSummary): boolean {
+  const active = change.yours.filter((pr) => pr.active);
+  return (
+    active.length > 0 &&
+    active.every((pr) => pr.reasons.every((r) => r.kind === "review-requested" && !r.direct))
   );
 }
 

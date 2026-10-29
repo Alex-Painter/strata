@@ -166,6 +166,17 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(github?.getAttribute("target")).toBe("_blank");
   expect(section("others-acme-app").textContent).toContain("Strata looks for changes");
 
+  // #3 asks only acme/backend, one of your teams: the toggle hides it.
+  const teams = [...waiting.querySelectorAll("label")]
+    .find((l) => l.textContent?.startsWith("Show team requests"))
+    ?.querySelector("input") as HTMLInputElement;
+  expect(teams.checked).toBe(true);
+  act(() => teams.click());
+  expect(rows("waiting-h")).toHaveLength(0);
+  expect(waiting.textContent).toContain("Show team requests (1 hidden)");
+  act(() => teams.click());
+  expect(rows("waiting-h")).toHaveLength(1);
+
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",
   ) as HTMLButtonElement;
