@@ -528,6 +528,15 @@ code,
     display: none;
     margin-left: -8px;
   }
+  .app[data-side="closed"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app[data-side="closed"] .side {
+    display: none;
+  }
+  .top .side-show {
+    margin-left: -8px;
+  }
   .bc {
     display: flex;
     align-items: center;
@@ -1153,6 +1162,14 @@ code,
     }
     .top .menu {
       display: inline-grid;
+    }
+    /* In drawer mode the menu button opens and closes the sidebar. */
+    .app[data-side="closed"] .side {
+      display: flex;
+    }
+    .ws .side-hide,
+    .top .side-show {
+      display: none;
     }
   }
   @media (max-width: 760px) {

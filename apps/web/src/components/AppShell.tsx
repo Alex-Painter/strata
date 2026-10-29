@@ -3,13 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { Link } from "wouter";
 import { api } from "../lib/api";
+import { useStored } from "../lib/stored";
 import { toggleTheme } from "../lib/theme";
 import { Icon, Logo } from "./Icon";
 
 /**
  * The frame every page shares: a quiet sidebar on the chrome, and one inset
- * card holding a 44 px top bar and the page. Below 960 px the sidebar becomes
- * a drawer behind the menu button.
+ * card holding a 44 px top bar and the page. The sidebar collapses, and the
+ * browser keeps that between visits. Below 960 px it becomes a drawer behind
+ * the menu button instead.
  */
 export function AppShell({
   me,
@@ -31,8 +33,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [drawer, setDrawer] = useState(false);
+  const [sideOpen, setSideOpen] = useStored("strata-sidebar-open", true);
   return (
-    <div className="app">
+    <div className="app" data-side={sideOpen ? "open" : "closed"}>
       <nav aria-label={navLabel} className="side" data-open={drawer}>
         <div className="ws">
           {me ? (
@@ -47,6 +50,15 @@ export function AppShell({
             </span>
           )}
           {tools?.side}
+          <button
+            type="button"
+            className="ib side-hide"
+            aria-label="Collapse the sidebar"
+            title="Collapse the sidebar"
+            onClick={() => setSideOpen(false)}
+          >
+            <Icon name="chev" className="i rotate-180" />
+          </button>
         </div>
         {nav}
         <SideFooter me={me} />
@@ -62,6 +74,17 @@ export function AppShell({
           >
             <Icon name="menu" />
           </button>
+          {!sideOpen && (
+            <button
+              type="button"
+              className="ib side-show"
+              aria-label="Expand the sidebar"
+              title="Expand the sidebar"
+              onClick={() => setSideOpen(true)}
+            >
+              <Icon name="chev" />
+            </button>
+          )}
           {top}
           <span className="flex-1" />
           {tools?.top}
