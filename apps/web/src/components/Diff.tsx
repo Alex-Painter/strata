@@ -1,7 +1,8 @@
 import type { DiffLine, FileChange, Hunk, SourceRef } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
+import { highlightLines, type Token } from "../lib/highlight";
 
 /** Files with more changed lines than this start closed. */
 const OPEN_FILE_LINES = 400;
@@ -218,6 +219,10 @@ export function HunkCard({
   pr?: number | undefined;
 }) {
   const [shown, setShown] = useState(!folded);
+  const tokens = useMemo(
+    () => (shown ? highlightLines(hunk.path, hunk.lines) : null),
+    [shown, hunk.path, hunk.lines],
+  );
   const head = (
     <>
       {showPath && <span className="file">{hunk.path}</span>}
@@ -267,7 +272,12 @@ export function HunkCard({
         <div className="code" data-anchor-source={JSON.stringify(hunkSource(hunk.id, pr))}>
           {hunk.lines.map((line, i) => (
             // Old and new numbers together are unique within a hunk.
-            <Line key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`} line={line} index={i} />
+            <Line
+              key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`}
+              line={line}
+              index={i}
+              tokens={tokens?.[i]}
+            />
           ))}
         </div>
       ) : (
@@ -299,13 +309,35 @@ export function hunkSource(hunkId: string, pr?: number): SourceRef {
   return pr === undefined ? { kind: "hunk", hunkId } : { kind: "pr-hunk", pr, hunkId };
 }
 
-function Line({ line, index }: { line: DiffLine; index: number }) {
+function Line({
+  line,
+  index,
+  tokens,
+}: {
+  line: DiffLine;
+  index: number;
+  /** The line's syntax tokens, when its file's language is known. */
+  tokens?: Token[] | undefined;
+}) {
   return (
     <div className="ln" data-line={line.kind} data-anchor-line={index}>
       <span className="no">{line.kind === "del" ? line.oldLine : line.newLine}</span>
       <span className="sg">{MARK[line.kind]}</span>
       <span>
-        <span data-anchor-text>{line.content}</span>
+        <span data-anchor-text>
+          {tokens
+            ? tokens.map((token, i) =>
+                token.className ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a line's tokens never move.
+                  <span key={i} className={token.className}>
+                    {token.text}
+                  </span>
+                ) : (
+                  token.text
+                ),
+              )
+            : line.content}
+        </span>
         {line.noNewlineAtEof && <span className="eof">No newline at end of file</span>}
       </span>
     </div>
