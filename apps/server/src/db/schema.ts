@@ -1,6 +1,6 @@
 /**
  * The database schema: who can sign in, their Changes, analysis runs and the
- * reports runs produce. Context sources and chat threads come later.
+ * reports runs produce, and chat threads. Context sources come later.
  * Change a table here, then run `pnpm --filter @strata/server db:generate` and
  * commit the migration it writes to apps/server/drizzle.
  */
@@ -133,7 +133,43 @@ export const assignments = sqliteTable(
   ],
 );
 
+/** A conversation with Claude about one Change. */
+export const chatThreads = sqliteTable(
+  "chat_threads",
+  {
+    id: text("id").primaryKey(),
+    changeId: text("change_id")
+      .notNull()
+      .references(() => changes.id, { onDelete: "cascade" }),
+    /** Empty until the first message names it. */
+    title: text("title").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("chat_threads_change_id_idx").on(table.changeId)],
+);
+
+export const chatMessages = sqliteTable(
+  "chat_messages",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => chatThreads.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    text: text("text").notNull(),
+    /** Anchor[] as JSON. */
+    anchors: text("anchors").notNull(),
+    /** The report the message was asked against (its analysis.startedAt). */
+    analysedAt: text("analysed_at"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("chat_messages_thread_id_idx").on(table.threadId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type ChangeRow = typeof changes.$inferSelect;
 export type RunRow = typeof runs.$inferSelect;
 export type AssignmentRow = typeof assignments.$inferSelect;
+export type ChatThreadRow = typeof chatThreads.$inferSelect;
+export type ChatMessageRow = typeof chatMessages.$inferSelect;

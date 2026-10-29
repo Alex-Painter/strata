@@ -21,6 +21,11 @@ export interface ChatMessage {
   text: string;
   /** What the user highlighted. Empty for assistant messages. */
   anchors: Anchor[];
+  /**
+   * The analysis the message was about (its report's `analysis.startedAt`).
+   * A newer run makes the thread's earlier messages refer to an older diff.
+   */
+  analysedAt: string | null;
   createdAt: string;
 }
 

@@ -164,7 +164,7 @@ describe("/api", () => {
 
   it("declares milestone-1 routes as not implemented", async () => {
     const { app } = setup({ DEV_AUTH_BYPASS: "1" });
-    expect((await app.request("/api/threads/thr_1/messages")).status).toBe(501);
+    expect((await app.request("/api/changes/chg_1/files")).status).toBe(501);
     expect((await app.request("/api/nope")).status).toBe(404);
   });
 });

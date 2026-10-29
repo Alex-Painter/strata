@@ -133,6 +133,7 @@ describe("chat", () => {
         role: "user",
         text: "What is this?",
         anchors: [],
+        analysedAt: null,
         createdAt: "2026-10-02T00:00:00Z",
       },
       {
@@ -141,6 +142,7 @@ describe("chat", () => {
         role: "assistant",
         text: "A stack.",
         anchors: [],
+        analysedAt: null,
         createdAt: "2026-10-02T00:00:00Z",
       },
     ];

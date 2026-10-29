@@ -249,7 +249,8 @@ function clip(text: string): string {
  */
 export function checkCitations(report: ChangeReport, text: string): string {
   const known = hunkIds(report);
-  return text.replace(new RegExp(CITATION_PATTERN.source, "g"), (match, id: string) =>
+  // A dropped citation takes the space before it, so "it does [id]." reads "it does."
+  return text.replace(new RegExp(` ?${CITATION_PATTERN.source}`, "g"), (match, id: string) =>
     known.has(id) ? match : "",
   );
 }
