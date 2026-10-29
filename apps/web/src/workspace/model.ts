@@ -21,7 +21,7 @@ export interface Nav {
   pr: number | null;
 }
 
-/** What the side panel shows details of. */
+/** What the left pane shows details of. */
 export type Selection =
   | { kind: "file"; path: string }
   | { kind: "hunk"; id: string }

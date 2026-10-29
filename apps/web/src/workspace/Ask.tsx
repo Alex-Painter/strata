@@ -185,7 +185,7 @@ export function Ask({
           ) : (
             <div key={message.id} className="ask-a">
               {old(message) && (
-                <p className="sub">Claude wrote this about an earlier analysis of the Change.</p>
+                <p className="sub">This answer is about an earlier analysis of the Change.</p>
               )}
               <Markdown text={message.text} onCite={onCite} citeLabel={citeLabel} />
             </div>

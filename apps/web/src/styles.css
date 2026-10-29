@@ -812,7 +812,7 @@ code,
     color: var(--del);
   }
 
-  /* Side panel. */
+  /* The chat panel, on the right. */
   .panel {
     /* The width the reviewer dragged it to, at most most of the window. */
     position: relative;
@@ -832,22 +832,22 @@ code,
     padding: 0 8px 0 10px;
     border-bottom: 1px solid var(--line);
   }
-  .ptab {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    padding: 0 10px;
-    border-radius: 6px;
+  .ptitle {
+    margin: 0 0 0 6px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--fg-2);
   }
-  .ptab[aria-selected="true"] {
-    background: var(--active);
-    color: var(--fg);
+  /* The Change's details, at the top of the left pane. */
+  .details {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 4px 8px 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--line);
   }
-  .ptab:disabled {
-    opacity: 0.45;
+  .details > * {
+    flex-shrink: 0;
   }
   .insp {
     flex: 1;
@@ -1163,6 +1163,13 @@ code,
   }
   .claims li {
     line-height: 1.55;
+  }
+  /* A selected sentence's hunks, under it. */
+  .claim-ev {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin: 10px 0 6px;
   }
 
   .frow {

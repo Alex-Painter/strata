@@ -147,7 +147,7 @@ const button = (page: HTMLElement, name: string) =>
     (b) => b.getAttribute("aria-label") === name || b.textContent === name,
   ) as HTMLButtonElement;
 
-const panel = (page: HTMLElement) => page.querySelector('aside[aria-label="Details"]');
+const panel = (page: HTMLElement) => page.querySelector('section[aria-label="Details"]');
 
 describe("Workspace", () => {
   it("shows a range as its whole diff, read like a whole stack's", () => {
@@ -163,7 +163,7 @@ describe("Workspace", () => {
     expect(to).toBe(`https://github.com/acme/app/commit/${head}`);
     expect(panel(page)?.textContent).toContain("Strata guessed nothing.");
     expect(page.querySelector("#summary-heading")?.parentElement?.textContent).toContain(
-      "Claude wrote this from the range's diff only.",
+      "This summary uses only the range's diff.",
     );
     expect(page.textContent).toContain("Strata's groups of the range");
     expect(page.querySelectorAll("li[data-section]")).toHaveLength(2);
@@ -200,7 +200,7 @@ describe("Workspace", () => {
     );
   });
 
-  it("analyses a Change again from the side panel", () => {
+  it("analyses a Change again from the details", () => {
     let asked = 0;
     const page = mount(range, {
       info: {
@@ -326,23 +326,39 @@ describe("Workspace", () => {
     expect(page.querySelector(".vbar h2")?.textContent).toBe("Overview");
   });
 
-  it("opens a sentence's evidence in the side panel", () => {
+  it("opens a sentence's hunks under it, and its details in the left pane", () => {
     const page = mount(range);
-    act(() => (page.querySelector("[data-claim] button") as HTMLButtonElement).click());
+    const chip = page.querySelector("[data-claim] button") as HTMLButtonElement;
+    act(() => chip.click());
     const details = panel(page);
+    expect(details?.closest('aside[aria-label="Change"]')).not.toBeNull();
     expect(details?.querySelector("h2")?.textContent).toBe("Accounts get a forecast flag.");
-    expect(details?.textContent).toContain("Claude wrote this from the range's diff");
-    expect(details?.querySelector(`[data-hunk="${model.id}"]`)?.textContent).toContain(
+    expect(details?.textContent).toContain("From the range's diff · ");
+    // The code shows on the canvas, under the sentence, and never in the details.
+    expect(details?.querySelector("[data-hunk]")).toBeNull();
+    const claim = chip.closest("[data-claim]") as HTMLElement;
+    expect(chip.getAttribute("aria-expanded")).toBe("true");
+    expect(claim.querySelector(`[data-hunk="${model.id}"]`)?.textContent).toContain(
       "app/models/account.py",
     );
-    // Choosing the evidence shows it in its layer.
-    act(() =>
-      (page.querySelector('aside[aria-label="Details"] .hsel') as HTMLButtonElement).click(),
-    );
+    // Choosing a hunk shows it in its layer.
+    act(() => (claim.querySelector(".hsel") as HTMLButtonElement).click());
     expect(page.querySelector(".vbar h2")?.textContent).toBe("Data model");
     expect(
       page.querySelector(`.canvas [data-hunk="${model.id}"]`)?.getAttribute("data-selected"),
     ).toBe("true");
+    expect(panel(page)?.textContent).toContain("@@ -0,0 +1,2");
+    act(() => button(page, "Show the Change").click());
+    expect(panel(page)?.textContent).toContain("Properties");
+  });
+
+  it("closes a sentence's hunks with the same button", () => {
+    const page = mount(range);
+    const chip = page.querySelector("[data-claim] button") as HTMLButtonElement;
+    act(() => chip.click());
+    act(() => chip.click());
+    expect(chip.getAttribute("aria-expanded")).toBe("false");
+    expect(page.querySelector(".claim-ev")).toBeNull();
   });
 
   it("keeps secondary options behind Display, with a chip for each one that's on", () => {
@@ -366,7 +382,7 @@ describe("Workspace", () => {
     expect(page.querySelector('[aria-label="Display"][role="dialog"]')).toBeNull();
   });
 
-  it("has a shortcuts sheet, a command menu and a key for the side panel", () => {
+  it("has a shortcuts sheet, a command menu, and no chat on a snapshot", () => {
     const page = mount(range);
     press("?");
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Keyboard shortcuts");
@@ -391,9 +407,9 @@ describe("Workspace", () => {
     expect(page.querySelector(".vbar h2")?.textContent).toBe("Config & infra");
     expect(panel(page)?.querySelector("h2")?.textContent).toBe("uv.lock");
 
+    // The CLI's page has no server, thus no chat panel.
+    expect(page.querySelector('aside[aria-label="Ask Claude"]')).toBeNull();
     press("\\");
-    expect(panel(page)).toBeNull();
-    press("\\");
-    expect(panel(page)).not.toBeNull();
+    expect(page.querySelector('aside[aria-label="Ask Claude"]')).toBeNull();
   });
 });

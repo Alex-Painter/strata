@@ -1,6 +1,6 @@
 # App shell and navigation
 
-Once signed in, the user lands on the home page. Every page shares one frame: a sidebar with the Strata home link and the `Changes` and `Settings` pages at the top, and their login, a theme switch and Sign out at the bottom, and one card with a 44 px top bar (a breadcrumb) holding the page. The home page has "Review a stack", "Browse a repo's stacks" and the list of their Changes; its sidebar lists the repos they've reviewed. Opening `/changes/<id>` shows the review workspace: page links in the sidebar, then a resizable, collapsible Change pane with Whole stack, the layers and the stack graph of pull requests, the canvas in the centre, details on the right. Unknown client routes show "Page not found." The server serves the same app shell for every client route, and serves fingerprinted assets with long-lived caching. What the home page and the workspace do with real stacks is in [stacks.md](./stacks.md).
+Once signed in, the user lands on the home page. Every page shares one frame: a sidebar with the Strata home link and the `Changes` and `Settings` pages at the top, and their login, a theme switch and Sign out at the bottom, and one card with a 44 px top bar (a breadcrumb) holding the page. The home page has "Review a stack", "Browse a repo's stacks" and the list of their Changes; its sidebar lists the repos they've reviewed. Opening `/changes/<id>` shows the review workspace: page links in the sidebar, then a resizable, collapsible Change pane with the Change's details, Whole stack, the layers and the stack graph of pull requests, the canvas in the centre, and the chat on the right. Unknown client routes show "Page not found." The server serves the same app shell for every client route, and serves fingerprinted assets with long-lived caching. What the home page and the workspace do with real stacks is in [stacks.md](./stacks.md).
 
 ## Sub-features
 
@@ -36,5 +36,5 @@ Preconditions:
 ## Gotchas
 
 - The workspace needs a real Change to show anything more; [stacks.md](./stacks.md) opens one against the fixture GitHub.
-- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and its `tab "Ask"` is disabled, titled `This page is a snapshot. Questions need the Strata server.` [cli.md](./cli.md) writes one and compares it with the workspace.
+- The CLI's static page (`dist-static/index.html` with an embedded `#strata-report`) renders the same workspace in `static` mode, and it has no chat panel and no `button "Chat"`. [cli.md](./cli.md) writes one and compares it with the workspace.
 - If the page shows `Strata cannot connect to its server: ...`, `/api/me` failed with something other than 401. Run `doctor`.

@@ -11,6 +11,7 @@ import { LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
+import { EvidenceContext, type EvidenceView } from "../components/Claims";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
 import { selectionAnchor } from "../lib/selection";
@@ -32,13 +33,14 @@ import {
 import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays";
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
 import { PaneHandle } from "./PaneHandle";
-import { Panel, type PanelTab, statusWord } from "./Panel";
+import { Details, Panel, statusWord } from "./Panel";
 import { StackRail } from "./StackRail";
 
 /**
- * The review workspace, after the Cross-Section design. The sidebar chooses a
- * layer or a PR; the canvas shows the overview or one layer of the diff in
- * scope; the side panel shows whatever is selected there, with its evidence.
+ * The review workspace, after the Cross-Section design. The left pane shows
+ * the details of the Change or of what is selected, then chooses a layer or a
+ * PR; the canvas shows the overview or one layer of the diff in scope, with a
+ * selected sentence's hunks under it; the side panel on the right is the chat.
  * Secondary options live behind Display (V), and everything has a key.
  */
 export function Workspace({
@@ -89,14 +91,10 @@ export function Workspace({
   const [panel, setPanel] = useStored("strata-panel", true);
   const [paneWidth, setPaneWidth] = useStored("strata-change-pane", 320);
   const [paneOpen, setPaneOpen] = useStored("strata-change-pane-open", true);
-  // The side panel has two widths: its usual one, and a wide one for showing
-  // the hunks a sentence rests on, since code needs room. Dragging sets the one in use.
-  const [panelWidth, setPanelWidth] = useStored("strata-panel-width", 360);
-  const [panelWide, setPanelWide] = useStored("strata-panel-wide", 760);
+  const [panelWidth, setPanelWidth] = useStored("strata-chat-width", 400);
   const [overlay, setOverlay] = useState<"cmdk" | "help" | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<PanelTab>("details");
   /** Highlights waiting to go with the next question. */
   const [asking, setAsking] = useState<Anchor[]>([]);
   /** The Ask button next to a text selection on a diff. */
@@ -242,7 +240,7 @@ export function Workspace({
         if (stack) setDisplay({ ...display, matrix: !display.matrix });
         break;
       case "\\":
-        setPanel(!panel);
+        if (changeId) setPanel(!panel);
         break;
       case "Escape":
         if (displayOpen) setDisplayOpen(false);
@@ -319,7 +317,7 @@ export function Workspace({
       {
         id: "panel",
         group: "Display",
-        label: panel ? "Hide the side panel" : "Show the side panel",
+        label: panel ? "Hide the chat" : "Show the chat",
         icon: "panel",
         hint: "\\",
         run: () => setPanel(!panel),
@@ -336,10 +334,20 @@ export function Workspace({
         run: () => setDisplay({ ...display, matrix: !display.matrix }),
       });
     }
-    return list;
-  }, [report, diff, stack, layers, display, panel, go, reveal, setDisplay, setPanel]);
+    return changeId ? list : list.filter((command) => command.id !== "panel");
+  }, [report, diff, stack, layers, display, panel, changeId, go, reveal, setDisplay, setPanel]);
 
   const name = report?.change.title ?? title ?? "Change";
+  // A selected sentence's hunks show under it on the canvas.
+  const evidence: EvidenceView | null = diff
+    ? {
+        chips: diff.chips,
+        pr: diff.pr ?? undefined,
+        onHunk: (id) => reveal({ kind: "hunk", id }),
+        onPr: scope,
+        onClose: () => setSelection(null),
+      }
+    : null;
   const overviewProps = report &&
     diff && {
       report,
@@ -391,16 +399,18 @@ export function Workspace({
             >
               <Icon name="help" />
             </button>
-            <button
-              type="button"
-              className="ib"
-              aria-label="Side panel"
-              title="Side panel  \"
-              aria-pressed={panel}
-              onClick={() => setPanel(!panel)}
-            >
-              <Icon name="panel" />
-            </button>
+            {changeId && (
+              <button
+                type="button"
+                className="ib"
+                aria-label="Chat"
+                title="Chat  \"
+                aria-pressed={panel}
+                onClick={() => setPanel(!panel)}
+              >
+                <Icon name="panel" />
+              </button>
+            )}
           </>
         ),
       }}
@@ -438,6 +448,17 @@ export function Workspace({
                 <Icon name="chev" className="i rotate-180" />
               </button>
             </div>
+            <Details
+              report={report}
+              diff={diff}
+              run={run}
+              yours={yours}
+              prs={prs}
+              selection={selection}
+              onReveal={reveal}
+              onSelect={setSelection}
+              onScope={scope}
+            />
             <ChangeNav
               report={report}
               layers={layers}
@@ -522,81 +543,64 @@ export function Workspace({
             </div>
           </div>
           <div ref={canvas} className="canvas">
-            <div className="canvas-in">
-              {run && <RunBanner run={run} hasReport={report !== null} />}
-              {report && diff && overviewProps ? (
-                layer ? (
-                  <LayerView
-                    report={report}
-                    diff={diff}
-                    part={part}
-                    layer={layer}
-                    display={display}
-                    selection={selection}
-                    onSelect={setSelection}
-                    onFile={(path) => reveal({ kind: "file", path })}
-                    onScope={scope}
-                  />
-                ) : node && stack ? (
-                  <PrOverview
-                    {...overviewProps}
-                    onClaim={(claim) =>
-                      setSelection({ kind: "claim", claim, by: `#${node.pr.number}'s own diff` })
-                    }
-                    stack={stack}
-                    node={node}
-                    part={part ?? undefined}
-                  />
-                ) : stack && summary ? (
-                  <StackOverview
-                    {...overviewProps}
-                    stack={stack}
-                    summary={summary}
-                    pickError={pickError}
-                  />
+            <EvidenceContext.Provider value={evidence}>
+              <div className="canvas-in">
+                {run && <RunBanner run={run} hasReport={report !== null} />}
+                {report && diff && overviewProps ? (
+                  layer ? (
+                    <LayerView
+                      report={report}
+                      diff={diff}
+                      part={part}
+                      layer={layer}
+                      display={display}
+                      selection={selection}
+                      onSelect={setSelection}
+                      onFile={(path) => reveal({ kind: "file", path })}
+                      onScope={scope}
+                    />
+                  ) : node && stack ? (
+                    <PrOverview
+                      {...overviewProps}
+                      onClaim={(claim) =>
+                        setSelection({ kind: "claim", claim, by: `#${node.pr.number}'s own diff` })
+                      }
+                      stack={stack}
+                      node={node}
+                      part={part ?? undefined}
+                    />
+                  ) : stack && summary ? (
+                    <StackOverview
+                      {...overviewProps}
+                      stack={stack}
+                      summary={summary}
+                      pickError={pickError}
+                    />
+                  ) : (
+                    <RangeOverview {...overviewProps} />
+                  )
                 ) : (
-                  <RangeOverview {...overviewProps} />
-                )
-              ) : (
-                !run && (
-                  <p className="text-muted">
-                    There is nothing to show. Strata did not analyse this Change.
-                  </p>
-                )
-              )}
-            </div>
+                  !run && (
+                    <p className="text-muted">
+                      There is nothing to show. Strata did not analyse this Change.
+                    </p>
+                  )
+                )}
+              </div>
+            </EvidenceContext.Provider>
           </div>
         </main>
-        {panel && (
-          <Panel
-            report={report}
-            diff={diff}
-            run={run}
-            yours={yours}
-            prs={prs}
-            selection={selection}
-            onReveal={reveal}
-            onSelect={setSelection}
-            onScope={scope}
-            onClose={() => setPanel(false)}
-            tab={tab}
-            onTab={setTab}
-            {...(selection?.kind === "claim" && tab === "details"
-              ? { width: panelWide, onWidth: setPanelWide }
-              : { width: panelWidth, onWidth: setPanelWidth })}
-            ask={
-              changeId ? (
-                <Ask
-                  changeId={changeId}
-                  report={report}
-                  anchors={asking}
-                  onRemoveAnchor={(index) => setAsking(asking.filter((_, i) => i !== index))}
-                  onClearAnchors={() => setAsking([])}
-                  onCite={cite}
-                />
-              ) : null
-            }
-          />
+        {panel && changeId && (
+          <Panel onClose={() => setPanel(false)} width={panelWidth} onWidth={setPanelWidth}>
+            <Ask
+              changeId={changeId}
+              report={report}
+              anchors={asking}
+              onRemoveAnchor={(index) => setAsking(asking.filter((_, i) => i !== index))}
+              onClearAnchors={() => setAsking([])}
+              onCite={cite}
+            />
+          </Panel>
         )}
         {pop && (
           <button
@@ -608,7 +612,6 @@ export function Workspace({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setAsking((now) => [...now, pop.anchor].slice(-10));
-              setTab("ask");
               setPanel(true);
               setPop(null);
               window.getSelection()?.removeAllRanges();

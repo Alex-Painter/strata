@@ -9,7 +9,7 @@ import type {
 import { LAYERS } from "@strata/core/model";
 import type { CSSProperties, ReactNode } from "react";
 import { citedHunks } from "../components/Claims";
-import { Counts, HunkCard, layerFact, meaningful } from "../components/Diff";
+import { Counts, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { ago, countPrs, describePath, FILE_STATUS, stateLabel } from "../lib/format";
 import { reviewStatus } from "../lib/status";
@@ -37,8 +37,6 @@ function RunAgainLine({ run }: { run: RunView | null }) {
   );
 }
 
-export type PanelTab = "details" | "ask";
-
 export const VERDICT_LABEL: Record<VerdictStatus, string> = {
   blocked: "Blocked",
   "needs-review": "Needs review",
@@ -57,11 +55,12 @@ export function statusWord(report: ChangeReport | null, run: RunView | null): st
 }
 
 /**
- * The side panel: details of whatever is selected (a file, a hunk or a
- * sentence) with its evidence and where it came from, or, with nothing
- * selected, the Change's status, stack and notes.
+ * The Change's details, at the top of the left pane: whatever is selected (a
+ * file, a hunk or a sentence) with where it came from, or, with nothing
+ * selected, the Change's status, stack and notes. Code never shows here: a
+ * sentence's hunks open under it on the canvas, where they can be highlighted.
  */
-export function Panel({
+export function Details({
   report,
   diff,
   run,
@@ -71,12 +70,6 @@ export function Panel({
   onReveal,
   onSelect,
   onScope,
-  onClose,
-  tab = "details",
-  onTab = () => {},
-  ask = null,
-  width = 360,
-  onWidth,
 }: {
   report: ChangeReport | null;
   diff: ScopedDiff | null;
@@ -90,19 +83,9 @@ export function Panel({
   onReveal: (selection: Selection) => void;
   onSelect: (selection: Selection) => void;
   onScope: (pr: number | null) => void;
-  onClose: () => void;
-  tab?: PanelTab;
-  onTab?: (tab: PanelTab) => void;
-  /** The Ask tab's content. Null where chat cannot run, such as the CLI's page. */
-  ask?: ReactNode;
-  width?: number;
-  /** Set to let the reviewer drag the panel's left edge. */
-  onWidth?: (width: number) => void;
 }) {
   const titles = new Map(report?.stack?.nodes.map((node) => [node.pr.number, node.pr.title]));
-  let body: ReactNode = (
-    <Overview report={report} diff={diff} run={run} yours={yours} fresh={fresh} />
-  );
+  let body: ReactNode = null;
   if (report && diff && selection?.kind === "file") {
     const file = diff.byPath.get(selection.path);
     if (file) {
@@ -134,26 +117,29 @@ export function Panel({
   } else if (diff && selection?.kind === "claim") {
     const cited = citedHunks(selection.claim, diff.byId);
     body = (
-      <div className="grid gap-[22px]">
+      <>
         <div className="grid gap-1">
           <h2 className="ot prose">{selection.claim.text}</h2>
           <p className="okind">
-            Claude wrote this from {selection.by} · {selection.claim.confidence} confidence
+            From {selection.by} · {selection.claim.confidence} confidence
           </p>
         </div>
         <Section title="Evidence" count={cited.length}>
-          <div className="grid gap-3">
+          <div className="grid">
             {cited.map((hunk) => (
-              <HunkCard
+              <button
                 key={hunk.id}
-                hunk={hunk}
-                showPath
-                chips={diff.chips.get(hunk.id) ?? []}
-                onSelect={() => onReveal({ kind: "hunk", id: hunk.id })}
-                onPr={onScope}
-              />
+                type="button"
+                className="evrow"
+                onClick={() => onReveal({ kind: "hunk", id: hunk.id })}
+              >
+                <span className="f">
+                  {hunk.path}:{hunk.newStart}
+                </span>
+              </button>
             ))}
           </div>
+          <p className="sub">The hunks show under the sentence.</p>
           {cited.length < citedIds(selection.claim).length && (
             <p className="sub">
               {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} are not in
@@ -161,12 +147,50 @@ export function Panel({
             </p>
           )}
         </Section>
-      </div>
+      </>
     );
   }
   return (
+    <section aria-label="Details" className="details">
+      {body ? (
+        <>
+          <button
+            type="button"
+            className="btn ghost sm justify-self-start"
+            onClick={() => onSelect(null)}
+          >
+            <Icon name="chev" className="i rotate-180" />
+            Show the Change
+          </button>
+          {body}
+        </>
+      ) : (
+        <Overview report={report} diff={diff} run={run} yours={yours} fresh={fresh} />
+      )}
+    </section>
+  );
+}
+
+/**
+ * The side panel, on the right: the chat with Claude, and nothing else. Code
+ * and details open in the canvas and the left pane, so that the reviewer can
+ * highlight them and ask about them here.
+ */
+export function Panel({
+  children,
+  onClose,
+  width = 400,
+  onWidth,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  width?: number;
+  /** Set to let the reviewer drag the panel's left edge. */
+  onWidth?: (width: number) => void;
+}) {
+  return (
     <aside
-      aria-label="Details"
+      aria-label="Ask Claude"
       className="panel"
       style={{ "--panel-w": `${width}px` } as CSSProperties}
     >
@@ -177,43 +201,17 @@ export function Panel({
           edge="left"
           min={PANEL_MIN}
           max={PANEL_MAX}
-          label="Resize the side panel"
+          label="Resize the chat"
         />
       )}
-      <div className="ptabs" role="tablist" aria-label="Side panel">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "details"}
-          className="ptab"
-          onClick={() => onTab("details")}
-        >
-          Details
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "ask"}
-          disabled={ask === null}
-          className="ptab"
-          title={
-            ask === null ? "This page is a snapshot. Questions need the Strata server." : undefined
-          }
-          onClick={() => onTab("ask")}
-        >
-          Ask
-        </button>
+      <div className="ptabs">
+        <h2 className="ptitle">Ask Claude</h2>
         <span className="flex-1" />
-        {selection && tab === "details" && (
-          <button type="button" className="btn ghost sm" onClick={() => onSelect(null)}>
-            Overview
-          </button>
-        )}
         <button type="button" className="ib" aria-label="Hide panel" onClick={onClose}>
           <Icon name="x" />
         </button>
       </div>
-      <div className="insp">{tab === "ask" && ask !== null ? ask : body}</div>
+      <div className="insp">{children}</div>
     </aside>
   );
 }
