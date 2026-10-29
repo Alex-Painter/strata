@@ -7,7 +7,7 @@ import type {
   YourPr,
 } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { citedHunks } from "../components/Claims";
 import { Counts, HunkCard, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
@@ -15,6 +15,10 @@ import { ago, countPrs, describePath, FILE_STATUS, stateLabel } from "../lib/for
 import { reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
 import { CommitLink, type RunView } from "./Overview";
+import { PaneHandle } from "./PaneHandle";
+
+const PANEL_MIN = 280;
+const PANEL_MAX = 1200;
 
 /**
  * When Strata last analysed the Change, and a button to analyse it again,
@@ -71,6 +75,8 @@ export function Panel({
   tab = "details",
   onTab = () => {},
   ask = null,
+  width = 360,
+  onWidth,
 }: {
   report: ChangeReport | null;
   diff: ScopedDiff | null;
@@ -89,6 +95,9 @@ export function Panel({
   onTab?: (tab: PanelTab) => void;
   /** The Ask tab's content. Null where chat cannot run, such as the CLI's page. */
   ask?: ReactNode;
+  width?: number;
+  /** Set to let the reviewer drag the panel's left edge. */
+  onWidth?: (width: number) => void;
 }) {
   const titles = new Map(report?.stack?.nodes.map((node) => [node.pr.number, node.pr.title]));
   let body: ReactNode = (
@@ -156,7 +165,21 @@ export function Panel({
     );
   }
   return (
-    <aside aria-label="Details" className="panel">
+    <aside
+      aria-label="Details"
+      className="panel"
+      style={{ "--panel-w": `${width}px` } as CSSProperties}
+    >
+      {onWidth && (
+        <PaneHandle
+          width={width}
+          onWidth={onWidth}
+          edge="left"
+          min={PANEL_MIN}
+          max={PANEL_MAX}
+          label="Resize the side panel"
+        />
+      )}
       <div className="ptabs" role="tablist" aria-label="Side panel">
         <button
           type="button"

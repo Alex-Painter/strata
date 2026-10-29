@@ -814,7 +814,9 @@ code,
 
   /* Side panel. */
   .panel {
-    flex: 0 0 360px;
+    /* The width the reviewer dragged it to, at most most of the window. */
+    position: relative;
+    flex: 0 0 min(var(--panel-w, 360px), 65vw);
     min-width: 0;
     min-height: 0;
     display: flex;
@@ -1277,9 +1279,6 @@ code,
   @media (max-width: 1180px) {
     .app {
       grid-template-columns: 200px minmax(0, 1fr);
-    }
-    .panel {
-      flex-basis: 320px;
     }
     .canvas {
       padding: 24px 20px 32px;

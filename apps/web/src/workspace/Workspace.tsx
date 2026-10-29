@@ -31,6 +31,7 @@ import {
 } from "./model";
 import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays";
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
+import { PaneHandle } from "./PaneHandle";
 import { Panel, type PanelTab, statusWord } from "./Panel";
 import { StackRail } from "./StackRail";
 
@@ -88,6 +89,10 @@ export function Workspace({
   const [panel, setPanel] = useStored("strata-panel", true);
   const [paneWidth, setPaneWidth] = useStored("strata-change-pane", 320);
   const [paneOpen, setPaneOpen] = useStored("strata-change-pane-open", true);
+  // The side panel has two widths: its usual one, and a wide one for showing
+  // the hunks a sentence rests on, since code needs room. Dragging sets the one in use.
+  const [panelWidth, setPanelWidth] = useStored("strata-panel-width", 360);
+  const [panelWide, setPanelWide] = useStored("strata-panel-wide", 760);
   const [overlay, setOverlay] = useState<"cmdk" | "help" | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
@@ -576,6 +581,9 @@ export function Workspace({
             onClose={() => setPanel(false)}
             tab={tab}
             onTab={setTab}
+            {...(selection?.kind === "claim" && tab === "details"
+              ? { width: panelWide, onWidth: setPanelWide }
+              : { width: panelWidth, onWidth: setPanelWidth })}
             ask={
               changeId ? (
                 <Ask
@@ -621,46 +629,6 @@ function claimSource(report: ChangeReport, claim: Claim): string {
   const section = report.guide.sections.find((s) => s.about.includes(claim));
   if (section) return `the Guide's “${section.title}”`;
   return report.stack ? "the whole-stack diff" : "the range's diff";
-}
-
-const PANE_MIN = 220;
-const PANE_MAX = 560;
-
-/** The left pane's right edge: drag it, or use the arrow keys, to resize the pane. */
-function PaneHandle({ width, onWidth }: { width: number; onWidth: (width: number) => void }) {
-  const clamp = (w: number) => Math.round(Math.min(PANE_MAX, Math.max(PANE_MIN, w)));
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: a focusable separator is the ARIA pattern for a resize handle.
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize the pane"
-      aria-valuemin={PANE_MIN}
-      aria-valuemax={PANE_MAX}
-      aria-valuenow={width}
-      tabIndex={0}
-      className="absolute top-0 right-0 bottom-0 z-10 w-1.5 cursor-col-resize hover:bg-accent-line focus-visible:bg-accent-line"
-      onPointerDown={(event) => {
-        event.preventDefault();
-        const startX = event.clientX;
-        const start = width;
-        const move = (e: PointerEvent) => onWidth(clamp(start + e.clientX - startX));
-        const up = () => {
-          window.removeEventListener("pointermove", move);
-          window.removeEventListener("pointerup", up);
-        };
-        window.addEventListener("pointermove", move);
-        window.addEventListener("pointerup", up);
-      }}
-      onKeyDown={(event) => {
-        const step = event.shiftKey ? 48 : 16;
-        if (event.key === "ArrowLeft") onWidth(clamp(width - step));
-        else if (event.key === "ArrowRight") onWidth(clamp(width + step));
-        else return;
-        event.preventDefault();
-      }}
-    />
-  );
 }
 
 /** The Change's own navigation: the whole stack (or overview), then its layers. */
