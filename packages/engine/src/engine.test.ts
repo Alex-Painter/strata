@@ -16,9 +16,9 @@ describe("createEngine (scaffold)", () => {
     ).rejects.toBeInstanceOf(NotImplementedError);
   });
 
-  it("rejects chat until milestone 1 implements it", async () => {
+  it("rejects chat about a local checkout", async () => {
     const stream = engine.chat({
-      report: {} as never,
+      report: { change: { repo: { kind: "local", path: "/tmp/x" } } } as never,
       history: [],
       text: "why?",
       anchors: [],
