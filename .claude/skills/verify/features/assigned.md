@@ -15,7 +15,7 @@ Strata searches the repos it's told to (`STRATA_ASSIGNED_REPOS`, GlyphicAI/maver
 ## How to get to it (user POV)
 
 - Open the home page. "Waiting on you" sits at the top, with a Refresh button.
-- Open a Change from that list. In the sidebar under Pull requests, your PRs say `yours`.
+- Open a Change from that list. In the stack graph at the left of the main pane, your PRs say `yours`.
 
 ## Driving it with strata-verify
 

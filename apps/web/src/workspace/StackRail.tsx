@@ -4,11 +4,11 @@ import { useMemo } from "react";
 import { Dot, EdgeLine, gutterWidth, laneX } from "../components/StackMap";
 import { reasonLabel } from "../lib/format";
 
-/** One sidebar row, the height of a nav row plus the gap between them. */
-const ROW = 29;
+/** One row: the PR's title, and its branch under it. */
+const ROW = 46;
 
 /**
- * The whole stack as a small vertical graph for the sidebar: the trunk at the
+ * The whole stack as a vertical graph, at the left of the page: the trunk at the
  * bottom, tips on top, a fork as two branches. PRs on this Change's path
  * scope the page; a PR on another branch is dimmed, and choosing it opens
  * the Change for its path.
@@ -71,6 +71,7 @@ export function StackRail({
         {layout.nodes.map((node) => {
           const n = node.pr;
           const title = prs.get(n)?.title ?? "";
+          const branch = prs.get(n)?.headRef;
           const here = onPath(n);
           const mine = yours.find((y) => y.number === n && y.active);
           const tip = tipFor(n);
@@ -78,7 +79,7 @@ export function StackRail({
             <li key={n} data-pr={n} style={{ height: ROW, paddingLeft: gutter - 6 }}>
               <button
                 type="button"
-                className={`nrow pr ${here ? "" : "faint"}`}
+                className={`flex h-full w-full min-w-0 flex-col justify-center rounded-md px-2 text-left hover:bg-hover aria-[current=true]:bg-active ${here ? "" : "faint opacity-50"}`}
                 aria-label={here ? `Show #${n} ${title}` : `Open the path through #${n} ${title}`}
                 aria-current={pr === n ? "true" : undefined}
                 title={
@@ -89,16 +90,30 @@ export function StackRail({
                 disabled={!here && (!onPickPath || pickingPath !== null)}
                 onClick={() => (here ? onScope(pr === n ? null : n) : onPickPath?.(tip))}
               >
-                <span className="pid">{n}</span>
-                <span className="nl">{title}</span>
-                {!here && pickingPath === tip ? (
-                  <span className="nm">Opening…</span>
-                ) : (
-                  mine && (
-                    <span className="nm" title={`Yours: ${reasonLabel(mine.reasons)}`}>
-                      yours
-                    </span>
-                  )
+                <span className="flex w-full min-w-0 items-baseline gap-2">
+                  <span className="shrink-0 font-mono text-[11.5px] text-faint">{n}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-text">{title}</span>
+                  {!here && pickingPath === tip ? (
+                    <span className="shrink-0 text-[11px] text-muted">Opening…</span>
+                  ) : (
+                    mine && (
+                      <span
+                        data-yours
+                        className="shrink-0 text-[11px] text-muted"
+                        title={`Yours: ${reasonLabel(mine.reasons)}`}
+                      >
+                        yours
+                      </span>
+                    )
+                  )}
+                </span>
+                {branch && (
+                  <span
+                    className="block w-full truncate font-mono text-[11px] text-faint"
+                    title={branch}
+                  >
+                    {branch}
+                  </span>
                 )}
               </button>
             </li>

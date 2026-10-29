@@ -210,7 +210,7 @@ describe("Workspace", () => {
         seenAt: "2026-10-02T00:00:00Z",
       },
     ]);
-    const mark = page.querySelector('li[data-pr="1"] .nm');
+    const mark = page.querySelector('li[data-pr="1"] [data-yours]');
     expect(mark?.textContent).toBe("yours");
     expect(mark?.getAttribute("title")).toBe("Yours: review requested from acme/backend");
     expect(button(page, "Whole stack").getAttribute("aria-current")).toBe("true");

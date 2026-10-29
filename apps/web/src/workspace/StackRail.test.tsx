@@ -5,7 +5,12 @@ import { afterEach, expect, it } from "vitest";
 import { StackRail } from "./StackRail";
 
 const pr = (number: number, parent: number | null) =>
-  ({ number, title: `PR ${number}`, parent }) as unknown as StackPrSummary;
+  ({
+    number,
+    title: `PR ${number}`,
+    headRef: `feat/pr-${number}`,
+    parent,
+  }) as unknown as StackPrSummary;
 // #5 forks into #6 and #7.
 const stack = {
   id: "s",
@@ -57,6 +62,8 @@ it("draws every PR, dims the other branch, and opens its path when chosen", () =
   expect(row(7).className).toContain("faint");
   expect(row(6).className).not.toContain("faint");
   expect(row(6).textContent).toContain("yours");
+  // Each PR shows its branch under its title.
+  expect(row(6).textContent).toContain("feat/pr-6");
   expect(container.querySelectorAll("path[data-edge]")).toHaveLength(3);
 
   act(() => row(6).click());
