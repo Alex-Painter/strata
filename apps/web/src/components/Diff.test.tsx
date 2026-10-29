@@ -132,7 +132,7 @@ describe("FileList", () => {
       />,
     );
     expect(document.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
-      "Added · Logic: A job that warms the cache, from Claude",
+      "Added · Logic: A job that warms the cache",
     );
   });
 

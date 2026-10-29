@@ -197,8 +197,8 @@ function WholeSummary({
               Summary
             </h2>
             <p className="sub">
-              Claude wrote this from the {of === "stack" ? "whole-stack diff" : "range's diff"}{" "}
-              only. Each sentence names the hunks that it rests on.
+              This summary uses only the {of === "stack" ? "whole-stack diff" : "range's diff"}.
+              Each sentence names the hunks that it rests on.
             </p>
           </div>
           <ClaimList
@@ -423,7 +423,7 @@ function PartSummary({ stack, part, ...props }: OverviewProps & { stack: Stack; 
             <h2 id="part-summary-heading" className="h2">
               What it changes
             </h2>
-            <p className="sub">Claude wrote this from this PR's own diff only.</p>
+            <p className="sub">This summary uses only this PR's own diff.</p>
           </div>
           <ClaimList
             claims={part.summary}

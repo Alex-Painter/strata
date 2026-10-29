@@ -369,8 +369,7 @@ export function fileFacts(file: FileChange): string[] {
 /** Why the file is in its layer, said plainly enough to check, and who decided. */
 export function layerFact(file: FileChange): string {
   const { layer } = file;
-  const who =
-    layer.by === "llm" ? ", from Claude" : layer.confidence === "low" ? ", a possible layer" : "";
+  const who = layer.by !== "llm" && layer.confidence === "low" ? ", a possible layer" : "";
   return `${LAYERS[layer.layer].title}: ${layer.reason}${who}`;
 }
 
