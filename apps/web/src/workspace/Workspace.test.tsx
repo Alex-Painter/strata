@@ -200,6 +200,29 @@ describe("Workspace", () => {
     );
   });
 
+  it("analyses a Change again from the side panel", () => {
+    let asked = 0;
+    const page = mount(range, {
+      info: {
+        id: "run_1",
+        status: "done",
+        progress: null,
+        error: null,
+        queuedAt: "2026-10-02T00:00:00.000Z",
+        startedAt: "2026-10-02T00:00:00.000Z",
+        finishedAt: "2026-10-02T00:00:00.000Z",
+      },
+      loading: false,
+      onRunAgain: () => {
+        asked += 1;
+      },
+      rerunning: false,
+    });
+    const details = page.querySelector('[aria-label="Details"]') as HTMLElement;
+    act(() => button(details, "Run again").click());
+    expect(asked).toBe(1);
+  });
+
   it("marks the PRs GitHub lists for you, and still opens on the whole stack", () => {
     const report = { ...range, change: { ...range.change, hints: [] }, stack };
     const page = mount(report, null, undefined, [

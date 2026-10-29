@@ -16,6 +16,23 @@ import { reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
 import { CommitLink, type RunView } from "./Overview";
 
+/**
+ * When Strata last analysed the Change, and a button to analyse it again,
+ * for example after a change to the repo's settings.
+ */
+function RunAgainLine({ run }: { run: RunView | null }) {
+  const status = run?.info?.status;
+  if (!run || status === "queued" || status === "running") return null;
+  return (
+    <span className="mt-0.5 flex items-center gap-2 text-[12px] text-muted">
+      {run.info?.finishedAt && <span>Analysed {ago(run.info.finishedAt)}</span>}
+      <button type="button" className="lnk" disabled={run.rerunning} onClick={run.onRunAgain}>
+        Run again
+      </button>
+    </span>
+  );
+}
+
 export const VERDICT_LABEL: Record<VerdictStatus, string> = {
   blocked: "Blocked",
   "needs-review": "Needs review",
@@ -206,6 +223,7 @@ function Overview({
                 <span title="Strata does not give a verdict at this time.">
                   {statusWord(report, run)}
                 </span>
+                <RunAgainLine run={run} />
               </Prop>
             </>
           ) : (
@@ -215,6 +233,7 @@ function Overview({
               >
                 {statusWord(report, run)}
               </span>
+              <RunAgainLine run={run} />
             </Prop>
           )}
           {stack && (

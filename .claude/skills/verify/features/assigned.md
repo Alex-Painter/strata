@@ -32,7 +32,7 @@ Preconditions:
 
 ## Claude per repo
 
-- Under "Waiting on you", each searched repo has `checkbox "Send the code in acme/app to Claude"`, off until `settings/acme/app.json` in the data folder says `"sendCodeToAnthropic": true`. Turning it on writes that file (other settings in it stay). `GET` and `POST /api/repos/:owner/:name/settings` read and change it; a file broken by hand answers `422` with what is wrong. Without an Anthropic API key, the hint under it says the setting has no effect.
+- The sidebar links `Settings` (`/settings`). There, each searched repo has `checkbox "Send the code in acme/app to Claude"`, off until `settings/acme/app.json` in the data folder says `"sendCodeToAnthropic": true`. Turning it on writes that file (other settings in it stay). `GET` and `POST /api/repos/:owner/:name/settings` read and change it; a file broken by hand answers `422` with what is wrong. Without an Anthropic API key, the hint under it says the setting has no effect.
 
 ## Gotchas
 

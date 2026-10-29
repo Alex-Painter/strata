@@ -3,6 +3,7 @@ import { Route, Switch } from "wouter";
 import { api, HttpError } from "./lib/api";
 import { readStaticReport } from "./lib/static-report";
 import { ChangesPage } from "./pages/ChangesPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { StacksPage } from "./pages/StacksPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
@@ -29,6 +30,7 @@ function ServerApp() {
   return (
     <Switch>
       <Route path="/" component={() => <ChangesPage me={me.data} />} />
+      <Route path="/settings">{() => <SettingsPage me={me.data} />}</Route>
       <Route path="/repos/:owner/:name">{() => <StacksPage me={me.data} />}</Route>
       {/* A new id is a new page, so a path picked on the old one stops asking. */}
       <Route path="/changes/:id">

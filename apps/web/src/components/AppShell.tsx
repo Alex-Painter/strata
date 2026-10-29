@@ -125,16 +125,34 @@ export function Breadcrumb({ items }: { items: Array<{ label: string; href?: str
 }
 
 /** The sidebar of the pages outside a Change: Changes, then the repos reviewed. */
-export function HomeNav({ current }: { current: string | null }) {
+export function HomeNav({
+  current,
+  page = "changes",
+}: {
+  current: string | null;
+  page?: "changes" | "settings";
+}) {
   const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
   const repos = [
     ...new Set([...(current ? [current] : []), ...(changes.data ?? []).map((c) => c.repo)]),
   ];
   return (
     <>
-      <Link href="/" className="nrow" aria-current={current === null ? "page" : undefined}>
+      <Link
+        href="/"
+        className="nrow"
+        aria-current={current === null && page === "changes" ? "page" : undefined}
+      >
         <Icon name="review" />
         <span className="nl">Changes</span>
+      </Link>
+      <Link
+        href="/settings"
+        className="nrow"
+        aria-current={page === "settings" ? "page" : undefined}
+      >
+        <Icon name="sliders" />
+        <span className="nl">Settings</span>
       </Link>
       {repos.length > 0 && (
         <div className="sec">
