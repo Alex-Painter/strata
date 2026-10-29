@@ -102,6 +102,14 @@ export function anchorId(anchor: Anchor): string {
   );
 }
 
+/**
+ * The lines of a hunk as an anchorable surface: each diff line's content,
+ * without its number or +/- marker, which is what the UI renders as text.
+ */
+export function hunkSurface(hunk: { lines: ReadonlyArray<{ content: string }> }): string[] {
+  return hunk.lines.map((line) => line.content);
+}
+
 /** The canonical text of a line-based surface. */
 export function surfaceText(lines: readonly string[]): string {
   return lines.join("\n");

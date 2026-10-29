@@ -1,4 +1,4 @@
-import type { DiffLine, FileChange, Hunk } from "@strata/core/model";
+import type { DiffLine, FileChange, Hunk, SourceRef } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
@@ -30,6 +30,7 @@ export function FileList({
   onFile,
   onHunk,
   onPr,
+  pr,
 }: {
   files: FileChange[];
   hunksOf: (file: FileChange) => Hunk[];
@@ -41,6 +42,8 @@ export function FileList({
   onFile: (path: string) => void;
   onHunk: (id: string) => void;
   onPr?: (pr: number) => void;
+  /** Set when these are one PR's own hunks, so a highlight points at that PR's diff. */
+  pr?: number | undefined;
 }) {
   let budget = OPEN_TOTAL_LINES;
   const opens = new Map(
@@ -66,6 +69,7 @@ export function FileList({
           onFile={onFile}
           onHunk={onHunk}
           {...(onPr ? { onPr } : {})}
+          pr={pr}
         />
       ))}
     </div>
@@ -82,6 +86,7 @@ function FileBlock({
   onFile,
   onHunk,
   onPr,
+  pr,
 }: {
   file: FileChange;
   hunks: Hunk[];
@@ -92,6 +97,7 @@ function FileBlock({
   onFile: (path: string) => void;
   onHunk: (id: string) => void;
   onPr?: (pr: number) => void;
+  pr?: number | undefined;
 }) {
   // Closed files render no lines, so a big diff costs nothing until opened.
   const [open, setOpen] = useState(initiallyOpen);
@@ -167,6 +173,7 @@ function FileBlock({
             selected={selected === hunk.id}
             onSelect={() => onHunk(hunk.id)}
             {...(onPr ? { onPr } : {})}
+            pr={pr}
           />
         ))}
       {!open && hunks.length > 0 && (
@@ -197,6 +204,7 @@ export function HunkCard({
   showPath = false,
   onSelect,
   onPr,
+  pr,
 }: {
   hunk: Hunk;
   folded?: boolean;
@@ -206,6 +214,8 @@ export function HunkCard({
   showPath?: boolean;
   onSelect?: () => void;
   onPr?: (pr: number) => void;
+  /** The PR whose own diff this hunk is from, if it is one. */
+  pr?: number | undefined;
 }) {
   const [shown, setShown] = useState(!folded);
   const head = (
@@ -253,10 +263,11 @@ export function HunkCard({
         ))}
       </div>
       {shown ? (
-        <div className="code">
-          {hunk.lines.map((line) => (
+        // The lines are a surface that can be highlighted (lib/selection.ts).
+        <div className="code" data-anchor-source={JSON.stringify(hunkSource(hunk.id, pr))}>
+          {hunk.lines.map((line, i) => (
             // Old and new numbers together are unique within a hunk.
-            <Line key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`} line={line} />
+            <Line key={`${line.oldLine ?? ""}:${line.newLine ?? ""}`} line={line} index={i} />
           ))}
         </div>
       ) : (
@@ -273,13 +284,17 @@ export function HunkCard({
 
 const MARK: Record<DiffLine["kind"], string> = { add: "+", del: "-", context: " " };
 
-function Line({ line }: { line: DiffLine }) {
+export function hunkSource(hunkId: string, pr?: number): SourceRef {
+  return pr === undefined ? { kind: "hunk", hunkId } : { kind: "pr-hunk", pr, hunkId };
+}
+
+function Line({ line, index }: { line: DiffLine; index: number }) {
   return (
-    <div className="ln" data-line={line.kind}>
+    <div className="ln" data-line={line.kind} data-anchor-line={index}>
       <span className="no">{line.kind === "del" ? line.oldLine : line.newLine}</span>
       <span className="sg">{MARK[line.kind]}</span>
       <span>
-        {line.content}
+        <span data-anchor-text>{line.content}</span>
         {line.noNewlineAtEof && <span className="eof">No newline at end of file</span>}
       </span>
     </div>

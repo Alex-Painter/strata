@@ -99,6 +99,7 @@ export function LayerView({
           onFile={(path) => onSelect({ kind: "file", path })}
           onHunk={(id) => onSelect({ kind: "hunk", id })}
           onPr={(pr) => onScope(pr)}
+          pr={part?.pr}
         />
       </section>
     </>
