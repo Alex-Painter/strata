@@ -164,6 +164,15 @@ export interface FileContentResponse {
   lines: string[];
 }
 
+/** A repo's settings that the web app can change. */
+export interface RepoSettingsResponse {
+  repo: string;
+  /** Claude reads the repo's code to write summaries and to place unclear files. */
+  sendCodeToAnthropic: boolean;
+  /** False when the server has no Anthropic API key, so the setting has no effect. */
+  claudeAvailable: boolean;
+}
+
 /** Where the search for your assigned PRs stands. */
 export interface AssignedStatus {
   /** The repos Strata searches. */

@@ -10,6 +10,7 @@ import type {
   CreateChangeRequest,
   MeResponse,
   PendingResponse,
+  RepoSettingsResponse,
   RunInfo,
   StacksResponse,
 } from "@strata/core/model";
@@ -92,8 +93,18 @@ async function untilDone<T>(
   }
 }
 
+const repoPath = (repo: string) => repo.split("/").map(encodeURIComponent).join("/");
+
 export const api = {
   me: () => request<MeResponse>("/api/me"),
+  /** `repo` is `owner/name`. */
+  repoSettings: (repo: string) =>
+    request<RepoSettingsResponse>(`/api/repos/${repoPath(repo)}/settings`),
+  setSendCode: (repo: string, sendCodeToAnthropic: boolean) =>
+    request<RepoSettingsResponse>(
+      `/api/repos/${repoPath(repo)}/settings`,
+      post({ sendCodeToAnthropic }),
+    ),
   signOut: () => request<void>("/auth/logout", post({})),
   /** `repo` is `owner/name`. Pending while the server is still reading it; ask again. */
   stacks: (repo: string) =>

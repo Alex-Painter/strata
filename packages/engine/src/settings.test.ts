@@ -1,8 +1,13 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadRepoSettings, SettingsError, settingsPath } from "./settings.js";
+import {
+  loadRepoSettings,
+  SettingsError,
+  saveSendCodeToAnthropic,
+  settingsPath,
+} from "./settings.js";
 
 let dataDir: string;
 beforeEach(async () => {
@@ -35,6 +40,31 @@ describe("repo settings", () => {
       layerRules: [rule],
       sendCodeToAnthropic: true,
     });
+  });
+
+  it("turn the Anthropic opt-in on and off, and keep the rest of the file", async () => {
+    // With no file, Strata makes one.
+    await saveSendCodeToAnthropic(dataDir, "acme/app", true);
+    expect(await loadRepoSettings(dataDir, "acme/app")).toEqual({
+      layerRules: [],
+      sendCodeToAnthropic: true,
+    });
+
+    const rule = { id: "billing", layer: "data-model", paths: ["billing/**"], reason: "Money" };
+    const path = await write({ layerRules: [rule], sendCodeToAnthropic: true });
+    expect(await saveSendCodeToAnthropic(dataDir, "acme/app", false)).toEqual({
+      layerRules: [rule],
+      sendCodeToAnthropic: false,
+    });
+    expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
+      layerRules: [rule],
+      sendCodeToAnthropic: false,
+    });
+
+    // A file someone broke by hand stays as it is.
+    await write("{ not json");
+    await expect(saveSendCodeToAnthropic(dataDir, "acme/app", true)).rejects.toThrow(SettingsError);
+    expect(await readFile(path, "utf8")).toBe("{ not json");
   });
 
   it("say what's wrong with a bad file", async () => {

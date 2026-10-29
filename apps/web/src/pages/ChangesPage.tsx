@@ -155,6 +155,9 @@ function WaitingOnYou({
           {note}
         </p>
       )}
+      {status?.repos.map((repo) => (
+        <ClaudeSetting key={repo} repo={repo} />
+      ))}
       {problems.map((problem) => (
         <p key={problem} className="alert">
           {problem}
@@ -229,6 +232,43 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Whether Claude may read this repo's code. Off by default; it writes the
+ * same setting as settings/<owner>/<name>.json in Strata's data folder.
+ */
+function ClaudeSetting({ repo }: { repo: string }) {
+  const queryClient = useQueryClient();
+  const settings = useQuery({
+    queryKey: ["repo-settings", repo],
+    queryFn: () => api.repoSettings(repo),
+  });
+  const save = useMutation({
+    mutationFn: (send: boolean) => api.setSendCode(repo, send),
+    onSuccess: (next) => queryClient.setQueryData(["repo-settings", repo], next),
+  });
+  const data = settings.data;
+  const error = settings.error?.message ?? save.error?.message ?? null;
+  return (
+    <div className="-mt-1 grid gap-0.5 text-[12px]">
+      <label className="flex items-center gap-1.5 text-muted">
+        <input
+          type="checkbox"
+          checked={data?.sendCodeToAnthropic ?? false}
+          disabled={!data || save.isPending}
+          onChange={(event) => save.mutate(event.target.checked)}
+        />
+        Send the code in {repo} to Claude
+      </label>
+      <span className="pl-5 text-faint">
+        {data && !data.claudeAvailable
+          ? "The server has no Anthropic API key. Thus this setting has no effect."
+          : "Claude writes the summaries and puts unclear files in a layer. The setting applies to the next analysis."}
+      </span>
+      {error && <span className="alert">{error}</span>}
+    </div>
   );
 }
 

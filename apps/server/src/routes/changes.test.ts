@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,6 +110,37 @@ describe("GET /api/repos/:owner/:name/stacks", () => {
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({
       error: "GitHub does not have the repo acme/other, or the token cannot see it.",
+    });
+  });
+});
+
+describe("repo settings", () => {
+  it("reads and turns the Anthropic opt-in on and off for a repo", async () => {
+    const { app, post } = setup();
+    const first = await app.request("/api/repos/acme/app/settings");
+    expect(await first.json()).toEqual({
+      repo: "acme/app",
+      sendCodeToAnthropic: false,
+      claudeAvailable: false,
+    });
+    const on = await post("/api/repos/acme/app/settings", { sendCodeToAnthropic: true });
+    expect(await on.json()).toMatchObject({ sendCodeToAnthropic: true });
+    const file = path.join(dataDir, "settings", "acme", "app.json");
+    expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ sendCodeToAnthropic: true });
+    expect(
+      (await post("/api/repos/acme/app/settings", { sendCodeToAnthropic: "yes" })).status,
+    ).toBe(400);
+  });
+
+  it("says what's wrong with a settings file broken by hand", async () => {
+    const { app } = setup();
+    const file = path.join(dataDir, "settings", "acme", "app.json");
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, '{"sendCodeToAnthropic": "yes"}');
+    const res = await app.request("/api/repos/acme/app/settings");
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      error: `${file}: sendCodeToAnthropic must be true or false.`,
     });
   });
 });

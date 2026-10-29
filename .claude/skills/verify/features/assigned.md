@@ -30,6 +30,10 @@ Preconditions:
 - **Not waiting, and other stacks.** On the same page, `heading "Assigned to you, not waiting"` lists `Add the forecast model` with `#3 reviewed by you`. `heading "Other stacks in acme/app"` lists `Add billing admins` (`3 PRs: 3 open by dev`, `Not analysed`), linking to `/repos/acme/app#stack-5`; the stacks from #9 and #1 aren't listed again. Choosing it scrolls the Stacks page to `Stack from #5`, whose `button "Analyse 2 PRs"` makes and runs the Change. Back home, the stack has moved to `heading "Opened by you"`, and on the stack page that path now shows `link "Open"` and `This path already has a Change.`
 - **Refresh.** Choose `Refresh`. The note under the heading shows a search step, such as `Searching acme/app`, then `Searched acme/app just now`. No new rows appear and nothing runs again, since no head moved.
 
+## Claude per repo
+
+- Under "Waiting on you", each searched repo has `checkbox "Send the code in acme/app to Claude"`, off until `settings/acme/app.json` in the data folder says `"sendCodeToAnthropic": true`. Turning it on writes that file (other settings in it stay). `GET` and `POST /api/repos/:owner/:name/settings` read and change it; a file broken by hand answers `422` with what is wrong. Without an Anthropic API key, the hint under it says the setting has no effect.
+
 ## Gotchas
 
 - The search reads GitHub as the token's user, which isn't always the signed-in login. Under the fixture both are `verify-bot`.

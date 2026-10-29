@@ -11,8 +11,8 @@
  *     "sendCodeToAnthropic": true
  *   }
  */
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { LAYER_IDS, type LayerId, type LayerRule } from "@strata/core";
 
 export interface RepoSettings {
@@ -84,6 +84,33 @@ export function parseSettings(raw: unknown, path: string): RepoSettings {
   const send = raw.sendCodeToAnthropic ?? false;
   if (typeof send !== "boolean") fail("sendCodeToAnthropic must be true or false.");
   return { layerRules, sendCodeToAnthropic: send as boolean };
+}
+
+/**
+ * Turns sending this repo's code to the Anthropic API on or off, keeping the
+ * rest of the file as it is. A file Strata cannot parse stays untouched.
+ */
+export async function saveSendCodeToAnthropic(
+  dataDir: string,
+  repo: string,
+  send: boolean,
+): Promise<RepoSettings> {
+  const path = settingsPath(dataDir, repo);
+  let raw: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, "utf8"));
+    parseSettings(parsed, path);
+    raw = parsed as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      if (error instanceof SettingsError) throw error;
+      throw new SettingsError(`${path} is not valid JSON: ${(error as Error).message}`);
+    }
+  }
+  const next = { ...raw, sendCodeToAnthropic: send };
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`);
+  return parseSettings(next, path);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

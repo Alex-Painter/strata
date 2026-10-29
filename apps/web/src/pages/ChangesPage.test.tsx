@@ -85,6 +85,7 @@ const stacks = {
   ],
 };
 let status: AssignedStatus;
+let send = false;
 const posts: string[] = [];
 
 beforeEach(() => {
@@ -96,9 +97,18 @@ beforeEach(() => {
     errors: ["acme/app#9: no luck"],
   };
   posts.length = 0;
+  send = false;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/repos/acme/app/settings") {
+        if (init?.method === "POST") send = JSON.parse(String(init.body)).sendCodeToAnthropic;
+        return Response.json({
+          repo: "acme/app",
+          sendCodeToAnthropic: send,
+          claudeAvailable: true,
+        });
+      }
       if (init?.method === "POST") {
         posts.push(url);
         status = { ...status, running: true, progress: "Searching acme/app" };
@@ -176,6 +186,16 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(waiting.textContent).toContain("Show team requests (1 hidden)");
   act(() => teams.click());
   expect(rows("waiting-h")).toHaveLength(1);
+
+  // Claude stays off for a repo until you turn it on.
+  const claude = [...waiting.querySelectorAll("label")]
+    .find((l) => l.textContent?.startsWith("Send the code in acme/app to Claude"))
+    ?.querySelector("input") as HTMLInputElement;
+  expect(claude.checked).toBe(false);
+  act(() => claude.click());
+  await flush();
+  expect(send).toBe(true);
+  expect(claude.checked).toBe(true);
 
   const refresh = [...waiting.querySelectorAll("button")].find(
     (b) => b.textContent === "Refresh",
