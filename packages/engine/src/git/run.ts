@@ -20,9 +20,17 @@ export class GitError extends Error {
     readonly args: string[],
     readonly result: GitResult,
   ) {
-    super(`git ${args.join(" ")} failed (${result.code}): ${result.stderr.trim()}`);
+    super(`git ${shown(args).join(" ")} failed (${result.code}): ${result.stderr.trim()}`);
     this.name = "GitError";
   }
+}
+
+/**
+ * The args without `-c` config, such as the credential helper script, which
+ * only adds noise to a log line.
+ */
+function shown(args: string[]): string[] {
+  return args.filter((arg, i) => arg !== "-c" && args[i - 1] !== "-c");
 }
 
 /** The environment every git call runs in. */
