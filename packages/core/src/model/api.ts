@@ -37,6 +37,8 @@ export interface StackPrSummary {
   author: string | null;
   state: PrState;
   draft: boolean;
+  /** When the PR was opened. */
+  createdAt: string;
   updatedAt: string;
   mergedAt: string | null;
   baseRef: string;
@@ -52,6 +54,12 @@ export interface StackPrSummary {
   review: StackPr["review"];
   checks: StackPr["checks"];
 }
+
+/** What a list of Changes shows for each PR on a path. */
+export type PathPr = Pick<
+  StackPrSummary,
+  "number" | "author" | "createdAt" | "state" | "draft" | "review" | "checks"
+>;
 
 export interface StackSummary {
   id: string;
@@ -132,6 +140,11 @@ export interface ChangeSummary {
   /** Its path's bottom and tip PRs, to match it to a stack. */
   rootPr: number;
   tipPr: number;
+  /**
+   * Its PRs, bottom first, as GitHub showed them when Strata last read the
+   * path. Empty for a Change that Strata has not read since it kept them.
+   */
+  prs: PathPr[];
   createdAt: string;
   updatedAt: string;
 }

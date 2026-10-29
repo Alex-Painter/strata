@@ -1,0 +1,1 @@
+ALTER TABLE `changes` ADD `path_prs` text;

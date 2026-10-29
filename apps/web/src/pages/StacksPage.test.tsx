@@ -195,6 +195,7 @@ it("opens the Change a path already has instead of analysing it again", async ()
       waiting: false,
       rootPr: 5,
       tipPr: 6,
+      prs: [],
       createdAt: "2026-10-01T00:00:00Z",
       updatedAt: "2026-10-01T00:00:00Z",
     },

@@ -12,6 +12,7 @@ function pr(number: number, parent: number | null, fields: Partial<StackPrSummar
     author: "dev",
     state: "open",
     draft: false,
+    createdAt: "2026-10-01T00:00:00Z",
     updatedAt: "2026-10-01T00:00:00Z",
     mergedAt: null,
     baseRef: parent === null ? "main" : `b${parent}`,

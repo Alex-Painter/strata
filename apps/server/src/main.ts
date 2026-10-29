@@ -5,6 +5,7 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app.js";
 import { AssignedSearch, searchedUsers } from "./assigned.js";
 import { createGitHubOAuth } from "./auth/github.js";
+import { backfillPathPrs } from "./change-store.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
 import { engineFactory } from "./engines.js";
@@ -33,6 +34,7 @@ const { db, close } = openDatabase(
   path.join(config.dataDir, "strata.sqlite"),
   fromHere("../drizzle"),
 );
+backfillPathPrs(db);
 const engineFor = engineFactory(config, db);
 const runs = new RunQueue(db, engineFor);
 const assigned = new AssignedSearch(db, engineFor, runs, config.assignedRepos);

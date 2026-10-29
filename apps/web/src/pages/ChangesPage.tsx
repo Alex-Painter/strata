@@ -2,14 +2,18 @@ import type {
   AssignedStatus,
   ChangeSummary,
   MeResponse,
+  PathPr,
   RunStatus,
   StackSummary,
 } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
+import { Icon } from "../components/Icon";
 import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, yoursLabel } from "../lib/format";
+import { prUrl } from "../lib/github";
+import { type ReviewStatus, type ReviewStatusKind, reviewStatus } from "../lib/status";
 import { ReadAt } from "./StacksPage";
 
 /**
@@ -189,32 +193,24 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
       ) : others.length === 0 ? (
         <div className="empty">There are no other open stacks.</div>
       ) : (
-        <ul className="list">
-          {others.map((stack) => {
+        <ChangeTable
+          rows={others.map((stack) => {
             const root = stack.prs.find((pr) => pr.number === stack.root);
-            const authors = [...new Set(stack.prs.flatMap((pr) => (pr.author ? [pr.author] : [])))];
-            return (
-              <li key={stack.id}>
-                <Link href={`/repos/${repo}#stack-${stack.root}`} className="lrow">
-                  <span className="min-w-0 flex-1 truncate">
-                    <span className="font-medium">{root?.title}</span>
-                    <span className="ml-2 text-[12px] text-muted">
-                      {countPrs(stack.prs)}
-                      {authors.length > 0 && ` by ${authors.join(", ")}`}
-                    </span>
-                  </span>
-                  <span className="shrink-0 font-mono text-[12px] text-faint">
-                    {repo}#{stack.root}
-                  </span>
-                  <span className="pill">Not analysed</span>
-                  <span className="w-16 shrink-0 text-right text-[12px] text-faint">
-                    {ago(stack.updatedAt)}
-                  </span>
-                </Link>
-              </li>
-            );
+            return {
+              key: stack.id,
+              href: `/repos/${repo}#stack-${stack.root}`,
+              title: root?.title ?? `#${stack.root}`,
+              note: countPrs(stack.prs),
+              repo,
+              rootPr: stack.root,
+              tipPr: null,
+              prs: stack.prs,
+              githubPr: stack.root,
+              status: reviewStatus(stack.prs, { waiting: false, reviewed: false }),
+              strata: "Not analysed",
+            };
           })}
-        </ul>
+        />
       )}
     </section>
   );
@@ -240,27 +236,145 @@ function ChangeList({
   if (!changes) return null;
   if (changes.length === 0) return <div className="empty">{empty}</div>;
   return (
-    <ul className="list">
-      {changes.map((change) => (
-        <li key={change.id}>
-          <Link href={`/changes/${change.id}`} className="lrow">
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-medium">{change.title}</span>
-              {change.yours.length > 0 && (
-                <span className="ml-2 text-[12px] text-muted">{yoursLabel(change.yours)}</span>
-              )}
-            </span>
-            <span className="shrink-0 font-mono text-[12px] text-faint">
-              {change.repo}#{change.rootPr}
-              {change.tipPr !== change.rootPr && ` → #${change.tipPr}`}
-            </span>
-            {change.status && <span className="pill">{STATUS[change.status]}</span>}
-            <span className="w-16 shrink-0 text-right text-[12px] text-faint">
-              {ago(change.updatedAt)}
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <ChangeTable
+      rows={changes.map((change) => {
+        const active = change.yours.find((pr) => pr.active);
+        return {
+          key: change.id,
+          href: `/changes/${change.id}`,
+          title: change.title,
+          note: change.yours.length > 0 ? yoursLabel(change.yours) : null,
+          repo: change.repo,
+          rootPr: change.rootPr,
+          tipPr: change.tipPr,
+          prs: change.prs,
+          githubPr: active?.number ?? change.rootPr,
+          status: reviewStatus(change.prs, {
+            waiting: change.waiting,
+            reviewed: change.yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
+          }),
+          strata: change.status ? STATUS[change.status] : null,
+        };
+      })}
+    />
+  );
+}
+
+interface Row {
+  key: string;
+  href: string;
+  title: string;
+  note: string | null;
+  repo: string;
+  rootPr: number;
+  tipPr: number | null;
+  prs: PathPr[];
+  /** The PR the GitHub button opens. */
+  githubPr: number;
+  status: ReviewStatus | null;
+  strata: string | null;
+}
+
+const TONE: Record<ReviewStatusKind, string> = {
+  "needs-you": "text-accent",
+  ready: "text-add",
+  "changes-requested": "text-del",
+  "checks-failed": "text-del",
+  draft: "text-faint",
+  merged: "text-faint",
+  closed: "text-faint",
+  reviewed: "text-muted",
+  "needs-review": "text-muted",
+};
+
+/** Changes or stacks as a table: what, who, when opened, review status, Strata's run, GitHub. */
+function ChangeTable({ rows }: { rows: Row[] }) {
+  const [, navigate] = useLocation();
+  return (
+    <div className="list overflow-x-auto">
+      <table className="w-full table-fixed border-collapse text-left">
+        <colgroup>
+          <col />
+          <col className="w-44" />
+          <col className="w-24" />
+          <col className="w-40" />
+          <col className="w-28" />
+          <col className="w-10" />
+        </colgroup>
+        <thead className="text-[11px] text-faint">
+          <tr className="border-b border-line">
+            <th className="px-3 py-1.5 font-normal">Change</th>
+            <th className="px-3 py-1.5 font-normal">Author</th>
+            <th className="px-3 py-1.5 font-normal">Opened</th>
+            <th className="px-3 py-1.5 font-normal">Status</th>
+            <th className="px-3 py-1.5 font-normal">Strata</th>
+            <th className="px-3 py-1.5 font-normal">
+              <span className="sr-only">GitHub</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const authors = [...new Set(row.prs.flatMap((pr) => pr.author ?? []))];
+            const opened = row.prs
+              .map((pr) => pr.createdAt)
+              .filter(Boolean)
+              .sort()[0];
+            return (
+              <tr
+                key={row.key}
+                className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover"
+                onClick={(event) => {
+                  if (!(event.target as Element).closest("a")) navigate(row.href);
+                }}
+              >
+                <td className="min-w-0 px-3 py-1.5">
+                  <Link href={row.href} className="block truncate font-medium text-text">
+                    {row.title}
+                  </Link>
+                  <span className="block truncate text-[12px] text-faint">
+                    <span className="font-mono">
+                      {row.repo}#{row.rootPr}
+                      {row.tipPr !== null && row.tipPr !== row.rootPr && ` → #${row.tipPr}`}
+                    </span>
+                    {row.note && <span className="ml-2 text-muted">{row.note}</span>}
+                  </span>
+                </td>
+                <td
+                  className="truncate px-3 py-1.5 text-[12px] text-muted"
+                  title={authors.join(", ")}
+                >
+                  {authors.join(", ")}
+                </td>
+                <td className="px-3 py-1.5 text-[12px] text-muted" title={opened}>
+                  {opened ? ago(opened) : ""}
+                </td>
+                <td
+                  className={`truncate px-3 py-1.5 text-[12px] ${row.status ? TONE[row.status.kind] : ""}`}
+                  title={row.status?.detail}
+                >
+                  {row.status?.label}
+                </td>
+                <td className="px-3 py-1.5">
+                  {row.strata && <span className="pill">{row.strata}</span>}
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  <a
+                    href={prUrl(row.repo, row.githubPr)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open #${row.githubPr} on GitHub`}
+                    title={`Open #${row.githubPr} on GitHub`}
+                    className="inline-flex size-7 items-center justify-center rounded-md text-faint hover:bg-active hover:text-text"
+                  >
+                    <Icon name="external" />
+                  </a>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

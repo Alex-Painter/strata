@@ -3,13 +3,13 @@
  * and the assignment search (a Change GitHub lists for you), so both make the
  * same Change for the same path.
  */
-import type { AssignedReason, ChangeSummary, YourPr } from "@strata/core/model";
+import type { AssignedReason, ChangeSummary, PathPr, Stack, YourPr } from "@strata/core/model";
 import { type ChangeInput, describeInput, describeRepo } from "@strata/core/model";
 import type { ResolvedChange } from "@strata/engine";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { newId } from "./auth/crypto.js";
 import type { Db } from "./db/client.js";
-import { assignments, type ChangeRow, changes } from "./db/schema.js";
+import { assignments, type ChangeRow, changes, reports } from "./db/schema.js";
 import { latestRun, type RunQueue } from "./runs.js";
 
 /** The PRs a resolved Change covers, bottom first. */
@@ -23,6 +23,38 @@ export function pathOf(resolved: ResolvedChange): number[] {
 export function headsOf(resolved: ResolvedChange): string {
   const byNumber = new Map(resolved.stack?.nodes.map((node) => [node.pr.number, node.pr]) ?? []);
   return JSON.stringify(pathOf(resolved).map((n) => byNumber.get(n)?.headOid ?? null));
+}
+
+/** The path's PRs as stored in `pathPrs`; null without a stack. */
+export function pathPrsOf(stack: Stack | null | undefined): string | null {
+  if (!stack) return null;
+  const byNumber = new Map(stack.nodes.map((node) => [node.pr.number, node.pr]));
+  const prs: PathPr[] = stack.selectedPath.flatMap((n) => {
+    const pr = byNumber.get(n);
+    if (!pr) return [];
+    const { number, author, createdAt, state, draft, review, checks } = pr;
+    return [{ number, author, createdAt, state, draft, review, checks }];
+  });
+  return JSON.stringify(prs);
+}
+
+/**
+ * Fills in the path's PRs for Changes saved before Strata kept them, from
+ * each Change's latest report.
+ */
+export function backfillPathPrs(db: Db) {
+  const missing = db.select().from(changes).where(isNull(changes.pathPrs)).all();
+  for (const row of missing) {
+    const report = db
+      .select({ body: reports.body })
+      .from(reports)
+      .where(eq(reports.changeId, row.id))
+      .orderBy(desc(reports.createdAt))
+      .get();
+    if (!report) continue;
+    const pathPrs = pathPrsOf((JSON.parse(report.body) as { stack?: Stack | null }).stack);
+    if (pathPrs) db.update(changes).set({ pathPrs }).where(eq(changes.id, row.id)).run();
+  }
 }
 
 /**
@@ -60,6 +92,7 @@ export function saveChange(
   if (existing) {
     const fields = {
       title: resolved.title,
+      pathPrs: pathPrsOf(resolved.stack),
       updatedAt: now,
       ...(origin === "added" ? { origin } : {}),
     };
@@ -76,6 +109,7 @@ export function saveChange(
     title: resolved.title,
     origin,
     queuedHeads: null,
+    pathPrs: pathPrsOf(resolved.stack),
     createdAt: now,
     updatedAt: now,
   };
@@ -107,6 +141,7 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
     waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
     rootPr: row.rootPr,
     tipPr: row.tipPr,
+    prs: row.pathPrs ? (JSON.parse(row.pathPrs) as PathPr[]) : [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

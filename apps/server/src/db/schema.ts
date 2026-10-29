@@ -58,6 +58,11 @@ export const changes = sqliteTable(
      * last queued a run, so it runs again only once one moves.
      */
     queuedHeads: text("queued_heads"),
+    /**
+     * The path's PRs as GitHub last showed them (JSON PathPr[], bottom first):
+     * author, when opened, state, review and checks.
+     */
+    pathPrs: text("path_prs"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },

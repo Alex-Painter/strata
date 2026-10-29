@@ -15,6 +15,7 @@ export function summarizeStack(stack: Stack): StackSummary {
     author: pr.author,
     state: pr.state,
     draft: pr.draft,
+    createdAt: pr.createdAt,
     updatedAt: pr.updatedAt,
     mergedAt: pr.mergedAt,
     baseRef: pr.baseRef,

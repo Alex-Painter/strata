@@ -199,6 +199,7 @@ describe("layer bars", () => {
         author: "dev",
         state: "open" as const,
         draft: false,
+        createdAt: "2026-10-01T00:00:00Z",
         updatedAt: "2026-10-01T00:00:00Z",
         mergedAt: null,
         baseRef: number === 1 ? "main" : "b1",

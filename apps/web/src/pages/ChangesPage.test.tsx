@@ -21,6 +21,7 @@ const change = (id: string, fields: Partial<ChangeSummary>): ChangeSummary => ({
   waiting: false,
   rootPr: Number(id),
   tipPr: Number(id),
+  prs: [],
   createdAt: "2026-10-01T00:00:00Z",
   updatedAt: "2026-10-01T00:00:00Z",
   ...fields,
@@ -117,14 +118,15 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   const section = (heading: string) =>
     container.querySelector(`section[aria-labelledby="${heading}"]`) as HTMLElement;
   const rows = (heading: string) =>
-    [...section(heading).querySelectorAll("a.lrow")].map((a) => [
-      a.getAttribute("href"),
-      a.textContent,
+    [...section(heading).querySelectorAll("tbody tr")].map((tr) => [
+      tr.querySelector("a")?.getAttribute("href"),
+      tr.textContent,
     ]);
 
   const waiting = section("waiting-h");
   expect(rows("waiting-h")).toHaveLength(1);
   expect(waiting.textContent).toContain("#3 review requested from acme/backend");
+  expect(waiting.textContent).toContain("Needs your review");
   expect(waiting.textContent).toContain("acme/app#9: no luck");
 
   expect(rows("assigned-h").map(([href]) => href)).toEqual(["/changes/6", "/changes/8"]);
@@ -136,7 +138,11 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   const others = rows("others-acme-app");
   expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
   expect(others[0]?.[1]).toContain("Not analysed");
-  expect(others[0]?.[1]).toContain("by kim, sam");
+  expect(others[0]?.[1]).toContain("kim, sam");
+  expect(others[0]?.[1]).toContain("Needs review");
+  const github = section("others-acme-app").querySelector('a[aria-label="Open #30 on GitHub"]');
+  expect(github?.getAttribute("href")).toBe("https://github.com/acme/app/pull/30");
+  expect(github?.getAttribute("target")).toBe("_blank");
   expect(section("others-acme-app").textContent).toContain("Strata looks for changes");
 
   const refresh = [...waiting.querySelectorAll("button")].find(

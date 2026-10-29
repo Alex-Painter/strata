@@ -251,6 +251,12 @@ describe("Changes", () => {
     expect(newest.change.id).not.toBe(other.change.id);
     const list = (await (await app.request("/api/changes")).json()) as ChangeSummary[];
     expect(list.map((c) => c.id).sort()).toEqual([newest.change.id, other.change.id].sort());
+    // Each lists its own path's PRs, as GitHub showed them.
+    const byId = new Map(list.map((c) => [c.id, c]));
+    expect(byId.get(other.change.id)?.prs.map((pr) => [pr.number, pr.state, pr.author])).toEqual([
+      [5, "open", expect.any(String)],
+      [6, "open", expect.any(String)],
+    ]);
     const paths = await Promise.all(
       [newest, other].map(async ({ change }) => {
         const d = (await (await app.request(`/api/changes/${change.id}`)).json()) as ChangeDetail;

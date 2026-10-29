@@ -4,6 +4,9 @@ import type { StackSummary } from "@strata/core/model";
 import { ENGINE_VERSION } from "@strata/engine";
 import type { Jobs } from "./jobs.js";
 
+/** Bump when StackSummary changes shape, so saved lists are read again. */
+const FORMAT = 2;
+
 /** How old a stack list can get before a page asks for a new read behind it. */
 const MAX_AGE_MS = 10 * 60_000;
 
@@ -18,6 +21,7 @@ export type StackListState =
 
 interface Saved extends StackList {
   engineVersion: string;
+  format?: number;
 }
 
 /**
@@ -86,7 +90,7 @@ export class StackCache {
   private async load(file: string): Promise<StackList | null> {
     try {
       const saved = JSON.parse(await readFile(file, "utf8")) as Saved;
-      if (saved.engineVersion !== ENGINE_VERSION) return null;
+      if (saved.engineVersion !== ENGINE_VERSION || saved.format !== FORMAT) return null;
       const list = { stacks: saved.stacks, readAt: saved.readAt };
       this.lists.set(file, list);
       return list;
@@ -100,7 +104,7 @@ export class StackCache {
       await mkdir(path.dirname(file), { recursive: true });
       await writeFile(
         file,
-        JSON.stringify({ ...list, engineVersion: ENGINE_VERSION } satisfies Saved),
+        JSON.stringify({ ...list, engineVersion: ENGINE_VERSION, format: FORMAT } satisfies Saved),
       );
     } catch (error) {
       // The list still serves from memory until the next restart.
