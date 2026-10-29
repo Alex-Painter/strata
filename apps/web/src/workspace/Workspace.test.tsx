@@ -225,10 +225,10 @@ describe("Workspace", () => {
     );
   });
 
-  it("lists the layers and PRs in the sidebar, and scopes to a PR", () => {
+  it("lists the layers and PRs in the Change pane, and scopes to a PR", () => {
     const report = { ...range, change: { ...range.change, hints: [] }, stack };
     const page = mount(report);
-    const nav = page.querySelector('nav[aria-label="Change"]') as HTMLElement;
+    const nav = page.querySelector('aside[aria-label="Change"]') as HTMLElement;
     expect(
       [...nav.querySelectorAll("[data-layer]")].map((row) => [
         row.getAttribute("data-layer"),

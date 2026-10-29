@@ -1,7 +1,7 @@
 import type { ChangeReport, Claim, LayerId, MeResponse, PathPr, YourPr } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
@@ -42,11 +42,14 @@ export function Workspace({
   pickError = null,
   yours = [],
   prs = [],
+  pageNav = null,
 }: {
   me?: MeResponse | undefined;
   title?: string | undefined;
   /** Your PRs on this Change, from your GitHub assignments; marked in the PR list. */
   yours?: YourPr[];
+  /** The app's own page links, for the sidebar. */
+  pageNav?: ReactNode;
   /** The path's PRs as the last assignment search saw them; fresher than the report's. */
   prs?: PathPr[];
   report: ChangeReport | null;
@@ -70,6 +73,8 @@ export function Workspace({
   const [selection, setSelection] = useState<Selection>(null);
   const [display, setDisplay] = useStored("strata-display", DEFAULT_DISPLAY);
   const [panel, setPanel] = useStored("strata-panel", true);
+  const [paneWidth, setPaneWidth] = useStored("strata-change-pane", 320);
+  const [paneOpen, setPaneOpen] = useStored("strata-change-pane-open", true);
   const [overlay, setOverlay] = useState<"cmdk" | "help" | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
@@ -289,7 +294,7 @@ export function Workspace({
   return (
     <AppShell
       me={me}
-      navLabel="Change"
+      navLabel="Strata"
       top={
         <>
           <Breadcrumb items={[...(me ? [{ label: "Changes", href: "/" }] : []), { label: name }]} />
@@ -337,39 +342,65 @@ export function Workspace({
           </>
         ),
       }}
-      nav={
-        report &&
-        diff && (
-          <Sidebar
-            report={report}
-            layers={layers}
-            layer={layer}
-            pr={pr}
-            countIn={(id) => filesIn(diff, id).length}
-            onNav={go}
-          />
-        )
-      }
+      nav={pageNav}
     >
       <div className="ws-body flex min-h-0 flex-1">
-        {summary && stack && stack.selectedPath.length > 0 && (
+        {report && diff && !paneOpen && (
+          <div className="hidden w-10 shrink-0 flex-col items-center border-r border-line py-2 md:flex">
+            <button
+              type="button"
+              className="ib"
+              aria-label="Expand the pane"
+              title="Expand the pane"
+              onClick={() => setPaneOpen(true)}
+            >
+              <Icon name="chev" />
+            </button>
+          </div>
+        )}
+        {report && diff && paneOpen && (
           <aside
-            aria-label="Stack"
-            className="hidden w-80 shrink-0 flex-col overflow-y-auto border-r border-line px-2 py-3 md:flex"
+            aria-label="Change"
+            style={{ width: paneWidth }}
+            className="relative hidden shrink-0 flex-col overflow-y-auto border-r border-line px-2 py-3 md:flex"
           >
-            <h2 className="mb-2 flex items-center px-2 text-[12px] text-muted">
-              <span className="flex-1">Pull requests</span>
-              <span className="text-faint">{summary.prs.length}</span>
-            </h2>
-            <StackRail
-              stack={summary}
-              path={stack.selectedPath}
+            <PaneHandle width={paneWidth} onWidth={setPaneWidth} />
+            <div className="mb-1 flex justify-end">
+              <button
+                type="button"
+                className="ib"
+                aria-label="Collapse the pane"
+                title="Collapse the pane"
+                onClick={() => setPaneOpen(false)}
+              >
+                <Icon name="chev" className="i rotate-180" />
+              </button>
+            </div>
+            <ChangeNav
+              report={report}
+              layers={layers}
+              layer={layer}
               pr={pr}
-              onScope={scope}
-              onPickPath={onPickPath}
-              pickingPath={pickingPath}
-              yours={yours}
+              countIn={(id) => filesIn(diff, id).length}
+              onNav={go}
             />
+            {summary && stack && stack.selectedPath.length > 0 && (
+              <div className="sec">
+                <h2 className="sec-h">
+                  <span className="flex-1">Pull requests</span>
+                  <span className="sn">{summary.prs.length}</span>
+                </h2>
+                <StackRail
+                  stack={summary}
+                  path={stack.selectedPath}
+                  pr={pr}
+                  onScope={scope}
+                  onPickPath={onPickPath}
+                  pickingPath={pickingPath}
+                  yours={yours}
+                />
+              </div>
+            )}
           </aside>
         )}
         <main className="flex min-w-0 flex-1 flex-col">
@@ -502,7 +533,48 @@ function claimSource(report: ChangeReport, claim: Claim): string {
   return report.stack ? "the whole-stack diff" : "the range's diff";
 }
 
-function Sidebar({
+const PANE_MIN = 220;
+const PANE_MAX = 560;
+
+/** The left pane's right edge: drag it, or use the arrow keys, to resize the pane. */
+function PaneHandle({ width, onWidth }: { width: number; onWidth: (width: number) => void }) {
+  const clamp = (w: number) => Math.round(Math.min(PANE_MAX, Math.max(PANE_MIN, w)));
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a focusable separator is the ARIA pattern for a resize handle.
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the pane"
+      aria-valuemin={PANE_MIN}
+      aria-valuemax={PANE_MAX}
+      aria-valuenow={width}
+      tabIndex={0}
+      className="absolute top-0 right-0 bottom-0 z-10 w-1.5 cursor-col-resize hover:bg-accent-line focus-visible:bg-accent-line"
+      onPointerDown={(event) => {
+        event.preventDefault();
+        const startX = event.clientX;
+        const start = width;
+        const move = (e: PointerEvent) => onWidth(clamp(start + e.clientX - startX));
+        const up = () => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      }}
+      onKeyDown={(event) => {
+        const step = event.shiftKey ? 48 : 16;
+        if (event.key === "ArrowLeft") onWidth(clamp(width - step));
+        else if (event.key === "ArrowRight") onWidth(clamp(width + step));
+        else return;
+        event.preventDefault();
+      }}
+    />
+  );
+}
+
+/** The Change's own navigation: the whole stack (or overview), then its layers. */
+function ChangeNav({
   report,
   layers,
   layer,

@@ -8,7 +8,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useParams, useSearchParams } from "wouter";
-import { AppShell, Breadcrumb } from "../components/AppShell";
+import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { api } from "../lib/api";
 import { useLatestRequest } from "../lib/latest-request";
 import type { Nav } from "../workspace/model";
@@ -99,6 +99,7 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       title={data?.change.title}
       yours={data?.change.yours ?? []}
       prs={data?.change.prs ?? []}
+      pageNav={<HomeNav current={null} />}
       report={data?.report ?? null}
       run={{
         info: data?.run ?? null,
