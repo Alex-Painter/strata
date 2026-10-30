@@ -13,13 +13,13 @@ export function Info({
   align?: "start" | "end";
 }) {
   return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: focus shows the text to keyboard users.
     <span
       className="info"
       role="img"
       aria-label={text}
       data-tip={text}
       data-align={align}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: focus shows the text to keyboard users.
       tabIndex={0}
     >
       <Icon name="info" />
