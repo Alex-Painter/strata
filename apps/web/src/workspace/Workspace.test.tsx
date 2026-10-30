@@ -248,6 +248,29 @@ describe("Workspace", () => {
     expect(button(page, "Whole stack").getAttribute("aria-current")).toBe("true");
   });
 
+  it("lists the PRs in the status newest first, as the Pull requests tree does", () => {
+    const two: Stack = {
+      ...stack,
+      nodes: [
+        { pr, parent: null, children: [2], depth: 0, anchor: base },
+        {
+          pr: { ...pr, number: 2, title: "Second" },
+          parent: 1,
+          children: [],
+          depth: 1,
+          anchor: base,
+        },
+      ],
+      paths: [[1, 2]],
+      selectedPath: [1, 2],
+    };
+    const page = mount({ ...range, change: { ...range.change, hints: [] }, stack: two });
+    const rows = [...page.querySelectorAll('[aria-label="Each PR"] li')].map((li) =>
+      li.textContent?.slice(0, 2),
+    );
+    expect(rows).toEqual(["#2", "#1"]);
+  });
+
   it("shows the stack's notes before the report's", () => {
     const report = { ...range, change: { ...range.change, hints: [] }, stack };
     const text = panel(mount(report))?.textContent ?? "";

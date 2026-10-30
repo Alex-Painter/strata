@@ -362,42 +362,47 @@ function PrMarks({
 }) {
   return (
     <ul className="mt-1.5 grid gap-1" aria-label="Each PR">
-      {prs.map((pr, i) => {
-        const marks: Array<[Tone, string]> = [];
-        if (pr.state !== "open") marks.push(["mute", pr.state === "merged" ? "Merged" : "Closed"]);
-        else {
-          // A draft does not wait for a review yet.
-          if (pr.draft) marks.push(["mute", "Draft"]);
-          else
-            marks.push(
-              pr.review === "approved"
-                ? ["ok", "Approved"]
-                : pr.review === "changes-requested"
-                  ? ["bad", "Changes requested"]
-                  : reviewed.has(pr.number)
-                    ? ["mute", "Reviewed by you"]
-                    : ["warn", "Needs review"],
-            );
-          if (pr.checks === "success") marks.push(["ok", "Checks pass"]);
-          else if (pr.checks === "failure") marks.push(["bad", "Checks fail"]);
-          else if (pr.checks === "pending") marks.push(["warn", "Checks running"]);
-        }
-        const title = titles.get(pr.number);
-        return (
-          <li
-            key={pr.number}
-            className="flex flex-wrap items-center gap-1.5"
-            title={[title, lines[i]].filter(Boolean).join("\n")}
-          >
-            <span className="w-14 shrink-0 font-mono text-[13px] text-muted">#{pr.number}</span>
-            {marks.map(([tone, label]) => (
-              <span key={label} className="mark" data-tone={tone}>
-                {label}
-              </span>
-            ))}
-          </li>
-        );
-      })}
+      {/* Newest first, the same order as the Pull requests tree. */}
+      {prs
+        .map((pr, i) => ({ pr, line: lines[i] }))
+        .reverse()
+        .map(({ pr, line }) => {
+          const marks: Array<[Tone, string]> = [];
+          if (pr.state !== "open")
+            marks.push(["mute", pr.state === "merged" ? "Merged" : "Closed"]);
+          else {
+            // A draft does not wait for a review yet.
+            if (pr.draft) marks.push(["mute", "Draft"]);
+            else
+              marks.push(
+                pr.review === "approved"
+                  ? ["ok", "Approved"]
+                  : pr.review === "changes-requested"
+                    ? ["bad", "Changes requested"]
+                    : reviewed.has(pr.number)
+                      ? ["mute", "Reviewed by you"]
+                      : ["warn", "Needs review"],
+              );
+            if (pr.checks === "success") marks.push(["ok", "Checks pass"]);
+            else if (pr.checks === "failure") marks.push(["bad", "Checks fail"]);
+            else if (pr.checks === "pending") marks.push(["warn", "Checks running"]);
+          }
+          const title = titles.get(pr.number);
+          return (
+            <li
+              key={pr.number}
+              className="flex flex-wrap items-center gap-1.5"
+              title={[title, line].filter(Boolean).join("\n")}
+            >
+              <span className="w-14 shrink-0 font-mono text-[13px] text-muted">#{pr.number}</span>
+              {marks.map(([tone, label]) => (
+                <span key={label} className="mark" data-tone={tone}>
+                  {label}
+                </span>
+              ))}
+            </li>
+          );
+        })}
     </ul>
   );
 }
