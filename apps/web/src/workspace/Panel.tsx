@@ -12,10 +12,10 @@ import { citedHunks } from "../components/Claims";
 import { Counts, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { Info } from "../components/Info";
-import { ago, countPrs, describePath, FILE_STATUS, stateLabel } from "../lib/format";
-import { reviewStatus } from "../lib/status";
+import { ago, countPrs, FILE_STATUS, stateLabel } from "../lib/format";
+import { type ReviewStatusKind, reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
-import { CommitLink, type RunView } from "./Overview";
+import type { RunView } from "./Overview";
 import { PaneHandle } from "./PaneHandle";
 
 const PANEL_MIN = 280;
@@ -242,9 +242,11 @@ function Overview({
   const notes = [...(stack?.notes ?? []), ...report.notes];
   const counts = diff ? meaningful(diff.files, diff.byId) : null;
   // Until Strata gives a verdict, the status is GitHub's, by the home page's rules.
+  const onPath: PathPr[] = fresh.length > 0 ? fresh : prs.map(({ pr }) => pr);
+  const titles = new Map(prs.map(({ pr }) => [pr.number, pr.title]));
   const github = report.verdict
     ? null
-    : reviewStatus(fresh.length > 0 ? fresh : prs.map(({ pr }) => pr), {
+    : reviewStatus(onPath, {
         waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
         reviewed: yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
       });
@@ -255,12 +257,10 @@ function Overview({
           {github ? (
             <>
               <Prop term="Status">
-                <span>{github.label}</span>
-                <ul className="grid gap-0.5 text-[13px] text-muted" aria-label="Each PR">
-                  {github.lines.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
+                <span className="mark self-start" data-tone={STATUS_TONE[github.kind]}>
+                  {github.label}
+                </span>
+                <PrMarks prs={onPath} lines={github.lines} titles={titles} />
               </Prop>
               <Prop term="Strata">
                 <span title="Strata does not give a verdict at this time.">
@@ -286,12 +286,6 @@ function Overview({
               <span className="font-mono text-[13px]">{stack.trunk.name}</span>
             </Prop>
           )}
-          {stack && path.length > 1 && <Prop term="Path">{describePath(path)}</Prop>}
-          {stack?.base && (
-            <Prop term="Left trunk">
-              <CommitLink repo={stack.repo} oid={stack.base} />
-            </Prop>
-          )}
           {scoped && (
             <Prop term="Scope">
               <a href={scoped.pr.url} target="_blank" rel="noreferrer" className="lnk">
@@ -305,12 +299,6 @@ function Overview({
               {plural(diff.files.length, "file")} · <Counts {...counts} />
             </Prop>
           )}
-          <Prop term="Analysed">
-            {ago(report.analysis.startedAt)}
-            {report.analysis.model && (
-              <span className="text-muted"> · with {report.analysis.model}</span>
-            )}
-          </Prop>
         </dl>
       </Section>
       {notes.length > 0 && (
@@ -323,6 +311,72 @@ function Overview({
         </Section>
       )}
     </>
+  );
+}
+
+/** How each status reads at a glance: its colour. */
+const STATUS_TONE: Record<ReviewStatusKind, Tone> = {
+  "needs-you": "accent",
+  ready: "ok",
+  "changes-requested": "bad",
+  "checks-failed": "bad",
+  "needs-review": "warn",
+  reviewed: "mute",
+  draft: "mute",
+  merged: "mute",
+  closed: "mute",
+};
+
+type Tone = "ok" | "warn" | "bad" | "accent" | "mute";
+
+/** One row for each PR on the path: its review and its checks, each in its colour. */
+function PrMarks({
+  prs,
+  lines,
+  titles,
+}: {
+  prs: PathPr[];
+  /** The same facts as sentences, for the hover text. */
+  lines: string[];
+  titles: Map<number, string>;
+}) {
+  return (
+    <ul className="mt-1.5 grid gap-1" aria-label="Each PR">
+      {prs.map((pr, i) => {
+        const marks: Array<[Tone, string]> = [];
+        if (pr.state !== "open") marks.push(["mute", pr.state === "merged" ? "Merged" : "Closed"]);
+        else {
+          // A draft does not wait for a review yet.
+          if (pr.draft) marks.push(["mute", "Draft"]);
+          else
+            marks.push(
+              pr.review === "approved"
+                ? ["ok", "Approved"]
+                : pr.review === "changes-requested"
+                  ? ["bad", "Changes requested"]
+                  : ["warn", "Needs review"],
+            );
+          if (pr.checks === "success") marks.push(["ok", "Checks pass"]);
+          else if (pr.checks === "failure") marks.push(["bad", "Checks fail"]);
+          else if (pr.checks === "pending") marks.push(["warn", "Checks running"]);
+        }
+        const title = titles.get(pr.number);
+        return (
+          <li
+            key={pr.number}
+            className="flex flex-wrap items-center gap-1.5"
+            title={[title, lines[i]].filter(Boolean).join("\n")}
+          >
+            <span className="w-14 shrink-0 font-mono text-[13px] text-muted">#{pr.number}</span>
+            {marks.map(([tone, label]) => (
+              <span key={label} className="mark" data-tone={tone}>
+                {label}
+              </span>
+            ))}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

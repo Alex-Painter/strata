@@ -57,7 +57,7 @@ export function AppShell({
             title="Collapse the sidebar"
             onClick={() => setSideOpen(false)}
           >
-            <Icon name="chev" className="i rotate-180" />
+            <Icon name="panel-left" />
           </button>
         </div>
         {nav}
@@ -82,7 +82,7 @@ export function AppShell({
               title="Expand the sidebar"
               onClick={() => setSideOpen(true)}
             >
-              <Icon name="chev" />
+              <Icon name="panel-left" />
             </button>
           )}
           {top}

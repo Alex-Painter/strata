@@ -969,12 +969,51 @@ code,
     display: flex;
     flex-direction: column;
     gap: 18px;
-    padding: 4px 8px 16px;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--line);
+    padding: 14px 8px 16px;
+    margin-top: 12px;
+    border-top: 1px solid var(--line);
   }
   .details > * {
     flex-shrink: 0;
+  }
+  /* A status in colour: a dot and a word on a faint tint (Panel.tsx). */
+  .mark {
+    --tone: var(--fg-2);
+    --tone-bg: var(--active);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--tone-bg);
+    color: var(--tone);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .mark::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .mark[data-tone="ok"] {
+    --tone: var(--add);
+    --tone-bg: var(--add-bg);
+  }
+  .mark[data-tone="warn"] {
+    --tone: var(--chg);
+    --tone-bg: var(--chg-bg);
+  }
+  .mark[data-tone="bad"] {
+    --tone: var(--del);
+    --tone-bg: var(--del-bg);
+  }
+  .mark[data-tone="accent"] {
+    --tone: var(--accent-2);
+    --tone-bg: var(--accent-soft);
   }
   .insp {
     flex: 1;

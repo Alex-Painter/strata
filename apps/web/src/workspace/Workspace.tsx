@@ -428,7 +428,7 @@ export function Workspace({
               title="Expand the pane"
               onClick={() => setPaneOpen(true)}
             >
-              <Icon name="chev" />
+              <Icon name="panel-left" />
             </button>
           </div>
         )}
@@ -439,17 +439,25 @@ export function Workspace({
             className="relative hidden shrink-0 flex-col overflow-y-auto border-r border-line px-2 py-3 md:flex"
           >
             <PaneHandle width={paneWidth} onWidth={setPaneWidth} />
-            <div className="mb-1 flex justify-end">
-              <button
-                type="button"
-                className="ib"
-                aria-label="Collapse the pane"
-                title="Collapse the pane"
-                onClick={() => setPaneOpen(false)}
-              >
-                <Icon name="chev" className="i rotate-180" />
-              </button>
-            </div>
+            <ChangeNav
+              collapse={
+                <button
+                  type="button"
+                  className="ib shrink-0"
+                  aria-label="Collapse the pane"
+                  title="Collapse the pane"
+                  onClick={() => setPaneOpen(false)}
+                >
+                  <Icon name="panel-left" />
+                </button>
+              }
+              report={report}
+              layers={layers}
+              layer={layer}
+              pr={pr}
+              countIn={(id) => filesIn(diff, id).length}
+              onNav={go}
+            />
             <Details
               report={report}
               diff={diff}
@@ -460,14 +468,6 @@ export function Workspace({
               onReveal={reveal}
               onSelect={setSelection}
               onScope={scope}
-            />
-            <ChangeNav
-              report={report}
-              layers={layers}
-              layer={layer}
-              pr={pr}
-              countIn={(id) => filesIn(diff, id).length}
-              onNav={go}
             />
             {summary && stack && stack.selectedPath.length > 0 && (
               <div className="sec">
@@ -646,7 +646,10 @@ function ChangeNav({
   pr,
   countIn,
   onNav,
+  collapse,
 }: {
+  /** The pane's collapse button, on the first row. */
+  collapse?: ReactNode;
   report: ChangeReport;
   layers: LayerId[];
   layer: LayerId | null;
@@ -657,15 +660,18 @@ function ChangeNav({
   const stack = report.stack;
   return (
     <>
-      <button
-        type="button"
-        className="nrow"
-        aria-current={layer === null && pr === null ? "true" : undefined}
-        onClick={() => onNav({ layer: null, pr: null })}
-      >
-        <Icon name="review" />
-        <span className="nl">{stack ? "Whole stack" : "Overview"}</span>
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="nrow min-w-0 flex-1"
+          aria-current={layer === null && pr === null ? "true" : undefined}
+          onClick={() => onNav({ layer: null, pr: null })}
+        >
+          <Icon name="review" />
+          <span className="nl">{stack ? "Whole stack" : "Overview"}</span>
+        </button>
+        {collapse}
+      </div>
       {layers.length > 0 && (
         <div className="sec">
           <div className="sec-h">Layers</div>
