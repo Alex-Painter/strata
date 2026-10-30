@@ -118,7 +118,7 @@ function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSum
     >
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate font-medium">{root?.title}</h2>
+          <h2 className="truncate font-medium">{existing?.title ?? root?.title}</h2>
           <p className="text-[13px] text-muted">
             {countPrs(stack.prs)} · updated {ago(stack.updatedAt)}
           </p>

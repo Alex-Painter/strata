@@ -117,7 +117,8 @@ export async function stackReport(
         String(path[0]),
         String(path[path.length - 1]),
       ),
-      title: resolved.title,
+      // Claude's name for the whole change, like Linear's stack names; else the bottom PR's title.
+      title: summaries.name ?? resolved.title,
       repo: resolved.repo,
       revisions: whole ? { base: whole.from, head: whole.to } : null,
       files: whole?.model.files ?? [],

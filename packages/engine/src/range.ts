@@ -75,7 +75,7 @@ export async function rangeReport(
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
       id: stableId("chg", describeRepo(resolved.repo), base, head),
-      title: resolved.title,
+      title: summaries.name ?? resolved.title,
       repo: resolved.repo,
       revisions: { base, head },
       files: model?.files ?? [],

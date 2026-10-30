@@ -32,6 +32,8 @@ import { runLimited } from "../limit.js";
 import { type AskJson, STE_RULE } from "../llm.js";
 
 export interface Summaries {
+  /** A short name for the change, from its diff alone, like Linear's stack names. Null without one. */
+  name: string | null;
   /** About the whole stack, from its diff alone. */
   summary: Claim[];
   guide: Guide;
@@ -44,7 +46,7 @@ export interface Summaries {
 }
 
 /** Bump when a prompt or schema changes, so cached answers aren't reused. */
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3;
 /** Characters of hunk text per request. Hunks past it are listed by header only. */
 const HUNK_CHARS = 120_000;
 /** Lines shown per hunk, and characters per line. */
@@ -66,6 +68,7 @@ export async function writeSummaries(
   const groups = whole ? guideGroups(whole) : [];
   let summary: Claim[] = [];
   let guide = ruleGuide(groups);
+  let name: string | null = null;
 
   if (whole && whole.hunks.length > 0) {
     const hunks = labelHunks(whole.hunks);
@@ -89,7 +92,8 @@ export async function writeSummaries(
           maxTokens: 16000,
         },
         signal,
-      )) as { summary?: unknown; sections?: unknown } | null;
+      )) as { name?: unknown; summary?: unknown; sections?: unknown } | null;
+      name = changeName(answer?.name);
       const cite = (hunk: Hunk): SourceRef => ({ kind: "hunk", hunkId: hunk.id });
       summary = claims(answer?.summary, hunks, cite, SUMMARY_CLAIMS);
       const plan = (Array.isArray(answer?.sections) ? answer.sections : []).flatMap(
@@ -159,7 +163,17 @@ export async function writeSummaries(
     partNotes.push(`Strata cannot ask Claude to summarise ${prs}. Cause: ${failures[0]}`);
   }
 
-  return { summary, guide, parts: byPr, notes, partNotes };
+  return { name, summary, guide, parts: byPr, notes, partNotes };
+}
+
+const NAME_CHARS = 80;
+
+/** Claude's name for the change, tidied: one line, no full stop, not too long. */
+export function changeName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.replace(/\s+/g, " ").trim().replace(/\.+$/, "");
+  if (!name) return null;
+  return name.length > NAME_CHARS ? `${name.slice(0, NAME_CHARS - 1).trimEnd()}…` : name;
 }
 
 /** Labels for a diff's hunks, in diff order: h1, h2, ... */
@@ -263,7 +277,10 @@ const WHOLE_SYSTEM = [
   "You help a reviewer read a code change: the net diff of one feature, from where it left the main branch to its end.",
   "Strata, the review tool, has sorted the change's files into groups by layer and directory, and labelled every group (g1, g2, ...) and hunk (h1, h2, ...).",
   "",
-  "Write two things.",
+  "Write three things.",
+  "",
+  "0. A name for the change: three to eight words that say what it does, in sentence case, with no full stop,",
+  'such as "Cache forecasts per account" or "Add a sources pane to screen queries". The reviewer sees it as the title of the change.',
   "",
   "1. A summary: three to six sentences on what the change does, most important first.",
   "Say what the code does in plain words. Don't praise it, guess at intent the code doesn't show, or count lines.",
@@ -307,6 +324,7 @@ const CLAIMS_SCHEMA = {
 const WHOLE_SCHEMA = {
   type: "object",
   properties: {
+    name: { type: "string" },
     summary: CLAIMS_SCHEMA,
     sections: {
       type: "array",
@@ -322,7 +340,7 @@ const WHOLE_SCHEMA = {
       },
     },
   },
-  required: ["summary", "sections"],
+  required: ["name", "summary", "sections"],
   additionalProperties: false,
 };
 

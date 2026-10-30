@@ -81,7 +81,8 @@ function wholeStack(prompt: string) {
         },
       ],
     }));
-  return { summary, sections };
+  // The same as the bottom PR's title, so the verify steps read the same with or without Claude.
+  return { name: "Cache forecasts per account", summary, sections };
 }
 
 function partSummary(prompt: string) {

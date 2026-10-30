@@ -1,7 +1,7 @@
 import { buildDiff, createClassifier, guideGroups, type PrPart } from "@strata/core";
 import { describe, expect, it } from "vitest";
 import { type AskJson, ClaudeError, type JsonQuestion } from "../llm.js";
-import { writeSummaries } from "./summaries.js";
+import { changeName, writeSummaries } from "./summaries.js";
 
 const adding = (path: string, ...lines: string[]) =>
   `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join("\n")}\n`;
@@ -31,6 +31,7 @@ const isWhole = (question: JsonQuestion) => question.prompt.startsWith("Strata's
 describe("writeSummaries", () => {
   it("asks about the whole stack from its diff alone, citing hunks and groups by label", async () => {
     const { ask, questions } = fakeAsk(() => ({
+      name: "  Give accounts a forecast flag. ",
       summary: [{ text: " Accounts get a forecast flag. ", hunks: ["h1"] }],
       sections: [
         {
@@ -41,6 +42,8 @@ describe("writeSummaries", () => {
       ],
     }));
     const result = await writeSummaries(whole, [], ask);
+    // The name comes from the diff alone, tidied to a title.
+    expect(result.name).toBe("Give accounts a forecast flag");
 
     const [question] = questions;
     expect(question?.prompt).toBe(
@@ -65,7 +68,7 @@ describe("writeSummaries", () => {
       ].join("\n\n"),
     );
     expect(question?.system).toContain("core of the change first");
-    expect(question?.schema).toMatchObject({ required: ["summary", "sections"] });
+    expect(question?.schema).toMatchObject({ required: ["name", "summary", "sections"] });
 
     const [model, service] = whole.hunks;
     expect(result.summary).toEqual([
@@ -243,11 +246,21 @@ describe("writeSummaries", () => {
     const result = await writeSummaries(null, [], ask);
     expect(questions).toEqual([]);
     expect(result).toEqual({
+      name: null,
       summary: [],
       guide: { by: "rule", sections: [] },
       parts: new Map(),
       notes: [],
       partNotes: [],
     });
+  });
+});
+
+describe("changeName", () => {
+  it("keeps a name to one short line, and has none for nothing", () => {
+    expect(changeName("Cache\n forecasts  per account.")).toBe("Cache forecasts per account");
+    expect(changeName("x".repeat(100))).toBe(`${"x".repeat(79)}…`);
+    expect(changeName("  ")).toBeNull();
+    expect(changeName(undefined)).toBeNull();
   });
 });
