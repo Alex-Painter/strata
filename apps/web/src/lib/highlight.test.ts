@@ -5,8 +5,8 @@ import { highlightLines, languageOf } from "./highlight";
 const line = (kind: DiffLine["kind"], content: string): DiffLine => ({
   kind,
   content,
-  oldLine: kind === "add" ? null : 1,
-  newLine: kind === "del" ? null : 1,
+  ...(kind === "add" ? {} : { oldLine: 1 }),
+  ...(kind === "del" ? {} : { newLine: 1 }),
 });
 
 describe("languageOf", () => {
