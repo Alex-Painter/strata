@@ -145,7 +145,8 @@ export function Logo() {
         strokeWidth="1.6"
         strokeLinecap="round"
       >
-        <path d="M3 4.5h10M3 8h10M3 11.5h10" />
+        {/* Three layers, as in public/favicon.svg. */}
+        <path d="M6 4.5h4M4.75 8h6.5M3.5 11.5h9" />
       </svg>
     </span>
   );
