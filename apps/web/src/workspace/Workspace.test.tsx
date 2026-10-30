@@ -173,7 +173,7 @@ describe("Workspace", () => {
     expect(page.querySelectorAll("li[data-section]")).toHaveLength(2);
     // Nothing about PRs: no matrix, no stack, no PR list.
     expect(page.textContent).not.toContain("Layers by PR");
-    expect(page.textContent).not.toContain("How it arrived");
+    expect(page.querySelector('header[data-scope="pr"]')).toBeNull();
     expect(page.querySelector('ul[aria-label="Pull requests"]')).toBeNull();
     expect(button(page, "Overview").getAttribute("aria-current")).toBe("true");
   });
@@ -269,11 +269,11 @@ describe("Workspace", () => {
     const row = button(page, "Show #1 Add the forecast flag");
     expect(row.closest("li")?.getAttribute("data-pr")).toBe("1");
     act(() => row.click());
-    expect(page.textContent).toContain("How it arrived");
+    expect(page.querySelector('header[data-scope="pr"]')).not.toBeNull();
     expect(row.getAttribute("aria-current")).toBe("true");
     expect(page.querySelector(".vbar")?.textContent).toContain("Only #1");
     press("Escape");
-    expect(page.textContent).not.toContain("How it arrived");
+    expect(page.querySelector('header[data-scope="pr"]')).toBeNull();
   });
 
   it("opens a matrix cell's file in that PR's scope and layer", () => {

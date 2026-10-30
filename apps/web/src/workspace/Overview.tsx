@@ -21,6 +21,7 @@ import { Icon, LAYER_ICON } from "../components/Icon";
 import { Info } from "../components/Info";
 import { LayerMatrixView } from "../components/LayerMatrix";
 import { StateBadge } from "../components/PrStatus";
+import { Spinner } from "../components/Spinner";
 import {
   ago,
   CHECKS_LABEL,
@@ -68,7 +69,8 @@ export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean
     // With a report on screen, a run is a refresh of it.
     const text = hasReport ? `Strata refreshes the report. ${step}` : step;
     return (
-      <p className="text-muted" role="status">
+      <p className="flex items-center gap-2 text-muted" role="status">
+        <Spinner />
         {text}…
       </p>
     );
@@ -289,8 +291,7 @@ export function PrOverview({
   const lastPush = pr.forcePushes[pr.forcePushes.length - 1];
   return (
     <>
-      <header className="grid gap-1.5">
-        <p className="sub">How it arrived</p>
+      <header className="grid gap-1.5" data-scope="pr">
         <h1 className="h1 flex items-baseline gap-2">
           <a
             href={pr.url}

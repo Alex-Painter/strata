@@ -14,6 +14,7 @@ import { AppShell, Breadcrumb } from "../components/AppShell";
 import { EvidenceContext, type EvidenceView } from "../components/Claims";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
+import { Spinner } from "../components/Spinner";
 import { selectionAnchor } from "../lib/selection";
 import { useStored } from "../lib/stored";
 import { toggleTheme } from "../lib/theme";
@@ -33,7 +34,7 @@ import {
 import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays";
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
 import { PaneHandle } from "./PaneHandle";
-import { Details, Panel, statusWord } from "./Panel";
+import { Details, Panel, statusWord, working } from "./Panel";
 import { StackRail } from "./StackRail";
 
 /**
@@ -371,9 +372,10 @@ export function Workspace({
         <>
           <Breadcrumb items={[...(me ? [{ label: "Changes", href: "/" }] : []), { label: name }]} />
           <span
-            className="pill status ml-1.5"
+            className="pill status ml-1.5 gap-1.5"
             title={report?.verdict?.headline ?? "Strata does not give a verdict at this time."}
           >
+            {working(run) && <Spinner />}
             {statusWord(report, run)}
           </span>
         </>

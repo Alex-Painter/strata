@@ -12,6 +12,7 @@ import { citedHunks } from "../components/Claims";
 import { Counts, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { Info } from "../components/Info";
+import { Spinner } from "../components/Spinner";
 import { ago, countPrs, FILE_STATUS, stateLabel } from "../lib/format";
 import { type ReviewStatusKind, reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
@@ -46,6 +47,12 @@ export const VERDICT_LABEL: Record<VerdictStatus, string> = {
 };
 
 /** The status pill's word: the verdict when there is one, else what the run is doing. */
+/** Whether a run is waiting or going, so the status shows the spinner. */
+export function working(run: RunView | null): boolean {
+  const status = run?.info?.status;
+  return status === "queued" || status === "running";
+}
+
 export function statusWord(report: ChangeReport | null, run: RunView | null): string {
   if (report?.verdict) return VERDICT_LABEL[report.verdict.status];
   const status = run?.info?.status;
@@ -263,7 +270,11 @@ function Overview({
                 <PrMarks prs={onPath} lines={github.lines} titles={titles} />
               </Prop>
               <Prop term="Strata">
-                <span title="Strata does not give a verdict at this time.">
+                <span
+                  className="inline-flex items-center gap-2"
+                  title="Strata does not give a verdict at this time."
+                >
+                  {working(run) && <Spinner />}
                   {statusWord(report, run)}
                 </span>
                 <RunAgainLine run={run} />
@@ -272,8 +283,10 @@ function Overview({
           ) : (
             <Prop term="Status">
               <span
+                className="inline-flex items-center gap-2"
                 title={report.verdict?.headline ?? "Strata does not give a verdict at this time."}
               >
+                {working(run) && <Spinner />}
                 {statusWord(report, run)}
               </span>
               <RunAgainLine run={run} />

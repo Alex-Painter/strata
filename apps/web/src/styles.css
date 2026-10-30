@@ -976,6 +976,51 @@ code,
   .details > * {
     flex-shrink: 0;
   }
+  /* Four dots that go around in a circle (components/Spinner.tsx); the faint ones trail. */
+  .spin {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 12px;
+    height: 12px;
+    animation: spin 0.9s linear infinite;
+  }
+  .spin i {
+    position: absolute;
+    width: 3.5px;
+    height: 3.5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .spin i:nth-child(1) {
+    top: 0;
+    left: 4.25px;
+  }
+  .spin i:nth-child(2) {
+    top: 4.25px;
+    right: 0;
+    opacity: 0.25;
+  }
+  .spin i:nth-child(3) {
+    bottom: 0;
+    left: 4.25px;
+    opacity: 0.5;
+  }
+  .spin i:nth-child(4) {
+    top: 4.25px;
+    left: 0;
+    opacity: 0.75;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spin {
+      animation: none;
+    }
+  }
   /* A status in colour: a dot and a word on a faint tint (Panel.tsx). */
   .mark {
     --tone: var(--fg-2);
