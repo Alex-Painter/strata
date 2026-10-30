@@ -1175,6 +1175,12 @@ code,
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  /* In the narrow left pane, each label sits above its value. */
+  .details .prop {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    padding: 5px 0;
+  }
   .ot {
     margin: 0;
     font: 500 15px / 1.4 var(--font-mono);
