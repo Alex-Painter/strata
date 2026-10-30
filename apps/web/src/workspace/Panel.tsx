@@ -256,7 +256,11 @@ function Overview({
             <>
               <Prop term="Status">
                 <span>{github.label}</span>
-                <span className="block text-[13px] text-muted">{github.detail}</span>
+                <ul className="grid gap-0.5 text-[13px] text-muted" aria-label="Each PR">
+                  {github.lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
               </Prop>
               <Prop term="Strata">
                 <span title="Strata does not give a verdict at this time.">

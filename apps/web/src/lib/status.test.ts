@@ -39,6 +39,12 @@ it("shows the GitHub facts behind the status", () => {
   expect(status?.detail).toBe(
     "#1 is merged. #2 is approved. Its checks failed. #3 needs a review. Its checks passed.",
   );
+  // One item for each PR, for the details' list.
+  expect(status?.lines).toEqual([
+    "#1 is merged.",
+    "#2 is approved. Its checks failed.",
+    "#3 needs a review. Its checks passed.",
+  ]);
 });
 
 it("has nothing to say about a Change that Strata has not read since it kept PRs", () => {

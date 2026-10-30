@@ -16,6 +16,8 @@ export interface ReviewStatus {
   label: string;
   /** The GitHub facts behind the label, one sentence for each PR. */
   detail: string;
+  /** The same facts, one item for each PR, for a list. */
+  lines: string[];
 }
 
 const LABEL: Record<ReviewStatusKind, string> = {
@@ -52,7 +54,8 @@ export function reviewStatus(
     return "needs-review";
   })();
   if (!kind) return null;
-  return { kind, label: LABEL[kind], detail: prs.map(describe).join(" ") };
+  const lines = prs.map(describe);
+  return { kind, label: LABEL[kind], detail: lines.join(" "), lines };
 }
 
 function describe(pr: PathPr): string {
