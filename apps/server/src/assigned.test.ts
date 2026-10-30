@@ -8,6 +8,7 @@ import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 import { AssignedSearch } from "./assigned.js";
+import { backfillTitles } from "./change-store.js";
 import { loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
 import { changes as changesTable, runs as runsTable } from "./db/schema.js";
@@ -166,6 +167,17 @@ describe("the assignment search", () => {
     db.update(changesTable).set({ title: "A name for the stack" }).run();
     await assigned.search(USER);
     expect((await list()).map((change) => change.title)).toEqual(["A name for the stack"]);
+  });
+
+  it("gives a Change its latest report's title again at start", async () => {
+    demo.github.requests = { 4: { assignees: ["alex"] } };
+    const { db, runs, assigned, list } = setup();
+    await assigned.search(USER);
+    await runs.idle();
+    const [reported] = (await list()).map((change) => change.title);
+    db.update(changesTable).set({ title: "A title that an old search wrote" }).run();
+    backfillTitles(db);
+    expect((await list()).map((change) => change.title)).toEqual([reported]);
   });
 
   it("keeps a Change once GitHub stops listing its PR, no longer waiting", async () => {

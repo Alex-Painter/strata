@@ -6,7 +6,7 @@
 import type { AssignedReason, ChangeSummary, PathPr, Stack, YourPr } from "@strata/core/model";
 import { type ChangeInput, describeInput, describeRepo, waitsOnYou } from "@strata/core/model";
 import type { ResolvedChange } from "@strata/engine";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { newId } from "./auth/crypto.js";
 import type { Db } from "./db/client.js";
 import { assignments, type ChangeRow, changes, reports } from "./db/schema.js";
@@ -54,6 +54,24 @@ export function backfillPathPrs(db: Db) {
     if (!report) continue;
     const pathPrs = pathPrsOf((JSON.parse(report.body) as { stack?: Stack | null }).stack);
     if (pathPrs) db.update(changes).set({ pathPrs }).where(eq(changes.id, row.id)).run();
+  }
+}
+
+/**
+ * Gives each Change the title of its latest report: the stack's name, when
+ * Claude wrote one. An older search set titles back to the bottom PR's title.
+ */
+export function backfillTitles(db: Db) {
+  for (const row of db.select().from(changes).all()) {
+    const report = db
+      .select({ title: sql<string | null>`json_extract(${reports.body}, '$.change.title')` })
+      .from(reports)
+      .where(eq(reports.changeId, row.id))
+      .orderBy(desc(reports.createdAt))
+      .get();
+    if (report?.title && report.title !== row.title) {
+      db.update(changes).set({ title: report.title }).where(eq(changes.id, row.id)).run();
+    }
   }
 }
 
