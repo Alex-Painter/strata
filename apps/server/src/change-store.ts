@@ -4,7 +4,7 @@
  * same Change for the same path.
  */
 import type { AssignedReason, ChangeSummary, PathPr, Stack, YourPr } from "@strata/core/model";
-import { type ChangeInput, describeInput, describeRepo } from "@strata/core/model";
+import { type ChangeInput, describeInput, describeRepo, waitsOnYou } from "@strata/core/model";
 import type { ResolvedChange } from "@strata/engine";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { newId } from "./auth/crypto.js";
@@ -138,7 +138,7 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
     status: latestRun(db, row.id)?.status ?? null,
     origin: row.origin,
     yours,
-    waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
+    waiting: yours.some((pr) => pr.active && waitsOnYou(pr.reasons)),
     rootPr: row.rootPr,
     tipPr: row.tipPr,
     prs: row.pathPrs ? (JSON.parse(row.pathPrs) as PathPr[]) : [],

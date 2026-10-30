@@ -49,7 +49,6 @@ it("draws every PR, dims the other branch, and opens its path when chosen", () =
         onScope={(n) => scoped.push(n)}
         onPickPath={(tip) => picked.push(tip)}
         pickingPath={null}
-        yours={[{ number: 6, reasons: [{ kind: "assignee" }], active: true, seenAt: "" }]}
       />,
     ),
   );
@@ -61,7 +60,7 @@ it("draws every PR, dims the other branch, and opens its path when chosen", () =
   expect(container.querySelector("li[data-trunk]")?.textContent).toBe("main");
   expect(row(7).className).toContain("faint");
   expect(row(6).className).not.toContain("faint");
-  expect(row(6).textContent).toContain("yours");
+  expect(container.querySelector("[data-yours]")).toBeNull();
   // Each PR shows its branch under its title.
   expect(row(6).textContent).toContain("feat/pr-6");
   expect(container.querySelectorAll("path[data-edge]")).toHaveLength(3);

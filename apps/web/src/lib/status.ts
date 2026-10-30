@@ -38,7 +38,7 @@ const LABEL: Record<ReviewStatusKind, string> = {
  */
 export function reviewStatus(
   prs: PathPr[],
-  you: { waiting: boolean; reviewed: boolean },
+  you: { waiting: boolean; reviewed: boolean; reviewedPrs?: ReadonlySet<number> },
 ): ReviewStatus | null {
   const open = prs.filter((pr) => pr.state === "open");
   const kind = ((): ReviewStatusKind | null => {
@@ -54,18 +54,20 @@ export function reviewStatus(
     return "needs-review";
   })();
   if (!kind) return null;
-  const lines = prs.map(describe);
+  const lines = prs.map((pr) => describe(pr, you.reviewedPrs?.has(pr.number) ?? false));
   return { kind, label: LABEL[kind], detail: lines.join(" "), lines };
 }
 
-function describe(pr: PathPr): string {
+function describe(pr: PathPr, reviewedByYou: boolean): string {
   if (pr.state !== "open") return `#${pr.number} is ${pr.state}.`;
   const review =
     pr.review === "approved"
       ? "is approved"
       : pr.review === "changes-requested"
         ? "has requested changes"
-        : "needs a review";
+        : reviewedByYou
+          ? "has your review"
+          : "needs a review";
   const checks =
     pr.checks === "success"
       ? " Its checks passed."

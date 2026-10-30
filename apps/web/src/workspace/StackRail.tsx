@@ -1,8 +1,7 @@
-import type { StackSummary, YourPr } from "@strata/core/model";
+import type { StackSummary } from "@strata/core/model";
 import { layoutStackMap } from "@strata/core/stack";
 import { useMemo } from "react";
 import { Dot, EdgeLine, gutterWidth, laneX } from "../components/StackMap";
-import { reasonLabel } from "../lib/format";
 
 /** One row: the PR's title, and its branch under it. */
 const ROW = 46;
@@ -20,7 +19,6 @@ export function StackRail({
   onScope,
   onPickPath,
   pickingPath,
-  yours,
 }: {
   stack: StackSummary;
   /** This Change's path, bottom first. */
@@ -32,7 +30,6 @@ export function StackRail({
   onPickPath?: ((tip: number) => void) | undefined;
   /** The tip whose Change is being opened. */
   pickingPath: number | null;
-  yours: YourPr[];
 }) {
   const layout = useMemo(() => layoutStackMap(stack), [stack]);
   const prs = new Map(stack.prs.map((p) => [p.number, p]));
@@ -73,7 +70,6 @@ export function StackRail({
           const title = prs.get(n)?.title ?? "";
           const branch = prs.get(n)?.headRef;
           const here = onPath(n);
-          const mine = yours.find((y) => y.number === n && y.active);
           const tip = tipFor(n);
           return (
             <li key={n} data-pr={n} style={{ height: ROW, paddingLeft: gutter - 6 }}>
@@ -93,18 +89,8 @@ export function StackRail({
                 <span className="flex w-full min-w-0 items-baseline gap-2">
                   <span className="shrink-0 font-mono text-[12.5px] text-faint">{n}</span>
                   <span className="min-w-0 flex-1 truncate text-[14px] text-text">{title}</span>
-                  {!here && pickingPath === tip ? (
+                  {!here && pickingPath === tip && (
                     <span className="shrink-0 text-[12px] text-muted">Opening…</span>
-                  ) : (
-                    mine && (
-                      <span
-                        data-yours
-                        className="shrink-0 text-[12px] text-muted"
-                        title={`Yours: ${reasonLabel(mine.reasons)}`}
-                      >
-                        yours
-                      </span>
-                    )
                   )}
                 </span>
                 {branch && (

@@ -30,3 +30,16 @@ export interface AssignedPrs {
   /** Open PRs, not your own, by number. */
   prs: AssignedPr[];
 }
+
+/**
+ * Whether a PR waits on you. Once you have reviewed it, it waits only when
+ * GitHub asks you by name again: a review removes your own request, so a
+ * request by name after it is a new one. An assignment or a team request
+ * does not make you review again.
+ */
+export function waitsOnYou(reasons: AssignedReason[]): boolean {
+  if (reasons.some((r) => r.kind === "reviewed")) {
+    return reasons.some((r) => r.kind === "review-requested" && r.direct);
+  }
+  return reasons.length > 0;
+}

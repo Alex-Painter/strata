@@ -142,7 +142,7 @@ describe("the assignment search", () => {
     expect(runCount()).toBe(2);
   });
 
-  it("makes and runs a Change for a PR you've reviewed, which doesn't wait on you", async () => {
+  it("makes and runs a Change for a PR you've reviewed, which doesn't wait on you even if assigned", async () => {
     demo.github.requests = {
       4: { reviewedBy: ["alex"] },
       6: { reviewedBy: ["alex"], assignees: ["alex"] },
@@ -151,7 +151,7 @@ describe("the assignment search", () => {
     await assigned.search(USER);
     expect(shape(await list())).toEqual([
       ["acme/app#4", "assigned", [[4, true]], false],
-      ["acme/app#6", "assigned", [[6, true]], true],
+      ["acme/app#6", "assigned", [[6, true]], false],
     ]);
     expect((await list())[0]?.yours[0]?.reasons).toEqual([{ kind: "reviewed" }]);
     expect(runCount()).toBe(2);

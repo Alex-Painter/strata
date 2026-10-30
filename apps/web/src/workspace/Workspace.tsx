@@ -484,7 +484,6 @@ export function Workspace({
                   onScope={scope}
                   onPickPath={onPickPath}
                   pickingPath={pickingPath}
-                  yours={yours}
                 />
               </div>
             )}

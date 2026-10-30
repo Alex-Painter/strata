@@ -51,3 +51,16 @@ it("has nothing to say about a Change that Strata has not read since it kept PRs
   expect(reviewStatus([], nobody)).toBeNull();
   expect(reviewStatus([], { waiting: true, reviewed: false })?.label).toBe("Needs your review");
 });
+
+it("says which PRs have your review", () => {
+  const status = reviewStatus([pr(1), pr(2)], {
+    waiting: false,
+    reviewed: true,
+    reviewedPrs: new Set([2]),
+  });
+  expect(status?.label).toBe("Reviewed by you");
+  expect(status?.lines).toEqual([
+    "#1 needs a review. Its checks passed.",
+    "#2 has your review. Its checks passed.",
+  ]);
+});

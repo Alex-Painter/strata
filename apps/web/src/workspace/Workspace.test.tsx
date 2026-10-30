@@ -227,19 +227,24 @@ describe("Workspace", () => {
     expect(asked).toBe(1);
   });
 
-  it("marks the PRs GitHub lists for you, and still opens on the whole stack", () => {
+  it("marks the PRs you reviewed in the status, and still opens on the whole stack", () => {
     const report = { ...range, change: { ...range.change, hints: [] }, stack };
     const page = mount(report, null, undefined, [
       {
         number: 1,
-        reasons: [{ kind: "review-requested", direct: false, teams: ["acme/backend"] }],
+        reasons: [
+          { kind: "review-requested", direct: false, teams: ["acme/backend"] },
+          { kind: "reviewed" },
+        ],
         active: true,
         seenAt: "2026-10-02T00:00:00Z",
       },
     ]);
-    const mark = page.querySelector('li[data-pr="1"] [data-yours]');
-    expect(mark?.textContent).toBe("yours");
-    expect(mark?.getAttribute("title")).toBe("Yours: review requested from acme/backend");
+    // The PR rows do not say "yours"; the status says what you did.
+    expect(page.querySelector("[data-yours]")).toBeNull();
+    const details = page.querySelector('[aria-label="Details"]')?.textContent ?? "";
+    expect(details).toContain("Reviewed by you");
+    expect(details).not.toContain("Needs your review");
     expect(button(page, "Whole stack").getAttribute("aria-current")).toBe("true");
   });
 

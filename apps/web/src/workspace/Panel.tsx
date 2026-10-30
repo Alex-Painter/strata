@@ -6,7 +6,7 @@ import type {
   VerdictStatus,
   YourPr,
 } from "@strata/core/model";
-import { LAYERS } from "@strata/core/model";
+import { LAYERS, waitsOnYou } from "@strata/core/model";
 import type { CSSProperties, ReactNode } from "react";
 import { citedHunks } from "../components/Claims";
 import { Counts, layerFact, meaningful } from "../components/Diff";
@@ -251,11 +251,15 @@ function Overview({
   // Until Strata gives a verdict, the status is GitHub's, by the home page's rules.
   const onPath: PathPr[] = fresh.length > 0 ? fresh : prs.map(({ pr }) => pr);
   const titles = new Map(prs.map(({ pr }) => [pr.number, pr.title]));
+  const reviewed = new Set(
+    yours.filter((pr) => pr.reasons.some((r) => r.kind === "reviewed")).map((pr) => pr.number),
+  );
   const github = report.verdict
     ? null
     : reviewStatus(onPath, {
-        waiting: yours.some((pr) => pr.active && pr.reasons.some((r) => r.kind !== "reviewed")),
-        reviewed: yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
+        waiting: yours.some((pr) => pr.active && waitsOnYou(pr.reasons)),
+        reviewed: reviewed.size > 0,
+        reviewedPrs: reviewed,
       });
   return (
     <>
@@ -267,7 +271,7 @@ function Overview({
                 <span className="mark self-start" data-tone={STATUS_TONE[github.kind]}>
                   {github.label}
                 </span>
-                <PrMarks prs={onPath} lines={github.lines} titles={titles} />
+                <PrMarks prs={onPath} lines={github.lines} titles={titles} reviewed={reviewed} />
               </Prop>
               <Prop term="Strata">
                 <span
@@ -347,11 +351,14 @@ function PrMarks({
   prs,
   lines,
   titles,
+  reviewed,
 }: {
   prs: PathPr[];
   /** The same facts as sentences, for the hover text. */
   lines: string[];
   titles: Map<number, string>;
+  /** The PRs you have reviewed. */
+  reviewed: ReadonlySet<number>;
 }) {
   return (
     <ul className="mt-1.5 grid gap-1" aria-label="Each PR">
@@ -367,7 +374,9 @@ function PrMarks({
                 ? ["ok", "Approved"]
                 : pr.review === "changes-requested"
                   ? ["bad", "Changes requested"]
-                  : ["warn", "Needs review"],
+                  : reviewed.has(pr.number)
+                    ? ["mute", "Reviewed by you"]
+                    : ["warn", "Needs review"],
             );
           if (pr.checks === "success") marks.push(["ok", "Checks pass"]);
           else if (pr.checks === "failure") marks.push(["bad", "Checks fail"]);
