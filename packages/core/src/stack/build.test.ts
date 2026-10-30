@@ -586,6 +586,18 @@ describe("choosing parents", () => {
     expect(order(resolve(moved, { pr: 2 }, graph, { main: "m0" }).stack)).toEqual([2]);
   });
 
+  it("links a child that GitHub retargeted with no event, through the base it moved to", () => {
+    // #2 was moved onto #1's branch; #1 merged, and GitHub put #2 back on main with no record.
+    const graph: Graph = { m0: [], h1: ["m0"], s1: ["m0"], h2: ["h1"] };
+    const lost = index(
+      pr(1, { state: "merged", mergedAt: at(40), mergeCommitOid: "s1" }),
+      pr(2, { baseChanges: [{ from: "main", to: "b1", at: at(31) }] }),
+    );
+    const { stack } = resolve(lost, { pr: 2 }, graph, { main: "s1" });
+    expect(order(stack)).toEqual([1, 2]);
+    expect(edge(stack, 2)).toMatchObject({ via: "retarget", ref: "b1" });
+  });
+
   it("follows a reordered stack instead of calling it a cycle", () => {
     // #2 was first, then the two swapped places and were rebased to match.
     const graph: Graph = { m0: [], h1: ["m0"], h2: ["h1"] };

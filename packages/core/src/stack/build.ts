@@ -668,7 +668,13 @@ function canBeParent(pr: StackPr, index: PrIndex): boolean {
 
 /** The branches a PR targets now and used to target, most recent first. */
 function candidateRefs(pr: StackPr): string[] {
-  const refs = [pr.baseRef, ...pr.baseChanges.map((change) => change.from).reverse()];
+  // Each base the PR had, newest first. A move's `to` counts too: GitHub can
+  // retarget a child onto the trunk with no event, so the last event's `to` is
+  // the old parent's branch.
+  const refs = [
+    pr.baseRef,
+    ...[...pr.baseChanges].reverse().flatMap((change) => [change.to, change.from]),
+  ];
   return [...new Set(refs)];
 }
 
