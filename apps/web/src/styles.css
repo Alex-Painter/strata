@@ -608,6 +608,48 @@ code,
     font-size: 13px;
     font-weight: 600;
   }
+  /* An info icon whose text shows on hover or focus (components/Info.tsx). */
+  .info {
+    position: relative;
+    display: inline-flex;
+    vertical-align: -2px;
+    margin-left: 6px;
+    color: var(--fg-3);
+    cursor: help;
+  }
+  .info > svg {
+    width: 13px;
+    height: 13px;
+  }
+  .info:hover,
+  .info:focus-visible {
+    color: var(--fg-2);
+  }
+  .info::after {
+    content: attr(data-tip);
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    left: -8px;
+    width: max-content;
+    max-width: 320px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--raised);
+    box-shadow: var(--shadow-pop);
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    white-space: normal;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+  }
+  .info:hover::after,
+  .info:focus-visible::after {
+    opacity: 1;
+  }
   .sub {
     font-size: 12px;
     color: var(--fg-2);

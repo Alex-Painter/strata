@@ -102,7 +102,9 @@ describe("GuideView", () => {
         onClaim={onClaim}
       />,
     );
-    expect(page.textContent).toContain("The order to read the whole stack in");
+    expect(page.querySelector("#guide-heading .info")?.getAttribute("aria-label")).toContain(
+      "The order to read the whole stack in",
+    );
     const items = [...page.querySelectorAll("li[data-section]")];
     expect(items.map((li) => li.querySelector("button")?.textContent)).toEqual([
       "1Forecasts2 files · +4 −0",
@@ -137,7 +139,9 @@ describe("GuideView", () => {
         onClaim={() => {}}
       />,
     );
-    expect(page.textContent).toContain("Strata's groups of the whole stack");
+    expect(page.querySelector("#guide-heading .info")?.getAttribute("aria-label")).toContain(
+      "Strata's groups of the whole stack",
+    );
     expect(
       [...page.querySelectorAll("li[data-section] > button")].map((b) => b.textContent),
     ).toEqual([

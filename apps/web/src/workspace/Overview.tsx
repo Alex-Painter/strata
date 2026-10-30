@@ -18,6 +18,7 @@ import { Counts, meaningful } from "../components/Diff";
 import { EvidenceList } from "../components/EvidenceList";
 import { GuideView } from "../components/Guide";
 import { Icon, LAYER_ICON } from "../components/Icon";
+import { Info } from "../components/Info";
 import { LayerMatrixView } from "../components/LayerMatrix";
 import { StateBadge } from "../components/PrStatus";
 import {
@@ -192,15 +193,12 @@ function WholeSummary({
     <>
       {report.summary.length > 0 && (
         <section aria-labelledby="summary-heading" className="grid gap-2">
-          <div className="grid gap-0.5">
-            <h2 id="summary-heading" className="h2">
-              Summary
-            </h2>
-            <p className="sub">
-              This summary uses only the {of === "stack" ? "whole-stack diff" : "range's diff"}.
-              Each sentence names the hunks that it rests on.
-            </p>
-          </div>
+          <h2 id="summary-heading" className="h2">
+            Summary
+            <Info
+              text={`This summary uses only the ${of === "stack" ? "whole-stack diff" : "range's diff"}. Each sentence names the hunks that it rests on.`}
+            />
+          </h2>
           <ClaimList
             claims={report.summary}
             hunks={diff.byId}
@@ -419,12 +417,10 @@ function PartSummary({ stack, part, ...props }: OverviewProps & { stack: Stack; 
       {how && <p className="text-muted">{how}</p>}
       {part.summary.length > 0 && (
         <section aria-labelledby="part-summary-heading" className="grid gap-2">
-          <div className="grid gap-0.5">
-            <h2 id="part-summary-heading" className="h2">
-              What it changes
-            </h2>
-            <p className="sub">This summary uses only this PR's own diff.</p>
-          </div>
+          <h2 id="part-summary-heading" className="h2">
+            What it changes
+            <Info text="This summary uses only this PR's own diff." />
+          </h2>
           <ClaimList
             claims={part.summary}
             hunks={props.diff.byId}

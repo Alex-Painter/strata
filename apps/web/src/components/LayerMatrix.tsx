@@ -3,6 +3,7 @@ import { LAYERS } from "@strata/core/model";
 import type { LayerMatrix, MatrixCell } from "@strata/core/stack";
 import { useState } from "react";
 import { fileAnchor } from "./Diff";
+import { Info } from "./Info";
 
 /** Shading steps for meaningful lines, against the busiest PR cell. */
 const STEPS = 5;
@@ -34,6 +35,9 @@ export function LayerMatrixView({
     <section aria-labelledby="matrix-heading" className="grid gap-2">
       <h2 id="matrix-heading" className="h2">
         Layers by PR
+        <Info
+          text={`Each number counts the lines in meaningful hunks. +Nm counts mechanical lines separately.${revised ? " ↻ marks lines that a later PR changed again. Thus the sum of the PR columns is not equal to Net." : ""}`}
+        />
       </h2>
       <div className="overflow-x-auto rounded-md border border-line">
         <table aria-labelledby="matrix-heading" className="border-collapse text-[12px]">
@@ -97,11 +101,6 @@ export function LayerMatrixView({
           </tbody>
         </table>
       </div>
-      <p className="sub">
-        Each number counts the lines in meaningful hunks. +Nm counts mechanical lines separately.
-        {revised &&
-          " ↻ marks lines that a later PR changed again. Thus the sum of the PR columns is not equal to Net."}
-      </p>
       {selected && selected.files.length > 0 && (
         <CellFiles cell={selected} title={titles.get(selected.pr ?? -1)} onOpen={onOpen} />
       )}

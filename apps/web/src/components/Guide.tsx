@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { lineCount } from "../lib/format";
 import { ClaimList } from "./Claims";
 import { meaningful } from "./Diff";
+import { Info } from "./Info";
 
 /**
  * The order to read the whole stack (or a range) in. Claude's sections say
@@ -39,16 +40,16 @@ export function GuideView({
     sections.length === guide.sections.length && sections.every((s, i) => s === guide.sections[i]);
   return (
     <section aria-labelledby="guide-heading" className="grid gap-3">
-      <div className="grid gap-0.5">
-        <h2 id="guide-heading" className="h2">
-          {heading}
-        </h2>
-        <p className="sub">
-          {guide.by === "llm"
-            ? `The order to read ${of} in: first the core of the change, last the glue code and mechanical changes.`
-            : `Strata's groups of ${of}, sorted by layer, then by mechanical kind, then by directory.`}
-        </p>
-      </div>
+      <h2 id="guide-heading" className="h2">
+        {heading}
+        <Info
+          text={
+            guide.by === "llm"
+              ? `The order to read ${of} in: first the core of the change, last the glue code and mechanical changes.`
+              : `Strata's groups of ${of}, sorted by layer, then by mechanical kind, then by directory.`
+          }
+        />
+      </h2>
       <ol className="list">
         {sections.map((section) => (
           <GuideItem

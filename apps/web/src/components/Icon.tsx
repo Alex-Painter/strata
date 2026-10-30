@@ -73,6 +73,12 @@ const PATHS = {
   chevd: <path d="M3.5 6L8 10.5 12.5 6" />,
   x: <path d="M4 4l8 8M12 4l-8 8" />,
   menu: <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />,
+  info: (
+    <>
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M8 7.25v4M8 4.9h.01" />
+    </>
+  ),
   help: (
     <>
       <circle cx="8" cy="8" r="6.25" />

@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { Icon } from "../components/Icon";
+import { Info } from "../components/Info";
 import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, yoursLabel } from "../lib/format";
 import { prUrl } from "../lib/github";
@@ -70,10 +71,8 @@ export function ChangesPage({ me }: { me: MeResponse }) {
           <section className="grid gap-3" aria-labelledby="assigned-h">
             <h2 id="assigned-h" className="h2">
               Assigned to you, not waiting
+              <Info text="Stacks that you reviewed before, or that you were on before." />
             </h2>
-            <p className="-mt-1 text-[12px] text-muted">
-              Stacks that you reviewed before, or that you were on before.
-            </p>
             <ChangeList
               changes={all?.filter(
                 (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
@@ -86,10 +85,8 @@ export function ChangesPage({ me }: { me: MeResponse }) {
             <section className="grid gap-3" aria-labelledby="opened-h">
               <h2 id="opened-h" className="h2">
                 Opened by you
+                <Info text="Stacks that you selected for analysis. Nobody asked you to review them." />
               </h2>
-              <p className="-mt-1 text-[12px] text-muted">
-                Stacks that you selected for analysis. Nobody asked you to review them.
-              </p>
               <ChangeList changes={opened} error={null} empty="" />
             </section>
           )}
@@ -193,12 +190,13 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
     <section className="grid gap-3" aria-labelledby={id}>
       <h2 id={id} className="h2">
         Other stacks in {repo}
+        <Info text="Open stacks that nobody asked you to review. Strata did not analyse them. Select a stack to see and analyse it." />
       </h2>
-      <p className="-mt-1 text-[12px] text-muted">
-        Open stacks that nobody asked you to review. Strata did not analyse them. Select a stack to
-        see and analyse it.
-        {list && <ReadAt readAt={list.readAt} refreshing={list.refreshing} />}
-      </p>
+      {list && (
+        <p className="-mt-1">
+          <ReadAt readAt={list.readAt} refreshing={list.refreshing} />
+        </p>
+      )}
       {stacks.error ? (
         <p className="alert">{stacks.error.message}</p>
       ) : !found ? (

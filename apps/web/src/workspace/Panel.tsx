@@ -11,6 +11,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { citedHunks } from "../components/Claims";
 import { Counts, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
+import { Info } from "../components/Info";
 import { ago, countPrs, describePath, FILE_STATUS, stateLabel } from "../lib/format";
 import { reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
@@ -139,7 +140,6 @@ export function Details({
               </button>
             ))}
           </div>
-          <p className="sub">The hunks show under the sentence.</p>
           {cited.length < citedIds(selection.claim).length && (
             <p className="sub">
               {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} are not in
@@ -475,7 +475,11 @@ function Provenance({
 }) {
   if (prs.size === 0) return null;
   return (
-    <Section title={diff.pr === null ? "Came from" : "Revised later in"} count={prs.size}>
+    <Section
+      title={diff.pr === null ? "Came from" : "Revised later in"}
+      count={prs.size}
+      info="Strata got this from git blame on its chain of commits."
+    >
       <div className="grid">
         {[...prs.entries()].map(([pr, notes]) => (
           <button
@@ -490,7 +494,6 @@ function Provenance({
           </button>
         ))}
       </div>
-      <p className="sub">Strata got this from git blame on its chain of commits.</p>
     </Section>
   );
 }
@@ -498,10 +501,13 @@ function Provenance({
 function Section({
   title,
   count,
+  info,
   children,
 }: {
   title: string;
   count?: number;
+  /** What the section is, shown on hover. */
+  info?: string;
   children: ReactNode;
 }) {
   return (
@@ -509,6 +515,7 @@ function Section({
       <h3 className="sh">
         {title}
         {count !== undefined && <span className="sn">{count}</span>}
+        {info && <Info text={info} />}
       </h3>
       {children}
     </section>

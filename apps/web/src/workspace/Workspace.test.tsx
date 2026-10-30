@@ -162,10 +162,14 @@ describe("Workspace", () => {
     expect(from).toBe(`https://github.com/acme/app/commit/${base}`);
     expect(to).toBe(`https://github.com/acme/app/commit/${head}`);
     expect(panel(page)?.textContent).toContain("Strata guessed nothing.");
-    expect(page.querySelector("#summary-heading")?.parentElement?.textContent).toContain(
-      "This summary uses only the range's diff.",
+    // Each section explains itself in a tip on its heading, not on the page.
+    expect(page.querySelector("#summary-heading .info")?.getAttribute("aria-label")).toBe(
+      "This summary uses only the range's diff. Each sentence names the hunks that it rests on.",
     );
-    expect(page.textContent).toContain("Strata's groups of the range");
+    expect(page.querySelector("#summary-heading")?.textContent).toBe("Summary");
+    expect(page.querySelector("#guide-heading .info")?.getAttribute("aria-label")).toContain(
+      "Strata's groups of the range",
+    );
     expect(page.querySelectorAll("li[data-section]")).toHaveLength(2);
     // Nothing about PRs: no matrix, no stack, no PR list.
     expect(page.textContent).not.toContain("Layers by PR");
