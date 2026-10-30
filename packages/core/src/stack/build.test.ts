@@ -248,6 +248,17 @@ describe("buildStack", () => {
       expect(edge(stack, 2)?.link).toBe("behind");
       expect(anchor(stack, 2)).toBe("h1");
       expect(kinds(stack)).toEqual(["needs-restack"]);
+      // It names the branches, and says what to do; the PR numbers come second.
+      const issue = stack.issues[0];
+      expect(issue?.message).toBe(
+        "b2 (#2) does not have the newest commits of b1 (#1). Rebase b2 onto b1, then force-push it.",
+      );
+      expect(issue?.evidence.map((item) => item.label)).toEqual([
+        "#2 targets b1",
+        "#1's head branch is b1",
+        "where b2 left b1",
+        "b1 now",
+      ]);
     });
 
     it("marks a child stale when its parent force-pushed", () => {
@@ -261,6 +272,9 @@ describe("buildStack", () => {
       expect(edge(stack, 2)?.link).toBe("stale");
       expect(anchor(stack, 2)).toBe("h1");
       expect(kinds(stack)).toEqual(["needs-restack"]);
+      expect(stack.issues[0]?.message).toBe(
+        "Someone force-pushed b1 (#1). Thus b2 (#2) is on commits that b1 no longer has. Rebase b2 onto b1, then force-push it.",
+      );
     });
   });
 

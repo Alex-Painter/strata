@@ -3,6 +3,7 @@ import { LAYERS } from "@strata/core/model";
 import { useMemo, useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
 import { highlightLines, type Token } from "../lib/highlight";
+import { Info } from "./Info";
 
 /** Files with more changed lines than this start closed. */
 const OPEN_FILE_LINES = 400;
@@ -113,13 +114,13 @@ function FileBlock({
       data-inspect={file.inspect.map((flag) => flag.rule).join(" ") || undefined}
       className="grid scroll-mt-4 gap-2"
     >
-      <div className="flex items-center overflow-hidden rounded-md border border-line">
+      <div className="flex items-center rounded-md border border-line">
         <button
           type="button"
           data-nav={`file:${file.path}`}
           aria-current={selected === file.path ? "true" : undefined}
           onClick={() => onFile(file.path)}
-          className="frow"
+          className="frow rounded-md"
         >
           <span className="fs" title={FILE_STATUS[file.status]}>
             {FILE_STATUS[file.status].charAt(0)}
@@ -141,6 +142,17 @@ function FileBlock({
           {file.mechanical && <span className="fm">{file.mechanical.reason}</span>}
           <LineCount file={file} hunks={hunks} />
         </button>
+        {/* Why the file is in its layer, and other facts, stay out of the way of the code. */}
+        <span className="mr-2 flex">
+          <Info
+            align="end"
+            text={[
+              ...facts,
+              layerFact(file),
+              ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
+            ].join(" · ")}
+          />
+        </span>
         {hunks.length > 0 && (
           <button
             type="button"
@@ -155,15 +167,6 @@ function FileBlock({
           </button>
         )}
       </div>
-      {(facts.length > 0 || file.inspect.length > 0 || (open && hunks.length > 0)) && (
-        <p className="px-1 text-[12px] text-muted">
-          {[
-            ...facts,
-            layerFact(file),
-            ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
-          ].join(" · ")}
-        </p>
-      )}
       {open &&
         hunks.map((hunk) => (
           <HunkCard

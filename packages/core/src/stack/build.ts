@@ -429,9 +429,9 @@ class Builder {
           anchor = met.oid;
           evidence.push(
             met.push
-              ? commitEvidence(met.push.before, `#${parent.number}'s head before a force-push`)
-              : commitEvidence(met.oid, `where #${child.number} left #${parent.number}`),
-            commitEvidence(parent.headOid, `#${parent.number}'s head now`),
+              ? commitEvidence(met.push.before, `${ref} before the force-push`)
+              : commitEvidence(met.oid, `where ${child.headRef} left ${ref}`),
+            commitEvidence(parent.headOid, `${ref} now`),
           );
         } else if (met === null) {
           link = "re-anchored";
@@ -446,9 +446,12 @@ class Builder {
         this.issue(
           "needs-restack",
           [child.number],
+          // Branch names first: a PR number alone tells the reviewer little.
           link === "behind"
-            ? `#${parent.number} has commits that #${child.number} does not have. #${child.number} needs a restack.`
-            : `#${child.number} sits on a head that a force-push removed from #${parent.number}. #${child.number} needs a restack.`,
+            ? `${child.headRef} (#${child.number}) does not have the newest commits of ${ref} (#${parent.number}). ` +
+                `Rebase ${child.headRef} onto ${ref}, then force-push it.`
+            : `Someone force-pushed ${ref} (#${parent.number}). Thus ${child.headRef} (#${child.number}) is on commits that ${ref} no longer has. ` +
+                `Rebase ${child.headRef} onto ${ref}, then force-push it.`,
           evidence,
         );
       }

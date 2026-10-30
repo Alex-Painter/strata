@@ -646,6 +646,10 @@ code,
     pointer-events: none;
     transition: opacity 0.1s;
   }
+  .info[data-align="end"]::after {
+    left: auto;
+    right: -8px;
+  }
   .info:hover::after,
   .info:focus-visible::after {
     opacity: 1;

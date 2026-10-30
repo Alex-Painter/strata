@@ -500,14 +500,30 @@ function PathList({ label, paths }: { label: string; paths: string[] }) {
   );
 }
 
+const RESTACK =
+  "A restack moves a branch onto the newest commit of the branch under it. " +
+  "In git, rebase the branch, then push it with --force-with-lease. " +
+  "Tools such as Graphite and git-spice restack all the branches of a stack.";
+
 function Issues({ repo, issues }: { repo: string; issues: StackIssue[] }) {
   if (issues.length === 0) return null;
   return (
     <section aria-label="Stack issues" className="grid gap-2">
       {issues.map((issue) => (
         <div key={`${issue.kind} ${issue.prs.join(",")}`} className="note text-text">
-          <p>{issue.message}</p>
-          <EvidenceList repo={repo} evidence={issue.evidence} />
+          <p>
+            {issue.message}
+            {issue.kind === "needs-restack" && <Info text={RESTACK} />}
+          </p>
+          {/* The commits and PR numbers are the proof, not the point: they stay folded. */}
+          {issue.evidence.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-[12px] text-muted hover:text-text">
+                Evidence
+              </summary>
+              <EvidenceList repo={repo} evidence={issue.evidence} />
+            </details>
+          )}
         </div>
       ))}
     </section>

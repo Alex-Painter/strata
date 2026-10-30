@@ -70,13 +70,15 @@ describe("FileList", () => {
     expect(
       [...page.querySelectorAll("[data-file]")].map((f) => f.getAttribute("data-file")),
     ).toEqual(["app/jobs/warm.py", "bin/run", "docs/new.md", "icon.png", "latest"]);
-    expect(page.querySelector('[data-file="docs/new.md"] p')?.textContent).toContain(
-      "Docs: Documentation: matches **/*.{md,mdx,rst,adoc,txt}",
-    );
-    expect(page.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
+    expect(
+      page.querySelector('[data-file="docs/new.md"] .info')?.getAttribute("aria-label"),
+    ).toContain("Docs: Documentation: matches **/*.{md,mdx,rst,adoc,txt}");
+    expect(
+      page.querySelector('[data-file="app/jobs/warm.py"] .info')?.getAttribute("aria-label"),
+    ).toBe(
       "Added · Logic: No rule matched. Thus Strata thinks that it is application code, a possible layer",
     );
-    expect(page.querySelector('[data-file="bin/run"] p')?.textContent).toContain(
+    expect(page.querySelector('[data-file="bin/run"] .info')?.getAttribute("aria-label")).toContain(
       "Mode 100644 → 100755",
     );
   });
@@ -98,7 +100,7 @@ describe("FileList", () => {
     expect(file?.querySelector("button[data-nav]")?.textContent).toContain(
       "Access and permissions",
     );
-    expect(file?.querySelector("p")?.textContent).toBe(
+    expect(file?.querySelector(".info")?.getAttribute("aria-label")).toBe(
       "Added · Logic: No rule matched. Thus Strata thinks that it is application code, a possible layer · " +
         'Inspect: Access and permissions: a word starting "session" in session.py',
     );
@@ -131,9 +133,9 @@ describe("FileList", () => {
         onHunk={() => {}}
       />,
     );
-    expect(document.querySelector('[data-file="app/jobs/warm.py"] p')?.textContent).toBe(
-      "Added · Logic: A job that warms the cache",
-    );
+    expect(
+      document.querySelector('[data-file="app/jobs/warm.py"] .info')?.getAttribute("aria-label"),
+    ).toBe("Added · Logic: A job that warms the cache");
   });
 
   const LOCKED = [
