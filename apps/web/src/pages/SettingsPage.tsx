@@ -50,7 +50,7 @@ function ClaudeSetting({ repo }: { repo: string }) {
   const data = settings.data;
   const error = settings.error?.message ?? save.error?.message ?? null;
   return (
-    <div className="grid gap-0.5 text-[13px]">
+    <div className="grid gap-0.5 text-[14px]">
       <label className="flex items-center gap-1.5 text-muted">
         <input
           type="checkbox"
@@ -60,7 +60,7 @@ function ClaudeSetting({ repo }: { repo: string }) {
         />
         Send the code in {repo} to Claude
       </label>
-      <span className="pl-5 text-[12px] text-faint">
+      <span className="pl-5 text-[13px] text-faint">
         {data && !data.claudeAvailable
           ? "The server has no Anthropic API key. Thus this setting has no effect."
           : "Claude writes the summaries and puts unclear files in a layer. The setting applies to the next analysis."}

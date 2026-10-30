@@ -5,7 +5,7 @@ import { evidenceUrl, shortOid } from "../lib/github";
 export function EvidenceList({ repo, evidence }: { repo: string; evidence: Evidence[] }) {
   if (evidence.length === 0) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-[12px] text-muted" aria-label="Evidence">
+    <ul className="mt-1 space-y-0.5 text-[13px] text-muted" aria-label="Evidence">
       {evidence.map((item) => {
         const url = evidenceUrl(repo, item);
         const { source } = item.anchor;

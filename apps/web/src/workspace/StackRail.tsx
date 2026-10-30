@@ -91,15 +91,15 @@ export function StackRail({
                 onClick={() => (here ? onScope(pr === n ? null : n) : onPickPath?.(tip))}
               >
                 <span className="flex w-full min-w-0 items-baseline gap-2">
-                  <span className="shrink-0 font-mono text-[11.5px] text-faint">{n}</span>
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-text">{title}</span>
+                  <span className="shrink-0 font-mono text-[12.5px] text-faint">{n}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] text-text">{title}</span>
                   {!here && pickingPath === tip ? (
-                    <span className="shrink-0 text-[11px] text-muted">Opening…</span>
+                    <span className="shrink-0 text-[12px] text-muted">Opening…</span>
                   ) : (
                     mine && (
                       <span
                         data-yours
-                        className="shrink-0 text-[11px] text-muted"
+                        className="shrink-0 text-[12px] text-muted"
                         title={`Yours: ${reasonLabel(mine.reasons)}`}
                       >
                         yours
@@ -109,7 +109,7 @@ export function StackRail({
                 </span>
                 {branch && (
                   <span
-                    className="block w-full truncate font-mono text-[11px] text-faint"
+                    className="block w-full truncate font-mono text-[12px] text-faint"
                     title={branch}
                   >
                     {branch}
@@ -122,7 +122,7 @@ export function StackRail({
         <li
           data-trunk={stack.trunk}
           style={{ height: ROW, paddingLeft: gutter + 2 }}
-          className="flex items-center font-mono text-[11.5px] text-faint"
+          className="flex items-center font-mono text-[12.5px] text-faint"
         >
           {stack.trunk}
         </li>

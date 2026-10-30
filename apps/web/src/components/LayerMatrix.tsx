@@ -40,7 +40,7 @@ export function LayerMatrixView({
         />
       </h2>
       <div className="overflow-x-auto rounded-md border border-line">
-        <table aria-labelledby="matrix-heading" className="border-collapse text-[12px]">
+        <table aria-labelledby="matrix-heading" className="border-collapse text-[13px]">
           <thead>
             <tr className="text-faint">
               <th scope="col" className="px-3 py-1.5 text-left font-normal">
@@ -69,7 +69,7 @@ export function LayerMatrixView({
                     {LAYERS[row.layer].title}
                     {LAYERS[row.layer].inspect && (
                       <span
-                        className="text-[11px] text-faint"
+                        className="text-[12px] text-faint"
                         title="Examine these changes carefully."
                       >
                         Inspect
@@ -152,7 +152,7 @@ function Cell({
     >
       <span className="font-mono">{cell.meaningful}</span>
       {(cell.mechanical > 0 || cell.revised > 0) && (
-        <span className="text-[10px] opacity-80">
+        <span className="text-[11px] opacity-80">
           {cell.revised > 0 && `↻${cell.revised}`}
           {cell.revised > 0 && cell.mechanical > 0 && " "}
           {cell.mechanical > 0 && `+${cell.mechanical}m`}
@@ -192,8 +192,8 @@ function CellFiles({
               }}
               className="flex items-baseline gap-2 px-3 py-1 hover:bg-hover"
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{file.path}</span>
-              <span className="shrink-0 text-[12px] text-faint">
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px]">{file.path}</span>
+              <span className="shrink-0 text-[13px] text-faint">
                 {[
                   lines(file.meaningful),
                   file.mechanical > 0 ? `${file.mechanical} mechanical` : null,

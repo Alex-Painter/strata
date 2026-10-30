@@ -3,7 +3,7 @@ import { CHECKS_LABEL, REVIEW_LABEL, stateLabel } from "../lib/format";
 
 /** A PR's state as a word in an outline pill. */
 export function StateBadge({ pr }: { pr: { state: PrState; draft: boolean } }) {
-  return <span className="pill h-4 px-1.5 text-[11px]">{stateLabel(pr)}</span>;
+  return <span className="pill h-4 px-1.5 text-[12px]">{stateLabel(pr)}</span>;
 }
 
 /** Review and CI status, as words. */

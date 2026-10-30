@@ -29,7 +29,7 @@ function RunAgainLine({ run }: { run: RunView | null }) {
   const status = run?.info?.status;
   if (!run || status === "queued" || status === "running") return null;
   return (
-    <span className="mt-0.5 flex items-center gap-2 text-[12px] text-muted">
+    <span className="mt-0.5 flex items-center gap-2 text-[13px] text-muted">
       {run.info?.finishedAt && <span>Analysed {ago(run.info.finishedAt)}</span>}
       <button type="button" className="lnk" disabled={run.rerunning} onClick={run.onRunAgain}>
         Run again
@@ -256,7 +256,7 @@ function Overview({
             <>
               <Prop term="Status">
                 <span>{github.label}</span>
-                <span className="block text-[12px] text-muted">{github.detail}</span>
+                <span className="block text-[13px] text-muted">{github.detail}</span>
               </Prop>
               <Prop term="Strata">
                 <span title="Strata does not give a verdict at this time.">
@@ -279,7 +279,7 @@ function Overview({
             <Prop term="Stack">
               {countPrs(prs.map((node) => node.pr))}
               {authors.length > 0 && ` by ${authors.join(", ")}`} onto{" "}
-              <span className="font-mono text-[12px]">{stack.trunk.name}</span>
+              <span className="font-mono text-[13px]">{stack.trunk.name}</span>
             </Prop>
           )}
           {stack && path.length > 1 && <Prop term="Path">{describePath(path)}</Prop>}
@@ -311,7 +311,7 @@ function Overview({
       </Section>
       {notes.length > 0 && (
         <Section title="Notes" count={notes.length}>
-          <ul className="grid gap-2 text-[12.5px] text-muted">
+          <ul className="grid gap-2 text-[13.5px] text-muted">
             {notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
@@ -448,7 +448,7 @@ function HunkDetails({
               <button
                 key={claim.text}
                 type="button"
-                className="evrow min-h-0 py-1.5 text-[12.5px] leading-normal"
+                className="evrow min-h-0 py-1.5 text-[13.5px] leading-normal"
                 onClick={() => onSelect({ kind: "claim", claim, by })}
               >
                 {claim.text}

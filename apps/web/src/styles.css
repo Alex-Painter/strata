@@ -202,7 +202,7 @@ body {
   margin: 0;
   background: var(--chrome);
   color: var(--fg);
-  font: 13px / 1.5 var(--font-sans);
+  font: 14px / 1.5 var(--font-sans);
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
 }
@@ -210,7 +210,7 @@ body {
 code,
 .mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 :focus-visible {
@@ -250,7 +250,7 @@ code,
     padding: 2px 5px;
     border: 1px solid var(--line);
     border-radius: 4px;
-    font: 500 11px / 1 var(--font-sans);
+    font: 500 12px / 1 var(--font-sans);
     color: var(--fg-3);
     text-align: center;
     white-space: nowrap;
@@ -284,7 +284,7 @@ code,
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--raised);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--fg);
     white-space: nowrap;
@@ -354,7 +354,7 @@ code,
     padding: 0 7px;
     border: 1px solid var(--line);
     border-radius: 999px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     line-height: 1;
     color: var(--fg-2);
@@ -375,7 +375,7 @@ code,
     border: 1px solid var(--line);
     border-radius: 4px;
     background: transparent;
-    font: 500 11px / 18px var(--font-mono);
+    font: 500 12px / 18px var(--font-mono);
     color: var(--fg-2);
     white-space: nowrap;
     vertical-align: 1px;
@@ -420,7 +420,7 @@ code,
     align-items: center;
     gap: 8px;
     min-width: 0;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
@@ -442,7 +442,7 @@ code,
     height: 28px;
     padding: 0 8px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--fg-2);
     white-space: nowrap;
@@ -467,7 +467,7 @@ code,
     text-overflow: ellipsis;
   }
   .nrow .nm {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     color: var(--fg-3);
     font-variant-numeric: tabular-nums;
@@ -475,7 +475,7 @@ code,
   .nrow .pid {
     width: 40px;
     flex: none;
-    font: 400 11.5px var(--font-mono);
+    font: 400 12.5px var(--font-mono);
     color: var(--fg-3);
   }
   .nrow.pr {
@@ -495,7 +495,7 @@ code,
     height: 26px;
     padding: 0 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--fg-3);
   }
@@ -521,7 +521,7 @@ code,
     gap: 6px;
     margin-top: auto;
     padding: 12px 4px 4px 8px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-3);
   }
 
@@ -563,7 +563,7 @@ code,
     align-items: center;
     gap: 6px;
     min-width: 0;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--fg-2);
     white-space: nowrap;
   }
@@ -599,13 +599,13 @@ code,
   }
   .h1 {
     margin: 0;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 600;
     letter-spacing: -0.015em;
   }
   .h2 {
     margin: 0;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
   }
   /* An info icon whose text shows on hover or focus (components/Info.tsx). */
@@ -638,7 +638,7 @@ code,
     background: var(--raised);
     box-shadow: var(--shadow-pop);
     color: var(--fg);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 400;
     line-height: 1.45;
     white-space: normal;
@@ -655,7 +655,7 @@ code,
     opacity: 1;
   }
   .sub {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-2);
   }
 
@@ -736,7 +736,7 @@ code,
   }
   .sheet-h h2 {
     margin: 0;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
   }
 
@@ -809,12 +809,12 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font: 500 12px var(--font-mono);
+    font: 500 13px var(--font-mono);
     color: var(--fg);
   }
   .hunk-h .rng {
     flex: none;
-    font: 400 11.5px var(--font-mono);
+    font: 400 12.5px var(--font-mono);
     color: var(--fg-3);
   }
   .hunk-h .sect {
@@ -822,14 +822,14 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font: 400 11.5px var(--font-mono);
+    font: 400 12.5px var(--font-mono);
     color: var(--fg-3);
   }
   .code {
     margin: 0;
     padding: 6px 0 8px;
     overflow-x: auto;
-    font: 12px / 1.65 var(--font-mono);
+    font: 13px / 1.65 var(--font-mono);
     color: var(--fg);
   }
   .ln {
@@ -923,13 +923,13 @@ code,
   }
   .ln .eof {
     margin-left: 8px;
-    font: 11px var(--font-sans);
+    font: 12px var(--font-sans);
     color: var(--fg-3);
     user-select: none;
   }
   .fold {
     padding: 8px 12px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-2);
   }
   .add-n {
@@ -961,7 +961,7 @@ code,
   }
   .ptitle {
     margin: 0 0 0 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
   }
   /* The Change's details, at the top of the left pane. */
@@ -1013,7 +1013,7 @@ code,
     border-radius: 6px;
     background: var(--bg);
     color: var(--fg);
-    font-size: 12.5px;
+    font-size: 13.5px;
   }
   .ask-log {
     flex: 1;
@@ -1039,11 +1039,11 @@ code,
     padding: 4px 8px;
     border-left: 2px solid var(--accent-line);
     text-align: left;
-    font-size: 12px;
+    font-size: 13px;
   }
   .ask-quote code {
     font-family: var(--font-mono, monospace);
-    font-size: 11.5px;
+    font-size: 12.5px;
   }
   .ask-a {
     display: grid;
@@ -1083,7 +1083,7 @@ code,
     border: 1px solid var(--accent-line);
     border-radius: 6px;
     background: var(--accent-soft);
-    font-size: 12px;
+    font-size: 13px;
   }
   .ask-pop {
     position: fixed;
@@ -1126,7 +1126,7 @@ code,
     border: 1px solid var(--line);
     border-radius: 4px;
     font-family: var(--font-mono, monospace);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-2);
     vertical-align: 1px;
   }
@@ -1145,7 +1145,7 @@ code,
     gap: 8px;
     min-height: 20px;
     margin: 0;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--fg-2);
   }
@@ -1164,10 +1164,10 @@ code,
     gap: 8px;
     align-items: baseline;
     padding: 4px 0;
-    font-size: 13px;
+    font-size: 14px;
   }
   .prop dt {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-2);
   }
   .prop dd {
@@ -1177,16 +1177,16 @@ code,
   }
   .ot {
     margin: 0;
-    font: 500 14px / 1.4 var(--font-mono);
+    font: 500 15px / 1.4 var(--font-mono);
     letter-spacing: -0.01em;
     word-break: break-word;
   }
   .ot.prose {
-    font: 600 15px / 1.4 var(--font-sans);
+    font: 600 16px / 1.4 var(--font-sans);
     letter-spacing: -0.015em;
   }
   .okind {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-3);
     overflow-wrap: anywhere;
   }
@@ -1198,7 +1198,7 @@ code,
     margin: 0 -8px;
     padding: 0 8px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     text-align: left;
     width: calc(100% + 16px);
   }
@@ -1211,7 +1211,7 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font: 400 12px var(--font-mono);
+    font: 400 13px var(--font-mono);
     color: var(--fg-2);
   }
 
@@ -1232,7 +1232,7 @@ code,
     align-items: center;
     gap: 8px;
     margin: 0;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     white-space: nowrap;
   }
@@ -1240,7 +1240,7 @@ code,
     color: var(--fg-2);
   }
   .vm {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-3);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -1253,7 +1253,7 @@ code,
     padding: 0 2px 0 8px;
     border: 1px solid var(--line);
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     white-space: nowrap;
   }
   .fchip button {
@@ -1320,7 +1320,7 @@ code,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font: 500 12.5px var(--font-mono);
+    font: 500 13.5px var(--font-mono);
   }
   .frow .fp .dir {
     color: var(--fg-3);
@@ -1329,12 +1329,12 @@ code,
   .frow .fs {
     width: 12px;
     flex: none;
-    font: 400 11.5px var(--font-mono);
+    font: 400 12.5px var(--font-mono);
     color: var(--fg-3);
   }
   .frow .fm {
     flex: none;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-3);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
@@ -1348,7 +1348,7 @@ code,
     border: 0;
     border-bottom: 1px solid var(--line);
     background: none;
-    font: 15px var(--font-sans);
+    font: 16px var(--font-sans);
     color: var(--fg);
     outline: none;
   }
@@ -1362,7 +1362,7 @@ code,
   }
   .cg {
     padding: 8px 12px 4px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-3);
   }
   .ci {
@@ -1373,7 +1373,7 @@ code,
     height: 38px;
     padding: 0 12px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     text-align: left;
   }
   .ci svg {

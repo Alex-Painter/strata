@@ -133,7 +133,7 @@ function FileBlock({
           {file.inspect.map((flag) => (
             <span
               key={flag.rule}
-              className="shrink-0 rounded border border-line px-1 text-[11px] text-muted"
+              className="shrink-0 rounded border border-line px-1 text-[12px] text-muted"
               title={`${flag.reason}. Changes here must be correct the first time. Examine them carefully.`}
             >
               {flag.title}
@@ -184,7 +184,7 @@ function FileBlock({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="justify-self-start px-1 text-[12px] text-muted hover:text-text"
+          className="justify-self-start px-1 text-[13px] text-muted hover:text-text"
         >
           {file.mechanical && fold
             ? `Folded: ${file.mechanical.reason.toLowerCase()}. Show ${plural(hunks.length, "hunk")}`
@@ -353,7 +353,7 @@ export function LineCount({ file, hunks }: { file: FileChange; hunks: Hunk[] }) 
   const all = lineCount(file.additions, file.deletions);
   if (file.mechanical) {
     return (
-      <span className="fm font-mono text-[11.5px]" title={`All lines: ${all}`}>
+      <span className="fm font-mono text-[12.5px]" title={`All lines: ${all}`}>
         {all}
       </span>
     );
@@ -373,7 +373,7 @@ export function Counts({
   title?: string;
 }) {
   return (
-    <span className="fm font-mono text-[11.5px]" title={title}>
+    <span className="fm font-mono text-[12.5px]" title={title}>
       <span className="add-n">+{additions}</span> <span className="del-n">−{deletions}</span>
     </span>
   );

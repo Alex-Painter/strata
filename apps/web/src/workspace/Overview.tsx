@@ -248,8 +248,8 @@ function LayerRows({
                   <Icon name={LAYER_ICON[layer]} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{LAYERS[layer].title}</span>
-                {LAYERS[layer].inspect && <span className="text-[12px] text-faint">Inspect</span>}
-                <span className="text-[12px] text-faint">{plural(files.length, "file")}</span>
+                {LAYERS[layer].inspect && <span className="text-[13px] text-faint">Inspect</span>}
+                <span className="text-[13px] text-faint">{plural(files.length, "file")}</span>
                 <span className="w-24 text-right">
                   <LayerCount files={files} diff={diff} />
                 </span>
@@ -264,7 +264,7 @@ function LayerRows({
 
 function LayerCount({ files, diff }: { files: ScopedDiff["files"]; diff: ScopedDiff }) {
   if (files.every((file) => file.mechanical)) {
-    return <span className="text-[12px] text-faint">mechanical</span>;
+    return <span className="text-[13px] text-faint">mechanical</span>;
   }
   return <Counts {...meaningful(files, diff.byId)} />;
 }
@@ -302,7 +302,7 @@ export function PrOverview({
           </a>
           <span>{pr.title}</span>
         </h1>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
           <StateBadge pr={pr} />
           {pr.review && <span>{REVIEW_LABEL[pr.review]}</span>}
           {pr.checks && <span>{CHECKS_LABEL[pr.checks]}</span>}
@@ -313,8 +313,8 @@ export function PrOverview({
 
       <dl className="props">
         <Fact term="Branch">
-          <span className="font-mono text-[12px]">{pr.headRef}</span> into{" "}
-          <span className="font-mono text-[12px]">{pr.baseRef}</span>
+          <span className="font-mono text-[13px]">{pr.headRef}</span> into{" "}
+          <span className="font-mono text-[13px]">{pr.baseRef}</span>
           {retarget && (
             <span className="text-muted">
               {" "}
@@ -493,7 +493,7 @@ function PathList({ label, paths }: { label: string; paths: string[] }) {
       {paths.map((path, i) => (
         <span key={path}>
           {i > 0 && ", "}
-          <span className="font-mono text-[12px]">{path}</span>
+          <span className="font-mono text-[13px]">{path}</span>
         </span>
       ))}
     </p>
@@ -518,7 +518,7 @@ function Issues({ repo, issues }: { repo: string; issues: StackIssue[] }) {
           {/* The commits and PR numbers are the proof, not the point: they stay folded. */}
           {issue.evidence.length > 0 && (
             <details className="mt-1">
-              <summary className="cursor-pointer text-[12px] text-muted hover:text-text">
+              <summary className="cursor-pointer text-[13px] text-muted hover:text-text">
                 Evidence
               </summary>
               <EvidenceList repo={repo} evidence={issue.evidence} />

@@ -132,7 +132,7 @@ function WaitingOnYou({
         <h2 id="waiting-h" className="h2 flex-1">
           Waiting on you
         </h2>
-        <label className="flex items-center gap-1.5 text-[12px] text-muted">
+        <label className="flex items-center gap-1.5 text-[13px] text-muted">
           <input
             type="checkbox"
             checked={teams.show}
@@ -148,7 +148,7 @@ function WaitingOnYou({
         )}
       </div>
       {searchable && (
-        <p className="-mt-1 text-[12px] text-muted" aria-live="polite">
+        <p className="-mt-1 text-[13px] text-muted" aria-live="polite">
           {note}
         </p>
       )}
@@ -200,7 +200,7 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
       {stacks.error ? (
         <p className="alert">{stacks.error.message}</p>
       ) : !found ? (
-        <p role="status" className="text-[12px] text-muted">
+        <p role="status" className="text-[13px] text-muted">
           Strata reads the stacks in {repo}…{progress ? ` ${progress}.` : ""}
         </p>
       ) : others.length === 0 ? (
@@ -347,7 +347,7 @@ function ChangeTable({ rows }: { rows: Row[] }) {
           <col className="w-28" />
           <col className="w-10" />
         </colgroup>
-        <thead className="text-[11px] text-faint">
+        <thead className="text-[12px] text-faint">
           <tr className="border-b border-line">
             <th className="px-3 py-1.5 font-normal">Change</th>
             <th className="px-3 py-1.5 font-normal">Author</th>
@@ -379,7 +379,7 @@ function ChangeTable({ rows }: { rows: Row[] }) {
                   <Link href={row.href} className="block truncate font-medium text-text">
                     {row.title}
                   </Link>
-                  <span className="block truncate text-[12px] text-faint">
+                  <span className="block truncate text-[13px] text-faint">
                     <span className="font-mono">
                       {row.repo}#{row.rootPr}
                       {row.tipPr !== null && row.tipPr !== row.rootPr && ` → #${row.tipPr}`}
@@ -388,22 +388,22 @@ function ChangeTable({ rows }: { rows: Row[] }) {
                   </span>
                 </td>
                 <td
-                  className="truncate px-3 py-1.5 text-[12px] text-muted"
+                  className="truncate px-3 py-1.5 text-[13px] text-muted"
                   title={authors.join(", ")}
                 >
                   {authors.join(", ")}
                 </td>
                 <td
-                  className="px-3 py-1.5 font-mono text-[12px] text-muted"
+                  className="px-3 py-1.5 font-mono text-[13px] text-muted"
                   title={row.place?.detail}
                 >
                   {row.place?.label}
                 </td>
-                <td className="px-3 py-1.5 text-[12px] text-muted" title={opened}>
+                <td className="px-3 py-1.5 text-[13px] text-muted" title={opened}>
                   {opened ? ago(opened) : ""}
                 </td>
                 <td
-                  className={`truncate px-3 py-1.5 text-[12px] ${row.status ? TONE[row.status.kind] : ""}`}
+                  className={`truncate px-3 py-1.5 text-[13px] ${row.status ? TONE[row.status.kind] : ""}`}
                   title={row.status?.detail}
                 >
                   {row.status?.label}

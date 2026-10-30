@@ -119,7 +119,7 @@ function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSum
       <header className="flex items-start gap-3 border-b border-line px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-medium">{root?.title}</h2>
-          <p className="text-[12px] text-muted">
+          <p className="text-[13px] text-muted">
             {countPrs(stack.prs)} · updated {ago(stack.updatedAt)}
           </p>
         </div>
@@ -151,7 +151,7 @@ function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSum
               <Link href={`/changes/${existing.id}`} className="btn primary">
                 Open
               </Link>
-              <span className="text-[12px] text-muted">
+              <span className="text-[13px] text-muted">
                 {existing.status ? `${RUN_STATUS[existing.status]} ` : ""}
                 {ago(existing.updatedAt)}. This path already has a Change.
               </span>
@@ -173,7 +173,7 @@ function StackCard({ stack, changes }: { stack: StackSummary; changes: ChangeSum
 /** When the list was read; the server keeps it a while and reads again behind it. */
 export function ReadAt({ readAt, refreshing }: { readAt: string; refreshing: boolean }) {
   return (
-    <span className="block text-[12px] text-faint">
+    <span className="block text-[13px] text-faint">
       Read {ago(readAt)}
       {refreshing && ". Strata looks for changes…"}
     </span>
@@ -199,7 +199,7 @@ function AnalyseButton({
         {label}
       </button>
       {!error && (
-        <span className="text-[12px] text-muted">
+        <span className="text-[13px] text-muted">
           Strata reads the diffs. On repos that you opted in, Claude writes the summary.
         </span>
       )}

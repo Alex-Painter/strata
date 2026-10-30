@@ -103,9 +103,9 @@ function GuideItem({
         onClick={() => setOpen((value) => !value)}
         className="flex w-full items-baseline gap-2 text-left"
       >
-        <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{n}</span>
+        <span className="w-5 shrink-0 font-mono text-[13px] text-faint">{n}</span>
         <span className="min-w-0 flex-1 font-medium">{section.title}</span>
-        <span className="shrink-0 text-[12px] text-faint">
+        <span className="shrink-0 text-[13px] text-faint">
           {files.length === 1 ? "1 file" : `${files.length} files`} ·{" "}
           {files.every((file) => file.mechanical)
             ? "mechanical"
@@ -124,17 +124,17 @@ function GuideItem({
               <button
                 type="button"
                 onClick={() => onFile(file.path)}
-                className="truncate text-left font-mono text-[12px] text-muted hover:text-text"
+                className="truncate text-left font-mono text-[13px] text-muted hover:text-text"
               >
                 {file.path}
               </button>
               {mixed && (
-                <span className="shrink-0 text-[12px] text-faint">
+                <span className="shrink-0 text-[13px] text-faint">
                   {LAYERS[file.layer.layer].title}
                 </span>
               )}
               {file.mechanical && (
-                <span className="shrink-0 text-[12px] text-faint">{file.mechanical.reason}</span>
+                <span className="shrink-0 text-[13px] text-faint">{file.mechanical.reason}</span>
               )}
             </li>
           ))}

@@ -36,7 +36,7 @@ export function DisplayPopover({
     >
       <span className="grid min-w-0 flex-1">
         <span>{label}</span>
-        <span className="text-[12px] leading-snug text-faint">{hint}</span>
+        <span className="text-[13px] leading-snug text-faint">{hint}</span>
       </span>
       {kbd && <kbd>{kbd}</kbd>}
       <span className="sw" />
@@ -166,7 +166,7 @@ export function CommandMenu({ commands, onClose }: { commands: Command[]; onClos
                 >
                   <Icon name={command.icon} />
                   <span className="ct">{command.label}</span>
-                  {command.hint && <span className="text-[12px] text-faint">{command.hint}</span>}
+                  {command.hint && <span className="text-[13px] text-faint">{command.hint}</span>}
                 </div>
               </div>
             );
@@ -226,7 +226,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
             </div>
           ))}
         </dl>
-        <p className="px-[18px] pb-4 text-[12px] text-faint">
+        <p className="px-[18px] pb-4 text-[13px] text-faint">
           Single keys do not operate while you type.
         </p>
       </div>

@@ -188,7 +188,7 @@ export function HomeNav({
               aria-current={current === repo ? "page" : undefined}
             >
               <Icon name="pr" />
-              <span className="nl font-mono text-[12px]">{repo}</span>
+              <span className="nl font-mono text-[13px]">{repo}</span>
             </Link>
           ))}
         </div>

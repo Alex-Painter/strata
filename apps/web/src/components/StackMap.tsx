@@ -112,7 +112,7 @@ export function StackMap({
         >
           <span className="font-mono text-text">{stack.trunk}</span>
           {stack.base && (
-            <span className="text-[11px]">
+            <span className="text-[12px]">
               left at{" "}
               <a
                 href={commitUrl(stack.repo, stack.base)}
@@ -182,7 +182,7 @@ function PrRow({
           {pr.title}
         </span>
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-faint">
+      <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-faint">
         <StateBadge pr={pr} />
         <ReviewMarks pr={pr} />
         {pr.state === "merged" && pr.mergeCommitOid && (
@@ -244,7 +244,7 @@ function LayerBar({ bar, widest }: { bar: PrLayerBar | null; widest: number }) {
           />
         )}
       </div>
-      <span className="shrink-0 font-mono text-[10px] leading-3 text-muted">{bar.meaningful}</span>
+      <span className="shrink-0 font-mono text-[11px] leading-3 text-muted">{bar.meaningful}</span>
     </div>
   );
 }
