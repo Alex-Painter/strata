@@ -99,6 +99,8 @@ export function Workspace({
   const [asking, setAsking] = useState<Anchor[]>([]);
   /** The Ask button next to a text selection on a diff. */
   const [pop, setPop] = useState<{ anchor: Anchor; x: number; y: number } | null>(null);
+  /** Counts the times Ask was chosen on a selection, to focus the question box. */
+  const [askFocus, setAskFocus] = useState(0);
 
   // A selection on a surface that can be highlighted shows the Ask button.
   useEffect(() => {
@@ -599,6 +601,7 @@ export function Workspace({
               onRemoveAnchor={(index) => setAsking(asking.filter((_, i) => i !== index))}
               onClearAnchors={() => setAsking([])}
               onCite={cite}
+              focus={askFocus}
             />
           </Panel>
         )}
@@ -612,6 +615,7 @@ export function Workspace({
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setAsking((now) => [...now, pop.anchor].slice(-10));
+              setAskFocus((n) => n + 1);
               setPanel(true);
               setPop(null);
               window.getSelection()?.removeAllRanges();

@@ -28,6 +28,7 @@ export function Ask({
   onRemoveAnchor,
   onClearAnchors,
   onCite,
+  focus = 0,
 }: {
   changeId: string;
   report: ChangeReport | null;
@@ -37,6 +38,8 @@ export function Ask({
   onClearAnchors: () => void;
   /** Opens a hunk on the canvas. */
   onCite: (hunkId: string) => void;
+  /** Goes up each time the reviewer chooses Ask on a selection: the question box then gets focus. */
+  focus?: number;
 }) {
   const queryClient = useQueryClient();
   const repo = report?.change.repo.kind === "github" ? report.change.repo : null;
@@ -62,6 +65,7 @@ export function Ask({
   const [pending, setPending] = useState<Pending | null>(null);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
   const shown = threadId ? (messages.data ?? []) : [];
 
   // Keep the newest text in view while the answer streams in.
@@ -70,6 +74,13 @@ export function Ask({
     if (length > 0) end.current?.scrollIntoView?.({ block: "end" });
   }, [length]);
   useEffect(() => () => abort.current?.abort(), []);
+  // After Ask on a selection, the reviewer can type the question at once.
+  const gated = settings.data
+    ? !settings.data.claudeAvailable || !settings.data.sendCodeToAnthropic
+    : false;
+  useEffect(() => {
+    if (focus > 0 && !gated) box.current?.focus();
+  }, [focus, gated]);
 
   const send = async () => {
     const question = text.trim();
@@ -244,6 +255,7 @@ export function Ask({
           </ul>
         )}
         <textarea
+          ref={box}
           aria-label="Question"
           placeholder={
             anchors.length > 0 ? "Write a question about the highlight" : "Write a question"

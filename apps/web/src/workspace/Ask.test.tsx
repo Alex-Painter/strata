@@ -84,7 +84,7 @@ afterEach(() => {
 
 const flush = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
 
-function render(props: { anchors: Anchor[]; onCite?: (id: string) => void }) {
+function render(props: { anchors: Anchor[]; onCite?: (id: string) => void; focus?: number }) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -99,6 +99,7 @@ function render(props: { anchors: Anchor[]; onCite?: (id: string) => void }) {
           onRemoveAnchor={() => {}}
           onClearAnchors={cleared}
           onCite={props.onCite ?? (() => {})}
+          focus={props.focus ?? 0}
         />
       </QueryClientProvider>,
     ),
@@ -153,4 +154,15 @@ it("points to Settings when the repo does not let Claude read its code", async (
   );
   expect(container.querySelector('a[href="/settings"]')).not.toBeNull();
   act(() => root.unmount());
+});
+
+it("focuses the question box after Ask on a selection", async () => {
+  const { container, root } = render({ anchors: [anchor] });
+  await flush();
+  expect(document.activeElement).not.toBe(container.querySelector("textarea"));
+  act(() => root.unmount());
+  const again = render({ anchors: [anchor], focus: 1 });
+  await flush();
+  expect(document.activeElement).toBe(again.container.querySelector("textarea"));
+  act(() => again.root.unmount());
 });
