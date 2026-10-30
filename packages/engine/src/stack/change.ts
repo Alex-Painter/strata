@@ -14,6 +14,7 @@ import {
   type PrIndex,
   REPORT_SCHEMA_VERSION,
   type Stack,
+  StackError,
   type StackSeed,
   stableId,
 } from "@strata/core";
@@ -46,7 +47,25 @@ export async function resolveStackChange(
       ? input.seed
       : { pr: input.numbers[0] as number, leaf: input.numbers[input.numbers.length - 1] as number };
   await cache.fetch({ pulls: pullsFor(index, seed) });
-  const stack = await resolveStack(index, seed, cache.gitDir);
+  let stack: Stack;
+  try {
+    stack = await resolveStack(index, seed, cache.gitDir);
+  } catch (error) {
+    const left = leftStack(index, seed, error);
+    if (!left) throw error;
+    // The saved bottom PR merged and GitHub lost its link: take the stack below the tip.
+    const fromTip: StackSeed = { pr: left.tip, leaf: left.tip };
+    await cache.fetch({ pulls: pullsFor(index, fromTip) });
+    const found = await resolveStack(index, fromTip, cache.gitDir);
+    stack = {
+      ...found,
+      notes: [
+        ...found.notes,
+        `GitHub no longer links #${left.bottom} to #${left.tip}. ` +
+          `Thus Strata shows the stack below #${left.tip}, from #${found.selectedPath[0]}.`,
+      ],
+    };
+  }
   if (input.kind === "stack" && stack.selectedPath.join(",") !== input.numbers.join(",")) {
     throw new StackInputError(
       `${input.numbers.map((n) => `#${n}`).join(", ")} is not a chain of branch links. ` +
@@ -84,6 +103,23 @@ export async function resolveStackChange(
   };
 }
 
+/**
+ * The saved path's bottom and tip, when the tip is no longer above the bottom
+ * because the bottom merged or closed. GitHub can retarget a child onto the
+ * trunk without a record of its old base, which cuts the link for good.
+ */
+function leftStack(
+  index: PrIndex,
+  seed: StackSeed,
+  error: unknown,
+): { bottom: number; tip: number } | null {
+  if (!(error instanceof StackError) || !("pr" in seed) || seed.leaf === undefined) return null;
+  const bottom = index.prs.find((pr) => pr.number === seed.pr);
+  const tip = index.prs.find((pr) => pr.number === seed.leaf);
+  if (!bottom || !tip || bottom.state === "open" || tip.number === bottom.number) return null;
+  return { bottom: bottom.number, tip: tip.number };
+}
+
 export async function stackReport(
   resolved: ResolvedChange & { stack: Stack },
   options: AnalyzeOptions,
@@ -105,7 +141,7 @@ export async function stackReport(
   const stack: Stack = {
     ...resolved.stack,
     issues: [...resolved.stack.issues, ...diffs.issues],
-    notes: [...diffNotes(resolved.stack, diffs), ...summaries.partNotes],
+    notes: [...resolved.stack.notes, ...diffNotes(resolved.stack, diffs), ...summaries.partNotes],
   };
   const path = stack.selectedPath;
   return {

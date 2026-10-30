@@ -157,6 +157,17 @@ describe("the assignment search", () => {
     expect(runCount()).toBe(2);
   });
 
+  it("keeps the stack's name when it searches again", async () => {
+    demo.github.requests = { 4: { assignees: ["alex"] } };
+    const { db, runs, assigned, list } = setup();
+    await assigned.search(USER);
+    await runs.idle();
+    // A finished run gave the Change the name Claude wrote for the stack.
+    db.update(changesTable).set({ title: "A name for the stack" }).run();
+    await assigned.search(USER);
+    expect((await list()).map((change) => change.title)).toEqual(["A name for the stack"]);
+  });
+
   it("keeps a Change once GitHub stops listing its PR, no longer waiting", async () => {
     demo.github.requests = { 4: { assignees: ["alex"] } };
     const { assigned, list } = setup();

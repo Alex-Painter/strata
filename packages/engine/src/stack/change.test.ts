@@ -64,6 +64,24 @@ describe("engine.resolveChange for stacks", () => {
     expect(byLeaf.stack?.selectedPath).toEqual([5, 6]);
   });
 
+  it("takes the stack below the tip when the saved bottom PR merged and left it", async () => {
+    const github = { kind: "github" as const, owner: "acme", name: "app" };
+    // #1 merged; nothing links it to #6 now, as when GitHub retargets with no record.
+    const left = await engine().resolveChange({
+      kind: "stack-of",
+      repo: github,
+      seed: { pr: 1, leaf: 6 },
+    });
+    expect(left.stack?.selectedPath).toEqual([5, 6]);
+    expect(left.stack?.notes).toEqual([
+      "GitHub no longer links #1 to #6. Thus Strata shows the stack below #6, from #5.",
+    ]);
+    // An open bottom PR has not left: the tip is just in another stack.
+    await expect(
+      engine().resolveChange({ kind: "stack-of", repo: github, seed: { pr: 2, leaf: 6 } }),
+    ).rejects.toThrow("#6 is not at or above #2 in its stack.");
+  });
+
   it("checks that an explicit list is a real chain", async () => {
     const chain = await engine().resolveChange(parseChangeInput("acme/app#1,2,3"));
     expect(chain.stack?.selectedPath).toEqual([1, 2, 3]);

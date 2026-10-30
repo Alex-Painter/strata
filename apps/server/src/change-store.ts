@@ -90,8 +90,8 @@ export function saveChange(
     )
     .get();
   if (existing) {
+    // The title stays: each finished run sets it, with the name Claude gave the stack.
     const fields = {
-      title: resolved.title,
       pathPrs: pathPrsOf(resolved.stack),
       updatedAt: now,
       ...(origin === "added" ? { origin } : {}),

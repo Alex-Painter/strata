@@ -8,6 +8,7 @@ import type { RunInfo } from "@strata/core/model";
 import type { Engine } from "@strata/engine";
 import { desc, eq, inArray } from "drizzle-orm";
 import { newId } from "./auth/crypto.js";
+import { pathPrsOf } from "./change-store.js";
 import type { Db } from "./db/client.js";
 import { type ChangeRow, changes, type RunRow, reports, runs } from "./db/schema.js";
 
@@ -83,7 +84,12 @@ export class RunQueue {
           .where(eq(runs.id, runId))
           .run();
         tx.update(changes)
-          .set({ title: report.change.title, updatedAt: at })
+          .set({
+            title: report.change.title,
+            // The PRs as this run found them: states change, and a merged bottom can leave.
+            ...(report.stack ? { pathPrs: pathPrsOf(report.stack) } : {}),
+            updatedAt: at,
+          })
           .where(eq(changes.id, change.id))
           .run();
       });
