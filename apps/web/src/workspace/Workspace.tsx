@@ -7,7 +7,7 @@ import type {
   PathPr,
   YourPr,
 } from "@strata/core/model";
-import { LAYERS } from "@strata/core/model";
+import { LAYER_IDS, LAYERS } from "@strata/core/model";
 import { summarizeStack } from "@strata/core/stack";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Breadcrumb } from "../components/AppShell";
@@ -676,15 +676,20 @@ function ChangeNav({
       {layers.length > 0 && (
         <div className="sec">
           <div className="sec-h">Layers</div>
-          {layers.map((id) => {
+          {/* Every layer, so the list keeps its shape; "Other" only when a file needs it. */}
+          {LAYER_IDS.filter((id) => id !== "other" || layers.includes(id)).map((id) => {
             const count = countIn(id);
+            const none = !layers.includes(id);
             return (
               <button
                 key={id}
                 type="button"
                 className={`nrow ${count === 0 ? "faint" : ""}`}
                 aria-current={layer === id ? "true" : undefined}
-                title={LAYERS[id].description}
+                disabled={none}
+                title={
+                  none ? `This Change has no ${LAYERS[id].title} files.` : LAYERS[id].description
+                }
                 data-layer={id}
                 onClick={() => onNav({ layer: id })}
               >

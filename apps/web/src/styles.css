@@ -448,7 +448,7 @@ code,
     white-space: nowrap;
     text-align: left;
   }
-  .nrow:hover {
+  .nrow:hover:not(:disabled) {
     background: var(--hover);
     color: var(--fg);
   }

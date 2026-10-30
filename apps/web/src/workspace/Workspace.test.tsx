@@ -288,11 +288,19 @@ describe("Workspace", () => {
       [...nav.querySelectorAll("[data-layer]")].map((row) => [
         row.getAttribute("data-layer"),
         row.textContent,
+        (row as HTMLButtonElement).disabled,
       ]),
     ).toEqual([
-      ["data-model", "Data model1"],
-      ["config", "Config & infra1"],
+      // Every layer shows; a layer with no files is greyed out and does nothing.
+      ["data-model", "Data model1", false],
+      ["api", "API0", true],
+      ["logic", "Logic0", true],
+      ["ui", "UI0", true],
+      ["tests", "Tests0", true],
+      ["config", "Config & infra1", false],
+      ["docs", "Docs0", true],
     ]);
+    expect(nav.querySelector('[data-layer="api"]')?.className).toContain("faint");
     expect(button(page, "Whole stack").getAttribute("aria-current")).toBe("true");
     const row = button(page, "Show #1 Add the forecast flag");
     expect(row.closest("li")?.getAttribute("data-pr")).toBe("1");
