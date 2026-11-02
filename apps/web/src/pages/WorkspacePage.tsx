@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useParams, useSearchParams } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
-import { api } from "../lib/api";
+import { api, HttpError } from "../lib/api";
 import { useLatestRequest } from "../lib/latest-request";
 import type { Nav } from "../workspace/model";
 import { Workspace } from "../workspace/Workspace";
@@ -85,10 +85,19 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       <AppShell
         me={me}
         navLabel="Change"
-        nav={null}
+        nav={<HomeNav current={null} />}
         top={<Breadcrumb items={[{ label: "Changes", href: "/" }, { label: "Change" }]} />}
       >
-        <p className="p-8 text-muted">{detail.error.message}</p>
+        <div className="grid justify-items-start gap-3 p-8">
+          <p className="text-muted">
+            {detail.error instanceof HttpError && detail.error.status === 404
+              ? "Strata cannot find this Change. The link is wrong, or the Change is gone."
+              : detail.error.message}
+          </p>
+          <a href="/" className="btn">
+            Go to Changes
+          </a>
+        </div>
       </AppShell>
     );
   }
