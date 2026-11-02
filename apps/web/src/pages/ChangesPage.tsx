@@ -337,10 +337,10 @@ function ChangeTable({ rows }: { rows: Row[] }) {
   const [, navigate] = useLocation();
   return (
     <div className="list overflow-x-auto">
-      <table className="w-full table-fixed border-collapse text-left">
+      <table className="w-full min-w-[840px] table-fixed border-collapse text-left">
         <colgroup>
           <col />
-          <col className="w-44" />
+          <col className="w-32" />
           <col className="w-20" />
           <col className="w-24" />
           <col className="w-40" />
