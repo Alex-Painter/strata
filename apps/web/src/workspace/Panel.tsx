@@ -391,15 +391,20 @@ function PrMarks({
           return (
             <li
               key={pr.number}
-              className="flex flex-wrap items-center gap-1.5"
+              className="flex items-start gap-1.5"
               title={[title, line].filter(Boolean).join("\n")}
             >
-              <span className="w-14 shrink-0 font-mono text-[13px] text-muted">#{pr.number}</span>
-              {marks.map(([tone, label]) => (
-                <span key={label} className="mark" data-tone={tone}>
-                  {label}
-                </span>
-              ))}
+              <span className="w-12 shrink-0 font-mono text-[13px] leading-[20px] text-muted">
+                #{pr.number}
+              </span>
+              {/* A mark that wraps lines up under the first mark, not under the PR number. */}
+              <span className="flex min-w-0 flex-wrap gap-1.5">
+                {marks.map(([tone, label]) => (
+                  <span key={label} className="mark" data-tone={tone}>
+                    {label}
+                  </span>
+                ))}
+              </span>
             </li>
           );
         })}
