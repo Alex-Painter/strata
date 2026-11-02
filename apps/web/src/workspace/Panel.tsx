@@ -274,13 +274,13 @@ function Overview({
                 <PrMarks prs={onPath} lines={github.lines} titles={titles} reviewed={reviewed} />
               </Prop>
               <Prop term="Strata">
-                <span
-                  className="inline-flex items-center gap-2"
-                  title="Strata does not give a verdict at this time."
-                >
-                  {working(run) && <Spinner />}
-                  {statusWord(report, run)}
-                </span>
+                {/* The top bar already says "No verdict yet": here only a run that is news shows. */}
+                {(working(run) || run?.info?.status === "failed") && (
+                  <span className="inline-flex items-center gap-2">
+                    {working(run) && <Spinner />}
+                    {statusWord(report, run)}
+                  </span>
+                )}
                 <RunAgainLine run={run} />
               </Prop>
             </>
