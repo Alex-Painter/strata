@@ -12,7 +12,8 @@
  * the repo when stopped.
  *
  * It lists #4 and #10 as asking something of the token's user, and #3 as
- * reviewed by them, for the assignment search.
+ * reviewed by them, for the assignment search. It accepts approvals from
+ * Strata's Approve action and keeps them in memory until it stops.
  *
  * It also stands in for Claude at POST /v1/messages (fixture-claude.ts): point
  * DEV_ANTHROPIC_BASE_URL at its origin, set any ANTHROPIC_API_KEY, and turn on

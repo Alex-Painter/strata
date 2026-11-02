@@ -27,6 +27,7 @@ import { Jobs } from "../jobs.js";
 import { latestRun, runInfo } from "../runs.js";
 import { StackCache } from "../stack-cache.js";
 import type { AppDeps, AppEnv } from "../types.js";
+import { approvalRoutes } from "./approvals.js";
 
 const CreateChange = z.object({
   input: z.string().min(1).max(500),
@@ -130,6 +131,8 @@ export function changeRoutes(deps: AppDeps) {
     if (!row) return c.json({ error: "Not found." }, 404);
     return c.json(deps.runs.enqueue(row), 202);
   });
+
+  app.route("/", approvalRoutes(deps, stackCache));
 
   app.onError((error, c) => {
     if (
