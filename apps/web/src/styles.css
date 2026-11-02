@@ -943,8 +943,9 @@ code,
   .panel {
     /* The width the reviewer dragged it to, at most most of the window. */
     position: relative;
-    flex: 0 0 min(var(--panel-w, 360px), 65vw);
-    min-width: 0;
+    /* It gives way before the canvas does, down to its narrowest width. */
+    flex: 0 1 min(var(--panel-w, 360px), 65vw);
+    min-width: 280px;
     min-height: 0;
     display: flex;
     flex-direction: column;

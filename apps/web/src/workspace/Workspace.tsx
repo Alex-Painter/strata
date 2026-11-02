@@ -440,7 +440,7 @@ export function Workspace({
           <aside
             aria-label="Change"
             style={{ width: paneWidth }}
-            className="relative hidden shrink-0 flex-col overflow-y-auto border-r border-line px-2 py-3 md:flex"
+            className="relative hidden min-w-[220px] shrink flex-col overflow-y-auto border-r border-line px-2 py-3 md:flex"
           >
             <PaneHandle width={paneWidth} onWidth={setPaneWidth} />
             <ChangeNav
@@ -492,7 +492,7 @@ export function Workspace({
             )}
           </aside>
         )}
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-w-[280px] flex-1 flex-col">
           <div className="vbar">
             <h2 className="vt">
               <Icon name={layer ? LAYER_ICON[layer] : "review"} />
