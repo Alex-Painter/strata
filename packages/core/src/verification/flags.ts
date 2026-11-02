@@ -102,18 +102,5 @@ export function verificationFlags(
       itemIds: [review.id],
     });
   }
-  if (
-    claims.length > 0 &&
-    verification.bodyAt &&
-    verification.headAt &&
-    verification.headAt > verification.bodyAt
-  ) {
-    flags.push({
-      kind: "stale",
-      pr,
-      message: `The head commit of #${pr} is newer than the last edit of its PR body. The body can describe older code.`,
-      itemIds: ids(claims),
-    });
-  }
   return flags;
 }

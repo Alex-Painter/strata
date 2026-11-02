@@ -94,7 +94,7 @@ describe("verificationFlags", () => {
     expect(kinds([item({ kind: "check", result: "skipped" })])).toEqual(["no-checks"]);
   });
 
-  it("flags an approval on an older commit and a body older than the head", () => {
+  it("flags an approval on an older commit, and not a body older than the head", () => {
     const flags = verificationFlags(
       base(
         [
@@ -107,8 +107,8 @@ describe("verificationFlags", () => {
       null,
     );
     expect(flags.map((flag) => flag.message)).toEqual([
+      // A restack gives a new commit date with no new code, so the body's age says little.
       "alex approved #1 at bbbbbbb. The head is now aaaaaaa.",
-      "The head commit of #1 is newer than the last edit of its PR body. The body can describe older code.",
     ]);
   });
 });

@@ -83,7 +83,7 @@ describe("parsePrBody", () => {
       },
       {
         kind: "not-run",
-        title: "an error path from a TypeScript MCP SDK client.",
+        title: "An error path from a TypeScript MCP SDK client.",
         result: "not-run",
         strength: "claimed",
         section: "Verification",

@@ -129,7 +129,9 @@ function readSection(section: Section, name: string, gapSection: boolean, add: A
       if (gap) {
         inGapList = true;
         const rest = gap[2]?.trim();
-        if (rest) add({ kind: "not-run", title: oneLine(rest), result: "not-run", section: name });
+        if (rest) {
+          add({ kind: "not-run", title: oneLine(capital(rest)), result: "not-run", section: name });
+        }
       } else if (!gapSection) {
         inGapList = false;
       }
@@ -301,6 +303,11 @@ export function stripMarkdown(text: string): string {
     .replace(/(^|\W)[*_]([^*_\n]+)[*_](?=\W|$)/g, "$1$2")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** "an error path" reads as a fragment in a list: "An error path". */
+function capital(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** The first sentence or 160 characters, for a title. */

@@ -172,7 +172,7 @@ describe("toPrVerification", () => {
       ["bot-review", "Airspeed Review: risk high, 0 findings", "pass", "observed", true],
       ["test", "Blacksmith: 22 tests fail", "fail", "observed", true],
       ["test", "`pytest` passed locally.", "claimed", "claimed", false],
-      ["not-run", "the live view on a phone.", "not-run", "claimed", false],
+      ["not-run", "The live view on a phone.", "not-run", "claimed", false],
     ]);
     const preview = v.items.find((item) => item.kind === "preview");
     expect(preview?.url).toBe("https://preview.example/9336");
