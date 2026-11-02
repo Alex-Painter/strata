@@ -19,14 +19,20 @@ import {
   type TimelineNode,
 } from "../github/graphql.js";
 import type { GitHubPort } from "../github/port.js";
+import type { VerificationNode, VerificationPage } from "../github/verification.js";
 
 export interface FakeGitHub extends GitHubPort {
-  calls: { query: "page" | "timeline" | "search"; variables: Record<string, unknown> }[];
+  calls: {
+    query: "page" | "timeline" | "search" | "verification";
+    variables: Record<string, unknown>;
+  }[];
   prs: PrNode[];
   /** The login the token belongs to. */
   viewer: string;
   /** Who each PR is assigned to and whose review it asks for, by PR number. */
   requests: Record<number, FakeRequests>;
+  /** Checks, reviews, comments and bodies by PR number, for the verification query. */
+  verification: Record<number, Partial<VerificationNode>>;
 }
 
 export interface FakeRequests {
@@ -54,6 +60,7 @@ export function fakeGitHub(
     prs,
     viewer: options.viewer ?? "reviewer",
     requests: {},
+    verification: {},
     async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
       if (query === VIEWER_QUERY) {
         const page: ViewerPage = { viewer: { login: fake.viewer } };
@@ -99,6 +106,18 @@ export function fakeGitHub(
               : null,
           },
         };
+        return page as T;
+      }
+      if (query.startsWith("query StrataVerification")) {
+        fake.calls.push({ query: "verification", variables });
+        const page: VerificationPage = { repository: {} };
+        for (const match of query.matchAll(/pr(\d+): pullRequest/g)) {
+          const n = Number(match[1]);
+          const node = fake.prs.find((pr) => pr.number === n);
+          (page.repository as Record<string, VerificationNode | null>)[`pr${n}`] = node
+            ? verificationNode(node, fake.verification[n] ?? {})
+            : null;
+        }
         return page as T;
       }
       throw new Error("The fake GitHub doesn't know this query.");
@@ -214,3 +233,31 @@ export const forcePushed = (before: string, after: string, minute: number): Time
   beforeCommit: { oid: before },
   afterCommit: { oid: after },
 });
+
+/** A PR's verification node: its own fields, then whatever the test gave for it. */
+function verificationNode(pr: PrNode, given: Partial<VerificationNode>): VerificationNode {
+  return {
+    number: pr.number,
+    url: pr.url,
+    body: null,
+    createdAt: pr.createdAt,
+    lastEditedAt: null,
+    headRefOid: pr.headRefOid,
+    commits: {
+      nodes: [
+        {
+          commit: {
+            oid: pr.headRefOid,
+            committedDate: pr.createdAt,
+            statusCheckRollup: null,
+            deployments: null,
+          },
+        },
+      ],
+    },
+    latestReviews: null,
+    reviews: null,
+    comments: null,
+    ...given,
+  };
+}

@@ -116,6 +116,14 @@ describe("engine.analyzeChange for stacks", () => {
     expect(report.change.title).toBe("Add the forecast model");
     expect(report.change.files).toHaveLength(3);
     expect(report.parts.map((part) => part.pr)).toEqual([1, 2, 3]);
+    // The fake GitHub gives no checks or bodies: each PR has only "no checks".
+    expect(
+      report.verification?.prs.map((pr) => [pr.pr, pr.head, pr.flags.map((f) => f.kind)]),
+    ).toEqual([
+      [1, demo.heads[1], ["no-checks"]],
+      [2, demo.heads[2], ["no-checks"]],
+      [3, demo.heads[3], ["no-checks"]],
+    ]);
     expect(report.verdict).toBeUndefined();
     expect(report.summary).toEqual([]);
     expect(report.guide.by).toBe("rule");
@@ -133,6 +141,7 @@ describe("engine.analyzeChange for stacks", () => {
       "Strata clones acme/app into its cache (only one time)",
       "Strata fetches the branches of acme/app and 3 PR heads",
       "Strata makes the diffs",
+      "Strata reads the checks, reviews and verification of each PR",
     ]);
   });
 
@@ -151,6 +160,26 @@ describe("engine.analyzeChange for stacks", () => {
     const a = await engine().analyzeChange(parseChangeInput("acme/app#1"));
     const b = await engine().analyzeChange(parseChangeInput("acme/app#3"));
     expect(a.change.id).toBe(b.change.id);
+  });
+});
+
+describe("engine.analyzeChange verification", () => {
+  it("keeps the report when GitHub cannot answer the verification query", async () => {
+    const github = {
+      ...demo.github,
+      graphql: <T>(query: string, variables: Record<string, unknown>): Promise<T> =>
+        query.startsWith("query StrataVerification")
+          ? Promise.reject(new Error("GitHub returned 502: Bad gateway"))
+          : demo.github.graphql<T>(query, variables),
+    };
+    const report = await engine({ githubPort: github }).analyzeChange(
+      parseChangeInput("acme/app#3"),
+    );
+    expect(report.change.files).toHaveLength(3);
+    expect(report.verification).toEqual({
+      prs: [],
+      notes: ["Strata cannot read the verification from GitHub. GitHub returned 502: Bad gateway"],
+    });
   });
 });
 
@@ -220,6 +249,7 @@ describe("engine.analyzeChange summaries", () => {
       "Strata fetches the branches of acme/app and 3 PR heads",
       "Strata makes the diffs",
       "Claude writes the summaries",
+      "Strata reads the checks, reviews and verification of each PR",
     ]);
     expect(bodies).toHaveLength(4);
     expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);

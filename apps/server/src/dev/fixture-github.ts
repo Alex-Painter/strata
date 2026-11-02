@@ -179,13 +179,120 @@ demo.github.requests = {
   10: { teams: [{ slug: "acme/backend", members: ["verify-bot"] }] },
 };
 
+// What each PR of #9-#11 carries as proof, for the Verification sections:
+// #9 passes, with a bot verdict and before/after screenshots that this server
+// serves; #10's CI still runs, and its body has a walk, a gap and manual steps;
+// #11's tests fail while its body says they pass, and it shows no picture of
+// its admin page.
+const run = (name: string, conclusion: string | null, status = "COMPLETED") => ({
+  __typename: "CheckRun" as const,
+  name,
+  status,
+  conclusion,
+  detailsUrl: `https://github.com/acme/app/actions/runs/1/job/${name.length}`,
+  startedAt: "2026-10-01T00:40:00Z",
+  completedAt: status === "COMPLETED" ? "2026-10-01T00:44:00Z" : null,
+  checkSuite: { app: { name: "GitHub Actions" }, workflowRun: null },
+});
+const headCommit = (oid: string, contexts: ReturnType<typeof run>[]) => ({
+  nodes: [
+    {
+      commit: {
+        oid,
+        committedDate: "2026-10-01T00:30:00Z",
+        statusCheckRollup: { contexts: { nodes: contexts } },
+        deployments: null,
+      },
+    },
+  ],
+});
+const verdictReview = (oid: string) => ({
+  author: { __typename: "Bot", login: "airspeed-dev-bot" },
+  state: "COMMENTED",
+  body: `<!-- airspeed-verdict {"head_sha":"${oid}","risk":"medium","reason":"The PR adds a cache table and a key format.","findings":0,"complete":true,"has_blocking_findings":false} -->`,
+  submittedAt: "2026-10-01T00:48:00Z",
+  url: "https://github.com/acme/app/pull/9#pullrequestreview-1",
+  commit: { oid },
+});
+demo.github.verification = {
+  9: {
+    body: [
+      "## Verification",
+      "",
+      "- `uv run pytest tests/` passed.",
+      "",
+      "## Screenshots",
+      "",
+      "Before: the forecast page loads in 4 seconds.",
+      "",
+      "![](ORIGIN/assets/before.svg)",
+      "",
+      "After: the forecast page loads from the cache.",
+      "",
+      "![](ORIGIN/assets/after.svg)",
+    ].join("\n"),
+    lastEditedAt: "2026-10-01T00:50:00Z",
+    commits: headCommit(h9, [run("Backend CI / Unit tests", "SUCCESS"), run("Lint", "SUCCESS")]),
+    reviews: { nodes: [verdictReview(h9)] },
+    latestReviews: {
+      nodes: [
+        {
+          author: { __typename: "User", login: "maya" },
+          state: "APPROVED",
+          submittedAt: "2026-10-01T00:49:00Z",
+          url: "https://github.com/acme/app/pull/9#pullrequestreview-2",
+          commit: { oid: h9 },
+        },
+      ],
+    },
+  },
+  10: {
+    body: [
+      "## Testing",
+      "",
+      "### Manual testing",
+      "",
+      "1. Seed three accounts.",
+      "2. Run the job. It gives `warm-cache accounts=3 failures=0`.",
+      "",
+      "Not run: the job on a real account with 10,000 deals.",
+    ].join("\n"),
+    lastEditedAt: "2026-10-01T00:50:00Z",
+    commits: headCommit(h10, [
+      run("Backend CI / Unit tests", null, "IN_PROGRESS"),
+      run("Lint", "SUCCESS"),
+    ]),
+  },
+  11: {
+    body: "## Verification\n\n- Backend unit tests and `tsc` pass locally.\n",
+    lastEditedAt: "2026-10-01T00:50:00Z",
+    commits: headCommit(h11, [
+      run("Frontend CI / Test", "FAILURE"),
+      run("Lint", "SUCCESS"),
+      run("Deploy preview", "SKIPPED"),
+    ]),
+  },
+};
+
 // The fixture's clock starts on 1 Oct 2026. Move every timestamp so the newest
 // is an hour ago, keeping the PRs inside the 90 days Strata reads.
 const newest = Math.max(...demo.github.prs.map((pr) => Date.parse(pr.updatedAt)));
 const shift = Date.now() - 3_600_000 - newest;
 demo.github.prs = demo.github.prs.map((pr) => shiftTimes(pr, shift));
+demo.github.verification = shiftTimes(demo.github.verification, shift);
+
+// Two small pictures for #9's screenshots.
+const picture = (label: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#e5e5e5"/><text x="160" y="96" font-family="sans-serif" font-size="20" text-anchor="middle">${label}</text></svg>`;
 
 const server = createServer(async (req, res) => {
+  const asset = req.method === "GET" ? /^\/assets\/(before|after)\.svg$/.exec(req.url ?? "") : null;
+  if (asset) {
+    res
+      .writeHead(200, { "content-type": "image/svg+xml" })
+      .end(picture(asset[1] === "before" ? "Before: 4 s" : "After: from the cache"));
+    return;
+  }
   if (req.method !== "POST" || (req.url !== "/graphql" && req.url !== "/v1/messages")) {
     res.writeHead(404).end();
     return;
@@ -217,6 +324,13 @@ const server = createServer(async (req, res) => {
 server.listen(Number(process.argv[2] ?? 0), "127.0.0.1", () => {
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : 0;
+  const body = demo.github.verification[9]?.body;
+  if (body) {
+    (demo.github.verification[9] as { body: string }).body = body.replaceAll(
+      "ORIGIN",
+      `http://127.0.0.1:${port}`,
+    );
+  }
   console.log(`READY http://127.0.0.1:${port}/graphql ${remote.dir}`);
 });
 

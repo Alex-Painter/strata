@@ -15,6 +15,7 @@ import { EvidenceContext, type EvidenceView } from "../components/Claims";
 import { Counts, meaningful } from "../components/Diff";
 import { Icon, LAYER_ICON } from "../components/Icon";
 import { Spinner } from "../components/Spinner";
+import { railMarks } from "../components/Verification";
 import { selectionAnchor } from "../lib/selection";
 import { useStored } from "../lib/stored";
 import { toggleTheme } from "../lib/theme";
@@ -85,6 +86,7 @@ export function Workspace({
   const part = report?.parts.find((p) => p.pr === pr) ?? null;
   const diff = useMemo(() => (report ? scopedDiff(report, part) : null), [report, part]);
   const layers = useMemo(() => (report ? changeLayers(report) : []), [report]);
+  const marks = useMemo(() => railMarks(report), [report]);
   const layer = nav.layer && layers.includes(nav.layer) ? nav.layer : null;
 
   const [selection, setSelection] = useState<Selection>(null);
@@ -484,6 +486,7 @@ export function Workspace({
                   onScope={scope}
                   onPickPath={onPickPath}
                   pickingPath={pickingPath}
+                  marks={marks}
                 />
               </div>
             )}

@@ -11,7 +11,15 @@
 import type { ChangeReport } from "../model/report.js";
 
 export function canonicalReport(report: ChangeReport): unknown {
-  const { analysis: _analysis, stack: _stack, parts: _parts, change, sources, ...rest } = report;
+  const {
+    analysis: _analysis,
+    stack: _stack,
+    parts: _parts,
+    verification: _verification,
+    change,
+    sources,
+    ...rest
+  } = report;
   const { id: _id, title: _title, revisions: _revisions, hints: _hints, ...whole } = change;
   return {
     ...rest,

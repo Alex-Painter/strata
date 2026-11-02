@@ -19,6 +19,7 @@ export function StackRail({
   onScope,
   onPickPath,
   pickingPath,
+  marks,
 }: {
   stack: StackSummary;
   /** This Change's path, bottom first. */
@@ -30,6 +31,8 @@ export function StackRail({
   onPickPath?: ((tip: number) => void) | undefined;
   /** The tip whose Change is being opened. */
   pickingPath: number | null;
+  /** A word or two per PR, such as "CI fails", from its verification. */
+  marks?: Map<number, string> | undefined;
 }) {
   const layout = useMemo(() => layoutStackMap(stack), [stack]);
   const prs = new Map(stack.prs.map((p) => [p.number, p]));
@@ -89,8 +92,12 @@ export function StackRail({
                 <span className="flex w-full min-w-0 items-baseline gap-2">
                   <span className="shrink-0 font-mono text-[12.5px] text-faint">{n}</span>
                   <span className="min-w-0 flex-1 truncate text-[14px] text-text">{title}</span>
-                  {!here && pickingPath === tip && (
+                  {!here && pickingPath === tip ? (
                     <span className="shrink-0 text-[12px] text-muted">Opening…</span>
+                  ) : (
+                    marks?.get(n) && (
+                      <span className="shrink-0 text-[12px] text-muted">{marks.get(n)}</span>
+                    )
                   )}
                 </span>
                 {branch && (

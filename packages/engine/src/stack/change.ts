@@ -17,9 +17,12 @@ import {
   StackError,
   type StackSeed,
   stableId,
+  type Verification,
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
+import type { GitHubPort } from "../github/port.js";
+import { readVerification } from "../github/verification.js";
 import { type ClaudeSteps, summarise, wholeNotes } from "../whole.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
@@ -128,6 +131,8 @@ export async function stackReport(
     startedAt: Date;
     /** The model `ask` uses. */
     model?: string;
+    /** Reads each PR's checks, reviews and PR body. Absent: the report has no verification. */
+    github?: GitHubPort | null;
   },
 ): Promise<ChangeReport> {
   const diffs = await buildStackDiffs(resolved.stack, resolved.gitDir, {
@@ -144,6 +149,9 @@ export async function stackReport(
     notes: [...resolved.stack.notes, ...diffNotes(resolved.stack, diffs), ...summaries.partNotes],
   };
   const path = stack.selectedPath;
+  const verification = meta.github
+    ? await verificationOf(meta.github, resolved, path, diffs, options)
+    : undefined;
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -165,6 +173,7 @@ export async function stackReport(
     stack,
     parts: diffs.parts.map((part) => ({ ...part, summary: summaries.parts.get(part.pr) ?? [] })),
     sources: options.sources ?? [],
+    ...(verification ? { verification } : {}),
     summary: summaries.summary,
     guide: summaries.guide,
     layerSummaries: [],
@@ -182,6 +191,28 @@ export async function stackReport(
       durationMs: Date.now() - meta.startedAt.getTime(),
     },
   };
+}
+
+/** A failure to read GitHub costs the report its verification, not the whole run. */
+async function verificationOf(
+  github: GitHubPort,
+  resolved: ResolvedChange & { stack: Stack },
+  path: number[],
+  diffs: StackDiffs,
+  options: AnalyzeOptions,
+): Promise<Verification> {
+  options.onProgress?.("Strata reads the checks, reviews and verification of each PR");
+  const files = new Map(diffs.parts.map((part) => [part.pr, part.files]));
+  try {
+    return await readVerification(
+      github,
+      resolved.stack.repo,
+      path.map((number) => ({ number, files: files.get(number) ?? null })),
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { prs: [], notes: [`Strata cannot read the verification from GitHub. ${reason}`] };
+  }
 }
 
 /** Says when the whole-stack diff doesn't cover the whole path. */

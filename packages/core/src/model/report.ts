@@ -11,6 +11,7 @@ import type { Finding } from "./findings.js";
 import type { IntentLedger } from "./intent.js";
 import type { LayerId } from "./layers.js";
 import type { PrPart, Stack } from "./stack.js";
+import type { Verification } from "./verification.js";
 
 /**
  * 2: the stack, and verdict, ledger and findings became optional.
@@ -19,7 +20,7 @@ import type { PrPart, Stack } from "./stack.js";
  * 5: where each PR's lines went (PrPart.provenance).
  * 6: the Guide, and a summary for the whole stack and for each PR.
  * 7: notes about the split moved to the stack, and each PR's baseOid.
- * 8: the inspect rules each file matched.
+ * 8: the inspect rules each file matched. Later, optional: `verification`.
  */
 export const REPORT_SCHEMA_VERSION = 8;
 
@@ -89,6 +90,12 @@ export interface ChangeReport {
   /** One per PR on the selected path, bottom first; empty without a stack. Also "How it arrived". */
   parts: PrPart[];
   sources: ContextSource[];
+  /**
+   * What each PR on the path carries as proof that it works: checks, previews,
+   * reviews, and its PR body's Verification section. Also "How it arrived".
+   * Absent for ranges, and in reports from before Strata read it.
+   */
+  verification?: Verification;
   /** Absent until the steps that decide it exist. */
   verdict?: Verdict;
   /** Three to six sentences about the whole stack, from its diff alone. */

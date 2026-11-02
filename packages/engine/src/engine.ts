@@ -88,7 +88,7 @@ export const createEngine: CreateEngine = (config) => {
         const resolved = await resolveStackInput(config, gh, options.onProgress);
         options.signal?.throwIfAborted();
         options.onProgress?.("Strata makes the diffs");
-        return stackReport(resolved, options, meta);
+        return stackReport(resolved, options, { ...meta, github: githubPort(config) });
       });
     },
     async readFile(repo, revision, path) {

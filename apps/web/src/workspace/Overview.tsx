@@ -22,6 +22,7 @@ import { Info } from "../components/Info";
 import { LayerMatrixView } from "../components/LayerMatrix";
 import { StateBadge } from "../components/PrStatus";
 import { Spinner } from "../components/Spinner";
+import { PrVerificationView, StackVerification } from "../components/Verification";
 import {
   ago,
   CHECKS_LABEL,
@@ -153,6 +154,7 @@ export function StackOverview({
           <WholeSummary {...props} of="stack" />
         </>
       )}
+      <StackVerification report={report} titles={titles} onScope={props.onScope} />
     </>
   );
 }
@@ -289,6 +291,7 @@ export function PrOverview({
   const retarget =
     edge?.via === "retarget" ? pr.baseChanges.find((c) => c.from === edge.ref) : null;
   const lastPush = pr.forcePushes[pr.forcePushes.length - 1];
+  const verification = props.report.verification?.prs.find((v) => v.pr === pr.number);
   return (
     <>
       <header className="grid gap-1.5" data-scope="pr">
@@ -390,6 +393,7 @@ export function PrOverview({
       </dl>
       <Issues repo={stack.repo} issues={issues} />
       {part && <PartSummary stack={stack} part={part} {...props} />}
+      {verification && <PrVerificationView verification={verification} />}
     </>
   );
 }
