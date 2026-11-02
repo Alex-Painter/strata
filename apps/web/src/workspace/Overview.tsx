@@ -35,6 +35,7 @@ import {
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
 import { revisedBy } from "../lib/provenance";
+import { type ApprovalsView, PrApprove } from "./Approve";
 import { changeLayers, filesIn, plural, type ScopedDiff } from "./model";
 
 export interface RunView {
@@ -278,8 +279,15 @@ export function PrOverview({
   stack,
   node,
   part,
+  approvals,
   ...props
-}: OverviewProps & { stack: Stack; node: StackNode; part: PrPart | undefined }) {
+}: OverviewProps & {
+  stack: Stack;
+  node: StackNode;
+  part: PrPart | undefined;
+  /** Approvals on GitHub; absent on the CLI's page. */
+  approvals?: ApprovalsView | undefined;
+}) {
   const { pr } = node;
   const edge = stack.edges.find((e) => e.child === pr.number);
   // A restack issue says what the link below already shows, with the same evidence.
@@ -292,6 +300,9 @@ export function PrOverview({
     edge?.via === "retarget" ? pr.baseChanges.find((c) => c.from === edge.ref) : null;
   const lastPush = pr.forcePushes[pr.forcePushes.length - 1];
   const verification = props.report.verification?.prs.find((v) => v.pr === pr.number);
+  // GitHub's review status as Strata last read it: newer than the report's after an approval.
+  const live = approvals?.data?.prs.find((p) => p.number === pr.number);
+  const review = live ? live.review : pr.review;
   return (
     <>
       <header className="grid gap-1.5" data-scope="pr">
@@ -308,10 +319,11 @@ export function PrOverview({
         </h1>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
           <StateBadge pr={pr} />
-          {pr.review && <span>{REVIEW_LABEL[pr.review]}</span>}
+          {review && <span>{REVIEW_LABEL[review]}</span>}
           {pr.checks && <span>{CHECKS_LABEL[pr.checks]}</span>}
           {pr.author && <span>by {pr.author}</span>}
           <span>updated {ago(pr.updatedAt)}</span>
+          {approvals && <PrApprove approvals={approvals} pr={pr.number} />}
         </p>
       </header>
 

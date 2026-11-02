@@ -1,9 +1,11 @@
 import {
+  type ApproveResult,
   type ChangeDetail,
   type ChangeReport,
   LAYER_IDS,
   type LayerId,
   type MeResponse,
+  type PrApproval,
 } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -11,6 +13,7 @@ import { useLocation, useParams, useSearchParams } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { api } from "../lib/api";
 import { useLatestRequest } from "../lib/latest-request";
+import type { ApprovalsView } from "../workspace/Approve";
 import type { Nav } from "../workspace/model";
 import { Workspace } from "../workspace/Workspace";
 
@@ -68,6 +71,8 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["change", id] }),
   });
 
+  const approvals = useApprovals(id, detail.data?.report?.analysis.startedAt ?? null);
+
   const layer = params.get("layer");
   const nav: Nav = {
     pr: Number(params.get("pr")) || null,
@@ -113,6 +118,49 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       onPickPath={(tip) => pickPath.mutate(tip)}
       pickingPath={pickPath.isPending ? (pickPath.variables ?? null) : null}
       pickError={pickPath.error?.message ?? null}
+      approvals={detail.data?.report?.stack ? approvals : undefined}
     />
   );
+}
+
+/**
+ * Approvals for the Change's PRs. Strata reads them from GitHub when the
+ * page opens and after each run, and sends an approval only from a confirmed
+ * click.
+ */
+function useApprovals(id: string, analysedAt: string | null): ApprovalsView {
+  const queryClient = useQueryClient();
+  const key = ["approvals", id, analysedAt];
+  const read = useQuery({
+    queryKey: key,
+    queryFn: () => api.approvals(id),
+    enabled: analysedAt !== null,
+    retry: false,
+  });
+  const [results, setResults] = useState<ApproveResult[]>([]);
+  const send = useMutation({
+    mutationFn: ({ prs, from }: { prs: PrApproval[]; from: "stack" | number }) =>
+      api.approve(id, {
+        prs: prs.map((pr) => ({ number: pr.number, headOid: pr.analysedHead ?? "" })),
+        ...(from === "stack" ? { stack: true } : {}),
+      }),
+    onMutate: () => setResults([]),
+    onSuccess: (body) => {
+      setResults(body.results);
+      queryClient.setQueryData(key, body.approvals);
+      void queryClient.invalidateQueries({ queryKey: ["change", id] });
+      void queryClient.invalidateQueries({ queryKey: ["changes"] });
+    },
+  });
+  return {
+    data: read.data ?? null,
+    error: read.error ? read.error.message : null,
+    sending: send.isPending ? (send.variables?.prs.map((pr) => pr.number) ?? []) : [],
+    results,
+    sendError:
+      send.error && send.variables
+        ? { from: send.variables.from, message: send.error.message }
+        : null,
+    approve: (prs, from) => send.mutate({ prs, from }),
+  };
 }
