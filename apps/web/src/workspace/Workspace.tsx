@@ -462,17 +462,7 @@ export function Workspace({
               countIn={(id) => filesIn(diff, id).length}
               onNav={go}
             />
-            <Details
-              report={report}
-              diff={diff}
-              run={run}
-              yours={yours}
-              prs={prs}
-              selection={selection}
-              onReveal={reveal}
-              onSelect={setSelection}
-              onScope={scope}
-            />
+            {/* The PRs are the stack's map: they come before the details. */}
             {summary && stack && stack.selectedPath.length > 0 && (
               <div className="sec">
                 <h2 className="sec-h">
@@ -490,6 +480,17 @@ export function Workspace({
                 />
               </div>
             )}
+            <Details
+              report={report}
+              diff={diff}
+              run={run}
+              yours={yours}
+              prs={prs}
+              selection={selection}
+              onReveal={reveal}
+              onSelect={setSelection}
+              onScope={scope}
+            />
           </aside>
         )}
         <main className="flex min-w-[280px] flex-1 flex-col">
