@@ -17,6 +17,7 @@ import type {
   Stack,
 } from "@strata/core";
 import type { GitHubPort } from "./github/port.js";
+import type { LivePrRead } from "./github/reviews.js";
 import type { LayerJudge } from "./layers/judge.js";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
@@ -126,6 +127,13 @@ export interface Engine {
    * review (directly or through a team), leaving out their own.
    */
   findAssigned(repo: string): Promise<AssignedPrs>;
+  /** One PR as GitHub shows it to the token's user now, with their latest review. */
+  readPr(repo: string, number: number): Promise<LivePrRead>;
+  /**
+   * Submits an approving review of `commitOid` as the token's user. Only call
+   * it when a person asked for this approval.
+   */
+  approvePr(read: LivePrRead, commitOid: string): Promise<{ url: string; commitOid: string }>;
   resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */

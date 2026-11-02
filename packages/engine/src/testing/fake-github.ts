@@ -18,12 +18,19 @@ import {
   type PrTimelinePage,
   type TimelineNode,
 } from "../github/graphql.js";
-import type { GitHubPort } from "../github/port.js";
+import { GitHubError, type GitHubPort } from "../github/port.js";
+import {
+  APPROVE_MUTATION,
+  type ApprovePage,
+  PR_REVIEW_QUERY,
+  type ReviewNode,
+  type ReviewPage,
+} from "../github/reviews.js";
 import type { VerificationNode, VerificationPage } from "../github/verification.js";
 
 export interface FakeGitHub extends GitHubPort {
   calls: {
-    query: "page" | "timeline" | "search" | "verification";
+    query: "page" | "timeline" | "search" | "verification" | "review" | "approve";
     variables: Record<string, unknown>;
   }[];
   prs: PrNode[];
@@ -33,6 +40,17 @@ export interface FakeGitHub extends GitHubPort {
   requests: Record<number, FakeRequests>;
   /** Checks, reviews, comments and bodies by PR number, for the verification query. */
   verification: Record<number, Partial<VerificationNode>>;
+  /** Reviews by PR number, oldest first. Approvals sent through the fake land here. */
+  reviews: Record<number, FakeReview[]>;
+  /** An error GitHub gives for an approval of the PR, such as a missing permission. */
+  refuseApproval: Record<number, string>;
+}
+
+export interface FakeReview {
+  by: string;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED";
+  commit: string;
+  submittedAt: string;
 }
 
 export interface FakeRequests {
@@ -61,6 +79,8 @@ export function fakeGitHub(
     viewer: options.viewer ?? "reviewer",
     requests: {},
     verification: {},
+    reviews: {},
+    refuseApproval: {},
     async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
       if (query === VIEWER_QUERY) {
         const page: ViewerPage = { viewer: { login: fake.viewer } };
@@ -69,6 +89,22 @@ export function fakeGitHub(
       if (query === ASSIGNED_QUERY) {
         fake.calls.push({ query: "search", variables });
         return search(fake, repo, String(variables.q), variables.cursor, pageSize) as T;
+      }
+      if (query === APPROVE_MUTATION) {
+        fake.calls.push({ query: "approve", variables });
+        return approve(fake, repo, String(variables.id), String(variables.commit)) as T;
+      }
+      if (query === PR_REVIEW_QUERY) {
+        fake.calls.push({ query: "review", variables });
+        const node = fake.prs.find((pr) => pr.number === variables.number);
+        const page: ReviewPage = {
+          viewer: { login: fake.viewer },
+          repository:
+            `${variables.owner}/${variables.name}` === repo
+              ? { pullRequest: node ? reviewNode(fake, repo, node) : null }
+              : null,
+        };
+        return page as T;
       }
       if (`${variables.owner}/${variables.name}` !== repo) {
         return { repository: null } as T;
@@ -124,6 +160,59 @@ export function fakeGitHub(
     },
   };
   return fake;
+}
+
+function reviewNode(fake: FakeGitHub, repo: string, pr: PrNode): ReviewNode {
+  const mine = (fake.reviews[pr.number] ?? []).filter(
+    (review) => review.by.toLowerCase() === fake.viewer.toLowerCase(),
+  );
+  const latest = mine[mine.length - 1];
+  return {
+    id: `PR_${pr.number}`,
+    number: pr.number,
+    url: pr.url,
+    state: pr.state,
+    isDraft: pr.isDraft,
+    headRefOid: pr.headRefOid,
+    reviewDecision: pr.reviewDecision,
+    author: pr.author,
+    viewerLatestReview: latest
+      ? {
+          state: latest.state,
+          url: `https://github.com/${repo}/pull/${pr.number}#pullrequestreview-${mine.length}`,
+          submittedAt: latest.submittedAt,
+          commit: { oid: latest.commit },
+        }
+      : null,
+  };
+}
+
+/** Acts as GitHub does: refuses the author's own PR, and records the review. */
+function approve(fake: FakeGitHub, repo: string, id: string, commit: string): ApprovePage {
+  const pr = fake.prs.find((node) => `PR_${node.number}` === id);
+  if (!pr) throw new Error(`Could not resolve to a node with the global id of '${id}'`);
+  const refusal = fake.refuseApproval[pr.number];
+  // GitHub answers with GraphQL errors, which the real port turns into GitHubErrors.
+  if (refusal) throw new GitHubError(refusal);
+  if (pr.author?.login.toLowerCase() === fake.viewer.toLowerCase()) {
+    throw new GitHubError("Review Can not approve your own pull request");
+  }
+  const submittedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const reviews = fake.reviews[pr.number] ?? [];
+  fake.reviews[pr.number] = reviews;
+  reviews.push({ by: fake.viewer, state: "APPROVED", commit, submittedAt });
+  pr.reviewDecision = "APPROVED";
+  pr.updatedAt = submittedAt;
+  const count = reviews.filter((r) => r.by === fake.viewer).length;
+  return {
+    addPullRequestReview: {
+      pullRequestReview: {
+        url: `https://github.com/${repo}/pull/${pr.number}#pullrequestreview-${count}`,
+        state: "APPROVED",
+        commit: { oid: commit },
+      },
+    },
+  };
 }
 
 /** Understands only the searches findAssigned sends, for the viewer's own login. */
