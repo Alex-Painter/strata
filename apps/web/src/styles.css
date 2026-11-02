@@ -938,6 +938,11 @@ code,
   .del-n {
     color: var(--del);
   }
+  /* A count of zero is not news: it does not take the add or remove colour. */
+  .add-n.zero,
+  .del-n.zero {
+    color: var(--fg-3);
+  }
 
   /* The chat panel, on the right. */
   .panel {

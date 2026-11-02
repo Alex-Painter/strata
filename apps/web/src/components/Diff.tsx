@@ -374,7 +374,8 @@ export function Counts({
 }) {
   return (
     <span className="fm font-mono text-[12.5px]" title={title}>
-      <span className="add-n">+{additions}</span> <span className="del-n">−{deletions}</span>
+      <span className={additions ? "add-n" : "add-n zero"}>+{additions}</span>{" "}
+      <span className={deletions ? "del-n" : "del-n zero"}>−{deletions}</span>
     </span>
   );
 }
