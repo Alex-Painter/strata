@@ -12,6 +12,7 @@ A stack is a group of PRs whose branches feed into each other. The reviewer give
 - `summaries`: three to six sentences about the whole stack and one to three per PR, each with a button that shows the hunks it rests on under the sentence, on the canvas.
 - `guide`: the whole stack's sections in reading order, each opening to its files, which open in their layer; Claude's when the repo allows it, Strata's groups otherwise.
 - `mermaid`: "Copy as Mermaid" puts the map on the clipboard as a flowchart.
+- `verification`: the proof each PR carries on GitHub (check runs, deployments, the latest human reviews, an Airspeed verdict, a Blacksmith failure comment, and the Verification sections of its body). The whole stack's overview ends with `heading "Verification"`: a weakest-cell line, a PR by kind table with a `Whole stack` row, and the flags. Each PR's scope ends with its own `Verification` section. The rail marks a PR whose CI fails or runs.
 - `changes-api`: `GET /api/repos/:owner/:name/stacks`, `POST /api/changes`, `GET /api/changes`, `GET /api/changes/:id` and `POST /api/changes/:id/runs`. One Change per path: asking again for any PR on a path returns the same Change. While a repo's first read runs, the stack list and `POST /api/changes` answer `202 {"pending":true,"progress":...}` after 1.5 s; the same request asked again returns the latest step, then the result. The stack list holds only stacks with at least one open PR. It's kept under `<dataDir>/cache/stacks/` and answers at once after the first read, with `readAt`; once it's over 10 minutes old it still answers, with `refreshing: true`, while a new read runs behind it.
 
 ## How to get to it (user POV)
@@ -65,6 +66,13 @@ With the stand-in Claude (`strata-verify up --github fixture --claude fixture`, 
 - **A PR's summary.** Choose `button "Show #10 Warm the forecast cache nightly"`. Under `Strata put the changes of this PR on the stack below it`, `heading "What it changes"` lists `Changes app/jobs/warm_cache.py.`, `Changes tests/test_warm_cache.py.` and `Changes uv.lock.`, each showing #10's own hunk under the sentence, and the heading's info tip reads `This summary uses only this PR's own diff.`
 - **Cache.** `POST /api/changes/<id>/runs` with `-d '{}'` gives the same summary: answers are cached under `<run dir>/instance/data/llm-cache/summaries/`, one file per request (one for the whole stack, one per PR).
 
+Verification, with the fixture (review `acme/app#10` as above; the stand-in GitHub gives #9-#11 checks, reviews and PR bodies, and serves #9's two screenshots itself):
+
+- **API.** `GET /api/changes/<id>` has `report.verification.prs[].pr` `[9,10,11]` and `notes` `[]`. #9's items include `check` `Backend CI / Unit tests` `pass`, `human-review` `maya approved`, `bot-review` `Airspeed Review: risk medium, 0 findings`, and two `screenshot`s with `pairing` `before` and `after`. #10 has a `walk` `warm-cache accounts=3 failures=0` and a `not-run` item. #11's `flags[].message` are `CI reports failing tests on #11. The PR body says that the tests pass.` and `#11 changes 1 UI file. It has no screenshot, recording or walk.`
+- **Stack overview.** Below the Layers, `heading "Verification"` (info tip) reads `Weakest: CI of #11 fails.`, then `table "Verification"` with the columns `CI`, `Tests`, `UI`, `Preview`, `Bot`, `Human` and the rows `#9` (`2 pass`, `Claimed`, `2 screenshots`, `–`, `Passes`, `Approved`), `#10` (`Running`, `–`, `Claimed`, ...), `#11` (`1 fails`, `Claimed`, `–`, ...) and `Whole stack` (`Needs a restack`, because #10 is behind #9). Under it, `list "Verification flags"` has three buttons, one per flag; choosing one scopes the page to its PR. The Pull requests rail shows `CI fails` on #11 and `CI runs` on #10.
+- **A PR.** `?pr=9` ends with `heading "Verification"`: `Checks 2 pass` (folded), `list "Screenshots and recordings"` with two images labelled `Before:` and `After:`, `Tests` with `Claimed uv run pytest tests/ passed.`, and `Reviews` with `maya approved` and the Airspeed verdict (`More` opens its reason). `?pr=11` shows its two flags as notes and `Checks 1 fail, 1 pass, 1 skipped` open. `?pr=10` shows `Not verified` with `the job on a real account with 10,000 deals.`
+- **No image.** An image that does not load becomes the link `Strata cannot show this file. Open it on its site.`
+
 Save each `read_page` tree with `strata-verify note $B stacks/<step>.aria.txt`, with the URL you were on.
 
 ## Gotchas
@@ -73,4 +81,6 @@ Save each `read_page` tree with `strata-verify note $B stacks/<step>.aria.txt`, 
 - The fixture's PR timestamps are moved to the last hour at startup, so "updated 1h ago" is expected. Its commits have fixed authors and dates, so their ids are the same on every `up` (main at dd4a224, #3's head 709ec39), which [cli.md](cli.md) relies on.
 - `?pr=<n>` with a PR outside the stack shows the whole stack rather than an error.
 - The stand-in Claude's sentences are mechanical on purpose ("Changes <path>."). They test the plumbing: labels, dropping bad citations, the Guide's merge and order, and opening hunks. How good real answers are can only be judged with a real key on a real stack.
+- Verification is optional in the report (schema 8): a report from before it shows no Verification section until you run the Change again. If GitHub refuses the verification query, the report still comes back, and the section shows only the note `Strata cannot read the verification from GitHub. <reason>`.
+- Screenshots on another site (such as cursor.com) can need a sign-in there; the tile then shows the link instead.
 - With `--github gh`, the real repo's data stays on the developer's machine. Don't paste work titles or code into evidence you share outside it.
