@@ -42,6 +42,7 @@ Keep implementation detail out. Name only user paths, stable handles, required s
 - [App shell and navigation](./app-shell.md) covers the home page, client-side routes, not-found pages and caching.
 - [Stacks](./stacks.md) covers finding a stack from a PR or branch, a repo's stack list, the stack map, the PR pane, the path picker and the stack and Changes API.
 - [Assigned Changes](./assigned.md) covers the search for PRs assigned to you, the home page tables (status, In stack, GitHub links), the team toggle, Refresh, the Status marks for your reviews and the Settings page.
+- [Approvals](./approvals.md) covers Approve on a PR, on a PR row and Approve stack: the confirm step, the blocked states and the approvals API.
 - [Chat](./chat.md) covers asking Claude about a Change in the chat panel at the right: highlights from a diff, threads, streamed answers, citations and the chat API.
 - [API surface](./api-surface.md) covers `/healthz`, `/api/me`, the milestone-1 routes that still answer 501, auth gating and the CSRF check.
 - [CLI](./cli.md) covers `strata --help`, usage errors, input validation and the `analyze` stub.
