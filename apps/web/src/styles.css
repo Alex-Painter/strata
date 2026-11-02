@@ -927,6 +927,51 @@ code,
     color: var(--fg-3);
     user-select: none;
   }
+
+  /* The full file: a wide sheet, one scroller, rows as wide as the widest line. */
+  .ff-overlay {
+    padding-top: 5vh;
+  }
+  .ff {
+    display: flex;
+    flex-direction: column;
+    width: min(1100px, 100%);
+    max-height: 90vh;
+    overflow: hidden;
+  }
+  .ff:focus {
+    outline: none;
+  }
+  .sheet-h .ff-path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 500 13.5px var(--font-mono);
+  }
+  .ff-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: var(--code-bg);
+  }
+  .ff-code {
+    display: inline-grid;
+    min-width: 100%;
+    padding: 8px 0 12px;
+  }
+  .ff-code .code {
+    padding: 0;
+    overflow: visible;
+    scroll-margin-top: 72px;
+  }
+  .ff-code .code[data-focus="true"] {
+    margin: 2px 6px;
+    border-radius: 6px;
+    box-shadow:
+      0 0 0 1px var(--accent-line),
+      inset 0 0 0 1px var(--accent-line);
+  }
   .fold {
     padding: 8px 12px;
     font-size: 13px;
@@ -1171,7 +1216,8 @@ code,
   }
   .ask-pop {
     position: fixed;
-    z-index: 70;
+    /* Over the full-file sheet, so a selection there can go to the chat. */
+    z-index: 90;
     box-shadow: var(--shadow-pop);
   }
   .md {

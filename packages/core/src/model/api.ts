@@ -193,3 +193,10 @@ export interface ApiError {
 export interface CreateThreadRequest {
   title?: string;
 }
+
+/** GET /api/changes/:id/file: one file of a Change at a revision its report names. */
+export interface FileResponse {
+  path: string;
+  revision: string;
+  content: string;
+}

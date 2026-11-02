@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ChangeDetail, ChangeSummary, StacksResponse } from "@strata/core/model";
+import type { ChangeDetail, ChangeSummary, FileResponse, StacksResponse } from "@strata/core/model";
 import type { Engine } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -333,6 +333,38 @@ describe("Changes", () => {
       const { error } = (await res.json()) as { error: string };
       expect([res.status, error]).toEqual([status, expect.stringMatching(message)]);
     }
+  });
+
+  it("reads a file at a revision the report names, and no other", async () => {
+    const { app, runs, post } = setup();
+    const { change } = (await (
+      await post("/api/changes", { input: "acme/app#2" })
+    ).json()) as ChangeDetail;
+    await runs.idle();
+    const { report } = (await (
+      await app.request(`/api/changes/${change.id}`)
+    ).json()) as ChangeDetail;
+    const head = report?.change.revisions?.head as string;
+    const file = (path: string, rev: string) =>
+      app.request(
+        `/api/changes/${change.id}/file?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(rev)}`,
+      );
+
+    const ok = await file("b1-2.txt", head);
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as FileResponse;
+    expect(body).toMatchObject({ path: "b1-2.txt", revision: head });
+    expect(body.content.length).toBeGreaterThan(0);
+    // A PR's own diff ends at its part's commit, which the route also reads.
+    const prEnd = report?.parts[0]?.to as string;
+    expect((await file("b1-2.txt", prEnd)).status).toBe(200);
+
+    expect((await file("nope.txt", head)).status).toBe(404);
+    // A revision the report does not name, even a real one, is refused.
+    expect((await file("b1-2.txt", "main")).status).toBe(400);
+    expect((await file("../etc/passwd", head)).status).toBe(404);
+    expect((await app.request(`/api/changes/${change.id}/file?path=a`)).status).toBe(400);
+    expect((await app.request("/api/changes/chg_nope/file?path=a&rev=b")).status).toBe(404);
   });
 
   it("answers unknown Changes with 404", async () => {

@@ -3,6 +3,7 @@ import { LAYERS } from "@strata/core/model";
 import { useMemo, useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
 import { highlightLines, type Token } from "../lib/highlight";
+import { OpenFullFile } from "./FullFile";
 import { Info } from "./Info";
 
 /** Files with more changed lines than this start closed. */
@@ -142,6 +143,7 @@ function FileBlock({
           {file.mechanical && <span className="fm">{file.mechanical.reason}</span>}
           <LineCount file={file} hunks={hunks} />
         </button>
+        {hunks.length > 0 && <OpenFullFile path={file.path} pr={pr} focus={null} />}
         {/* Why the file is in its layer, and other facts, stay out of the way of the code. */}
         <span className="mr-2 flex">
           <Info
@@ -269,6 +271,7 @@ export function HunkCard({
             {chip.text}
           </button>
         ))}
+        <OpenFullFile path={hunk.path} pr={pr} focus={hunk.id} />
       </div>
       {shown ? (
         // The lines are a surface that can be highlighted (lib/selection.ts).
@@ -312,7 +315,7 @@ export function hunkSource(hunkId: string, pr?: number): SourceRef {
   return pr === undefined ? { kind: "hunk", hunkId } : { kind: "pr-hunk", pr, hunkId };
 }
 
-function Line({
+export function Line({
   line,
   index,
   tokens,
