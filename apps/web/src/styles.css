@@ -779,6 +779,23 @@ code,
     border-color: var(--accent-line);
     box-shadow: 0 0 0 1px var(--accent-line);
   }
+  /* A file and its hunks in one hairline card. The hunks lose their own frame. */
+  .fcard {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .fcard .hunk {
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+  }
+  .fcard .hunk[data-selected="true"] {
+    box-shadow: inset 0 0 0 1px var(--accent-line);
+  }
+  .fcard .hunk:has(.hsel:focus-visible) {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
   .hunk-h {
     display: flex;
     align-items: center;

@@ -114,72 +114,75 @@ function FileBlock({
       data-inspect={file.inspect.map((flag) => flag.rule).join(" ") || undefined}
       className="grid scroll-mt-4 gap-2"
     >
-      <div className="flex items-center rounded-md border border-line">
-        <button
-          type="button"
-          data-nav={`file:${file.path}`}
-          aria-current={selected === file.path ? "true" : undefined}
-          onClick={() => onFile(file.path)}
-          className="frow rounded-md"
-        >
-          <span className="fs" title={FILE_STATUS[file.status]}>
-            {FILE_STATUS[file.status].charAt(0)}
-          </span>
-          <span className="fp">
-            {file.oldPath && <span className="dir">{file.oldPath} → </span>}
-            <span className="dir">{dir}</span>
-            {file.path.slice(dir.length)}
-          </span>
-          {file.inspect.map((flag) => (
-            <span
-              key={flag.rule}
-              className="shrink-0 rounded border border-line px-1 text-[12px] text-muted"
-              title={`${flag.reason}. Changes here must be correct the first time. Examine them carefully.`}
-            >
-              {flag.title}
-            </span>
-          ))}
-          {file.mechanical && <span className="fm">{file.mechanical.reason}</span>}
-          <LineCount file={file} hunks={hunks} />
-        </button>
-        {/* Why the file is in its layer, and other facts, stay out of the way of the code. */}
-        <span className="mr-2 flex">
-          <Info
-            align="end"
-            text={[
-              ...facts,
-              layerFact(file),
-              ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
-            ].join(" · ")}
-          />
-        </span>
-        {hunks.length > 0 && (
+      {/* One card: the file's row on top, its hunks under it. */}
+      <div className="fcard">
+        <div className="flex items-center">
           <button
             type="button"
-            className="ib mr-1"
-            aria-expanded={open}
-            aria-label={open ? `Hide ${file.path}` : `Show ${file.path}`}
-            onClick={() => setOpen((value) => !value)}
+            data-nav={`file:${file.path}`}
+            aria-current={selected === file.path ? "true" : undefined}
+            onClick={() => onFile(file.path)}
+            className="frow"
           >
-            <svg className="i" viewBox="0 0 16 16" aria-hidden="true">
-              <path d={open ? "M3.5 6L8 10.5 12.5 6" : "M6 3.5L10.5 8 6 12.5"} />
-            </svg>
+            <span className="fs" title={FILE_STATUS[file.status]}>
+              {FILE_STATUS[file.status].charAt(0)}
+            </span>
+            <span className="fp">
+              {file.oldPath && <span className="dir">{file.oldPath} → </span>}
+              <span className="dir">{dir}</span>
+              {file.path.slice(dir.length)}
+            </span>
+            {file.inspect.map((flag) => (
+              <span
+                key={flag.rule}
+                className="shrink-0 rounded border border-line px-1 text-[12px] text-muted"
+                title={`${flag.reason}. Changes here must be correct the first time. Examine them carefully.`}
+              >
+                {flag.title}
+              </span>
+            ))}
+            {file.mechanical && <span className="fm">{file.mechanical.reason}</span>}
+            <LineCount file={file} hunks={hunks} />
           </button>
-        )}
+          {/* Why the file is in its layer, and other facts, stay out of the way of the code. */}
+          <span className="mr-2 flex">
+            <Info
+              align="end"
+              text={[
+                ...facts,
+                layerFact(file),
+                ...file.inspect.map((flag) => `Inspect: ${flag.reason}`),
+              ].join(" · ")}
+            />
+          </span>
+          {hunks.length > 0 && (
+            <button
+              type="button"
+              className="ib mr-1"
+              aria-expanded={open}
+              aria-label={open ? `Hide ${file.path}` : `Show ${file.path}`}
+              onClick={() => setOpen((value) => !value)}
+            >
+              <svg className="i" viewBox="0 0 16 16" aria-hidden="true">
+                <path d={open ? "M3.5 6L8 10.5 12.5 6" : "M6 3.5L10.5 8 6 12.5"} />
+              </svg>
+            </button>
+          )}
+        </div>
+        {open &&
+          hunks.map((hunk) => (
+            <HunkCard
+              key={hunk.id}
+              hunk={hunk}
+              folded={fold && file.mechanical === null && hunk.mechanical !== null}
+              chips={chips?.get(hunk.id) ?? []}
+              selected={selected === hunk.id}
+              onSelect={() => onHunk(hunk.id)}
+              {...(onPr ? { onPr } : {})}
+              pr={pr}
+            />
+          ))}
       </div>
-      {open &&
-        hunks.map((hunk) => (
-          <HunkCard
-            key={hunk.id}
-            hunk={hunk}
-            folded={fold && file.mechanical === null && hunk.mechanical !== null}
-            chips={chips?.get(hunk.id) ?? []}
-            selected={selected === hunk.id}
-            onSelect={() => onHunk(hunk.id)}
-            {...(onPr ? { onPr } : {})}
-            pr={pr}
-          />
-        ))}
       {!open && hunks.length > 0 && (
         <button
           type="button"
