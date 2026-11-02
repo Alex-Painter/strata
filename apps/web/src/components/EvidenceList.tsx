@@ -15,8 +15,10 @@ export function EvidenceList({ repo, evidence }: { repo: string; evidence: Evide
             : source.kind === "pr"
               ? `#${source.number}`
               : "";
-        // A label that already names its PR ("#10 targets b9") is the link itself.
-        const named = ref !== "" && item.label.startsWith(`${ref} `);
+        // A label that already names its PR ("#10 targets b9", "#9's head branch is b9")
+        // is the link itself.
+        const named =
+          ref !== "" && (item.label.startsWith(`${ref} `) || item.label.startsWith(`${ref}'s `));
         return (
           <li key={`${ref} ${item.label}`} className="flex gap-2">
             {named ? (

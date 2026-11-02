@@ -9,6 +9,7 @@ import {
 import { useMemo, useState } from "react";
 import { linkLabel, needsRestack } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
+import { Icon } from "./Icon";
 import { ReviewMarks, StateBadge } from "./PrStatus";
 
 const ROW = 52;
@@ -305,7 +306,11 @@ export function CopyMermaid({ stack }: { stack: StackSummary }) {
   return (
     <button
       type="button"
-      className="btn ghost sm"
+      className="ib"
+      aria-label={
+        copied === "yes" ? "Copied" : copied === "failed" ? "Cannot copy" : "Copy as Mermaid"
+      }
+      title={copied === "yes" ? "Copied" : copied === "failed" ? "Cannot copy" : "Copy as Mermaid"}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(stackMermaid(stack));
@@ -316,7 +321,7 @@ export function CopyMermaid({ stack }: { stack: StackSummary }) {
         setTimeout(() => setCopied(null), 1500);
       }}
     >
-      {copied === "yes" ? "Copied" : copied === "failed" ? "Cannot copy" : "Copy as Mermaid"}
+      <Icon name={copied === "yes" ? "check" : "copy"} />
     </button>
   );
 }
