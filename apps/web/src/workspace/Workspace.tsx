@@ -20,6 +20,7 @@ import { railMarks } from "../components/Verification";
 import { selectionAnchor } from "../lib/selection";
 import { useStored } from "../lib/stored";
 import { toggleTheme } from "../lib/theme";
+import { type ApprovalsView, ApproveStack } from "./Approve";
 import { Ask } from "./Ask";
 import { LayerView } from "./LayerView";
 import {
@@ -60,6 +61,7 @@ export function Workspace({
   prs = [],
   pageNav = null,
   changeId = null,
+  approvals,
 }: {
   me?: MeResponse | undefined;
   title?: string | undefined;
@@ -78,6 +80,8 @@ export function Workspace({
   onPickPath?: (tip: number) => void;
   pickingPath?: number | null;
   pickError?: string | null;
+  /** Approvals on GitHub, for the server's page. */
+  approvals?: ApprovalsView | undefined;
 }) {
   const stack = report?.stack ?? null;
   const summary = useMemo(() => (stack ? summarizeStack(stack) : null), [stack]);
@@ -479,6 +483,9 @@ export function Workspace({
                   <span className="flex-1">Pull requests</span>
                   <span className="sn">{summary.prs.length}</span>
                 </h2>
+                {approvals && stack.selectedPath.length > 1 && (
+                  <ApproveStack approvals={approvals} />
+                )}
                 <StackRail
                   stack={summary}
                   path={stack.selectedPath}
@@ -487,6 +494,7 @@ export function Workspace({
                   onPickPath={onPickPath}
                   pickingPath={pickingPath}
                   marks={marks}
+                  approvals={approvals}
                 />
               </div>
             )}

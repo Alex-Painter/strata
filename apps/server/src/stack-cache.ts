@@ -33,6 +33,8 @@ interface Saved extends StackList {
  */
 export class StackCache {
   private readonly lists = new Map<string, StackList>();
+  /** Lists that GitHub changed under, such as by an approval Strata sent; read again on next ask. */
+  private readonly stale = new Set<string>();
 
   constructor(
     private readonly dataDir: string,
@@ -54,12 +56,13 @@ export class StackCache {
     const last = this.lists.get(file) ?? (await this.load(file));
     const now = this.options.now ?? (() => new Date());
     const age = last ? now().getTime() - Date.parse(last.readAt) : Number.POSITIVE_INFINITY;
-    if (last && age < (this.options.maxAgeMs ?? MAX_AGE_MS)) {
+    if (last && !this.stale.has(file) && age < (this.options.maxAgeMs ?? MAX_AGE_MS)) {
       return { done: true, value: last, refreshing: false };
     }
     const reading = this.jobs.run(
       `stacks\0${file}`,
       async (onProgress) => {
+        this.stale.delete(file);
         const list = { stacks: await read(onProgress), readAt: now().toISOString() };
         this.lists.set(file, list);
         await this.save(file, list);
@@ -73,6 +76,11 @@ export class StackCache {
     }
     const state = await reading;
     return state.done ? { ...state, refreshing: false } : state;
+  }
+
+  /** The next ask answers with the last list and reads a new one behind it. */
+  expire(scope: { userId: string; repo: string }): void {
+    this.stale.add(this.fileFor(scope));
   }
 
   private fileFor({ userId, repo }: { userId: string; repo: string }) {

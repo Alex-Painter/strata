@@ -2,6 +2,7 @@ import type { StackSummary } from "@strata/core/model";
 import { layoutStackMap } from "@strata/core/stack";
 import { useMemo } from "react";
 import { Dot, EdgeLine, gutterWidth, laneX } from "../components/StackMap";
+import { type ApprovalsView, RowApprove } from "./Approve";
 
 /** One row: the PR's title, and its branch under it. */
 const ROW = 46;
@@ -20,6 +21,7 @@ export function StackRail({
   onPickPath,
   pickingPath,
   marks,
+  approvals,
 }: {
   stack: StackSummary;
   /** This Change's path, bottom first. */
@@ -33,6 +35,8 @@ export function StackRail({
   pickingPath: number | null;
   /** A word or two per PR, such as "CI fails", from its verification. */
   marks?: Map<number, string> | undefined;
+  /** Approvals on GitHub; absent on the CLI's page. */
+  approvals?: ApprovalsView | undefined;
 }) {
   const layout = useMemo(() => layoutStackMap(stack), [stack]);
   const prs = new Map(stack.prs.map((p) => [p.number, p]));
@@ -75,10 +79,15 @@ export function StackRail({
           const here = onPath(n);
           const tip = tipFor(n);
           return (
-            <li key={n} data-pr={n} style={{ height: ROW, paddingLeft: gutter - 6 }}>
+            <li
+              key={n}
+              data-pr={n}
+              className="relative"
+              style={{ height: ROW, paddingLeft: gutter - 6 }}
+            >
               <button
                 type="button"
-                className={`flex h-full w-full min-w-0 flex-col justify-center rounded-md px-2 text-left hover:bg-hover aria-[current=true]:bg-active ${here ? "" : "faint opacity-50"}`}
+                className={`flex h-full w-full min-w-0 flex-col justify-center rounded-md px-2 text-left hover:bg-hover aria-[current=true]:bg-active ${here ? "" : "faint opacity-50"} ${here && approvals?.data ? "pr-9" : ""}`}
                 aria-label={here ? `Show #${n} ${title}` : `Open the path through #${n} ${title}`}
                 aria-current={pr === n ? "true" : undefined}
                 title={
@@ -109,6 +118,7 @@ export function StackRail({
                   </span>
                 )}
               </button>
+              {here && approvals && <RowApprove approvals={approvals} pr={n} title={title} />}
             </li>
           );
         })}

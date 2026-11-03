@@ -5,6 +5,7 @@ export { NotImplementedError } from "./errors.js";
 export { type Checkout, CheckoutError, readCheckout } from "./git/checkout.js";
 export type { AuthoredPrs } from "./github/authored.js";
 export { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
+export type { LivePrRead } from "./github/reviews.js";
 export type { LayerAnswer, LayerJudge, LayerQuestion, LayerRequest } from "./layers/judge.js";
 export {
   loadRepoSettings,

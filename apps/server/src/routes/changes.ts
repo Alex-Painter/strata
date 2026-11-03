@@ -28,6 +28,7 @@ import { Jobs } from "../jobs.js";
 import { latestRun, runInfo } from "../runs.js";
 import { StackCache } from "../stack-cache.js";
 import type { AppDeps, AppEnv } from "../types.js";
+import { approvalRoutes } from "./approvals.js";
 
 const CreateChange = z.object({
   input: z.string().min(1).max(500),

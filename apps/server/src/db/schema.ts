@@ -133,6 +133,30 @@ export const assignments = sqliteTable(
   ],
 );
 
+/**
+ * An approving review that Strata sent to GitHub for a person who asked for
+ * it. One row per review GitHub accepted, never changed: GitHub keeps the
+ * review itself, and this is Strata's log of what it sent.
+ */
+export const prReviews = sqliteTable(
+  "pr_reviews",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    /** The Change the reviewer approved from; null once that Change is gone. */
+    changeId: text("change_id").references(() => changes.id, { onDelete: "set null" }),
+    repo: text("repo").notNull(),
+    pr: integer("pr").notNull(),
+    /** The GitHub login the review went out as. */
+    login: text("login").notNull(),
+    /** The commit the review names: the head Strata analysed. */
+    commitOid: text("commit_oid").notNull(),
+    url: text("url").notNull(),
+    submittedAt: integer("submitted_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("pr_reviews_pr_idx").on(table.ownerId, table.repo, table.pr)],
+);
+
 /** A conversation with Claude about one Change. */
 export const chatThreads = sqliteTable(
   "chat_threads",
@@ -171,5 +195,6 @@ export type User = typeof users.$inferSelect;
 export type ChangeRow = typeof changes.$inferSelect;
 export type RunRow = typeof runs.$inferSelect;
 export type AssignmentRow = typeof assignments.$inferSelect;
+export type PrReviewRow = typeof prReviews.$inferSelect;
 export type ChatThreadRow = typeof chatThreads.$inferSelect;
 export type ChatMessageRow = typeof chatMessages.$inferSelect;

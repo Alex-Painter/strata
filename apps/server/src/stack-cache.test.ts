@@ -88,3 +88,15 @@ it("keeps the old list when a read behind it fails", async () => {
   expect(errors).toEqual([new Error("GitHub is down")]);
   expect(ids(await stacks.get(scope, read))).toEqual(["read 1"]);
 });
+
+it("reads a young list again behind it once it is expired", async () => {
+  const stacks = cache();
+  await stacks.get(scope, read);
+  stacks.expire(scope);
+  const stale = await stacks.get(scope, read);
+  expect(stale).toMatchObject({ done: true, refreshing: true });
+  expect(ids(stale)).toEqual(["read 1"]);
+  await settle();
+  expect(await stacks.get(scope, read)).toMatchObject({ done: true, refreshing: false });
+  expect(ids(await stacks.get(scope, read))).toEqual(["read 2"]);
+});

@@ -18,6 +18,7 @@ import type {
 } from "@strata/core";
 import type { AuthoredPrs } from "./github/authored.js";
 import type { GitHubPort } from "./github/port.js";
+import type { LivePrRead } from "./github/reviews.js";
 import type { LayerJudge } from "./layers/judge.js";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
@@ -129,6 +130,13 @@ export interface Engine {
   findAssigned(repo: string): Promise<AssignedPrs>;
   /** Open PRs in `repo` that the token's user opened, newest update first. */
   findAuthored(repo: string): Promise<AuthoredPrs>;
+  /** One PR as GitHub shows it to the token's user now, with their latest review. */
+  readPr(repo: string, number: number): Promise<LivePrRead>;
+  /**
+   * Submits an approving review of `commitOid` as the token's user. Only call
+   * it when a person asked for this approval.
+   */
+  approvePr(read: LivePrRead, commitOid: string): Promise<{ url: string; commitOid: string }>;
   resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */
