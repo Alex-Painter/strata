@@ -3,6 +3,7 @@ import { LAYERS } from "@strata/core/model";
 import { useMemo, useState } from "react";
 import { FILE_STATUS, lineCount } from "../lib/format";
 import { highlightLines, type Token } from "../lib/highlight";
+import { OpenFullFile } from "./FullFile";
 import { Info } from "./Info";
 
 /** Files with more changed lines than this start closed. */
@@ -144,6 +145,7 @@ function FileBlock({
             {file.mechanical && <span className="fm">{file.mechanical.reason}</span>}
             <LineCount file={file} hunks={hunks} />
           </button>
+          {hunks.length > 0 && <OpenFullFile path={file.path} pr={pr} focus={null} />}
           {/* Why the file is in its layer, and other facts, stay out of the way of the code. */}
           <span className="mr-2 flex">
             <Info
@@ -175,6 +177,8 @@ function FileBlock({
               key={hunk.id}
               hunk={hunk}
               folded={fold && file.mechanical === null && hunk.mechanical !== null}
+              // The file's row opens a file of one hunk; more hunks each open at their own place.
+              fullFile={hunks.length > 1}
               chips={chips?.get(hunk.id) ?? []}
               selected={selected === hunk.id}
               onSelect={() => onHunk(hunk.id)}
@@ -209,6 +213,7 @@ export function HunkCard({
   chips = [],
   selected = false,
   showPath = false,
+  fullFile = true,
   onSelect,
   onPr,
   pr,
@@ -219,6 +224,8 @@ export function HunkCard({
   selected?: boolean;
   /** Name the file in the header, for hunks shown away from their file. */
   showPath?: boolean;
+  /** Show the button that opens the whole file at this hunk. */
+  fullFile?: boolean;
   onSelect?: () => void;
   onPr?: (pr: number) => void;
   /** The PR whose own diff this hunk is from, if it is one. */
@@ -272,6 +279,7 @@ export function HunkCard({
             {chip.text}
           </button>
         ))}
+        {fullFile && <OpenFullFile path={hunk.path} pr={pr} focus={hunk.id} />}
       </div>
       {shown ? (
         // The lines are a surface that can be highlighted (lib/selection.ts).
@@ -298,7 +306,11 @@ export function HunkCard({
   );
 }
 
-const MARK: Record<DiffLine["kind"], string> = { add: "+", del: "-", context: " " };
+const MARK: Record<DiffLine["kind"], string> = {
+  add: "+",
+  del: "-",
+  context: " ",
+};
 
 /** A hunk by id: the whole-stack diff first, then each PR's own diff. */
 export function findHunk(
@@ -315,7 +327,7 @@ export function hunkSource(hunkId: string, pr?: number): SourceRef {
   return pr === undefined ? { kind: "hunk", hunkId } : { kind: "pr-hunk", pr, hunkId };
 }
 
-function Line({
+export function Line({
   line,
   index,
   tokens,

@@ -12,6 +12,7 @@ import {
   ChangeInputError,
   type ChangeReport,
   type ChangeSummary,
+  type FileResponse,
   type PendingResponse,
   parseChangeInput,
   type StacksResponse,
@@ -33,6 +34,23 @@ const CreateChange = z.object({
   leaf: z.number().int().positive().optional(),
   sources: z.array(z.unknown()).optional(),
 });
+
+/** Files bigger than this are not sent to the browser. */
+const MAX_FILE_CHARS = 2_000_000;
+
+/** The revisions a report's diffs start or end at. */
+export function reportRevisions(report: ChangeReport): Set<string> {
+  const revisions = new Set<string>();
+  if (report.change.revisions) {
+    revisions.add(report.change.revisions.base);
+    revisions.add(report.change.revisions.head);
+  }
+  for (const part of report.parts) {
+    if (part.from) revisions.add(part.from);
+    if (part.to) revisions.add(part.to);
+  }
+  return revisions;
+}
 
 export function changeRoutes(deps: AppDeps) {
   const { db } = deps;
@@ -130,6 +148,31 @@ export function changeRoutes(deps: AppDeps) {
     if (!row) return c.json({ error: "Not found." }, 404);
     return c.json(deps.runs.enqueue(row), 202);
   });
+
+  // One file of the Change at a revision its report names: the whole-stack
+  // base or head, or the start or end of a PR's own diff. Any other revision
+  // is refused, so the route only reads code that the Change shows.
+  app.get("/changes/:id/file", async (c) => {
+    const row = owned(c);
+    if (!row) return c.json({ error: "Not found." }, 404);
+    const path = c.req.query("path");
+    const revision = c.req.query("rev");
+    if (!path || !revision) return c.json({ error: "The query must have path and rev." }, 400);
+    const { report } = detail(row);
+    if (!report) return c.json({ error: "Strata does not have a report for this Change." }, 404);
+    if (!reportRevisions(report).has(revision))
+      return c.json({ error: "The report of this Change does not name that revision." }, 400);
+    const content = await deps
+      .engineFor(c.get("user").id)
+      .readFile(report.change.repo, revision, path);
+    if (content === null)
+      return c.json({ error: `Strata cannot find ${path} at that revision.` }, 404);
+    if (content.length > MAX_FILE_CHARS)
+      return c.json({ error: `${path} is too large. Strata does not show it.` }, 413);
+    return c.json<FileResponse>({ path, revision, content });
+  });
+
+  app.route("/", approvalRoutes(deps, stackCache));
 
   app.onError((error, c) => {
     if (

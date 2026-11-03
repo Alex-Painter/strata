@@ -13,6 +13,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { AppShell, Breadcrumb } from "../components/AppShell";
 import { EvidenceContext, type EvidenceView } from "../components/Claims";
 import { Counts, meaningful } from "../components/Diff";
+import { FullFileContext, FullFileDialog, type FullFileTarget } from "../components/FullFile";
 import { Icon, LAYER_ICON } from "../components/Icon";
 import { Spinner } from "../components/Spinner";
 import { railMarks } from "../components/Verification";
@@ -96,6 +97,8 @@ export function Workspace({
   const [paneOpen, setPaneOpen] = useStored("strata-change-pane-open", true);
   const [panelWidth, setPanelWidth] = useStored("strata-chat-width", 400);
   const [overlay, setOverlay] = useState<"cmdk" | "help" | null>(null);
+  /** The file open in the full-file dialog. */
+  const [fullFile, setFullFile] = useState<FullFileTarget | null>(null);
   const [displayOpen, setDisplayOpen] = useState(false);
   const canvas = useRef<HTMLDivElement>(null);
   /** Highlights waiting to go with the next question. */
@@ -201,6 +204,13 @@ export function Workspace({
     if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === "k") {
       event.preventDefault();
       setOverlay((open) => (open === "cmdk" ? null : "cmdk"));
+      return;
+    }
+    if (fullFile) {
+      if (key === "Escape") {
+        event.preventDefault();
+        setFullFile(null);
+      }
       return;
     }
     if (overlay) {
@@ -551,49 +561,56 @@ export function Workspace({
           </div>
           <div ref={canvas} className="canvas">
             <EvidenceContext.Provider value={evidence}>
-              <div className="canvas-in">
-                {run && <RunBanner run={run} hasReport={report !== null} />}
-                {report && diff && overviewProps ? (
-                  layer ? (
-                    <LayerView
-                      report={report}
-                      diff={diff}
-                      part={part}
-                      layer={layer}
-                      display={display}
-                      selection={selection}
-                      onSelect={setSelection}
-                      onFile={(path) => reveal({ kind: "file", path })}
-                      onScope={scope}
-                    />
-                  ) : node && stack ? (
-                    <PrOverview
-                      {...overviewProps}
-                      onClaim={(claim) =>
-                        setSelection({ kind: "claim", claim, by: `#${node.pr.number}'s own diff` })
-                      }
-                      stack={stack}
-                      node={node}
-                      part={part ?? undefined}
-                    />
-                  ) : stack && summary ? (
-                    <StackOverview
-                      {...overviewProps}
-                      stack={stack}
-                      summary={summary}
-                      pickError={pickError}
-                    />
+              <FullFileContext.Provider value={changeId ? setFullFile : null}>
+                <div className="canvas-in">
+                  {run && <RunBanner run={run} hasReport={report !== null} />}
+                  {report && diff && overviewProps ? (
+                    layer ? (
+                      <LayerView
+                        report={report}
+                        diff={diff}
+                        part={part}
+                        layer={layer}
+                        display={display}
+                        selection={selection}
+                        onSelect={setSelection}
+                        onFile={(path) => reveal({ kind: "file", path })}
+                        onScope={scope}
+                      />
+                    ) : node && stack ? (
+                      <PrOverview
+                        {...overviewProps}
+                        onClaim={(claim) =>
+                          setSelection({
+                            kind: "claim",
+                            claim,
+                            by: `#${node.pr.number}'s own diff`,
+                          })
+                        }
+                        stack={stack}
+                        node={node}
+                        part={part ?? undefined}
+                        approvals={approvals}
+                      />
+                    ) : stack && summary ? (
+                      <StackOverview
+                        {...overviewProps}
+                        stack={stack}
+                        summary={summary}
+                        pickError={pickError}
+                      />
+                    ) : (
+                      <RangeOverview {...overviewProps} />
+                    )
                   ) : (
-                    <RangeOverview {...overviewProps} />
-                  )
-                ) : (
-                  !run && (
-                    <p className="text-muted">
-                      There is nothing to show. Strata did not analyse this Change.
-                    </p>
-                  )
-                )}
-              </div>
+                    !run && (
+                      <p className="text-muted">
+                        There is nothing to show. Strata did not analyse this Change.
+                      </p>
+                    )
+                  )}
+                </div>
+              </FullFileContext.Provider>
             </EvidenceContext.Provider>
           </div>
         </main>
@@ -623,6 +640,8 @@ export function Workspace({
               setAskFocus((n) => n + 1);
               setPanel(true);
               setPop(null);
+              // The chat is under the full file, so the question box shows.
+              setFullFile(null);
               window.getSelection()?.removeAllRanges();
             }}
           >
@@ -632,6 +651,14 @@ export function Workspace({
       </div>
       {overlay === "cmdk" && <CommandMenu commands={commands} onClose={() => setOverlay(null)} />}
       {overlay === "help" && <Shortcuts onClose={() => setOverlay(null)} />}
+      {fullFile && changeId && report && (
+        <FullFileDialog
+          changeId={changeId}
+          report={report}
+          target={fullFile}
+          onClose={() => setFullFile(null)}
+        />
+      )}
     </AppShell>
   );
 }

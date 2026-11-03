@@ -12,6 +12,7 @@ import type {
   ChatStreamEvent,
   ChatThread,
   CreateChangeRequest,
+  FileResponse,
   MeResponse,
   PendingResponse,
   PostChatMessageRequest,
@@ -141,6 +142,11 @@ export const api = {
     request<ChatThread>(`/api/changes/${encodeURIComponent(changeId)}/threads`, post({})),
   messages: (threadId: string) =>
     request<ChatMessage[]>(`/api/threads/${encodeURIComponent(threadId)}/messages`),
+  /** One file of a Change at a revision its report names. */
+  file: (changeId: string, path: string, revision: string) =>
+    request<FileResponse>(
+      `/api/changes/${encodeURIComponent(changeId)}/file?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(revision)}`,
+    ),
   ask,
 };
 
