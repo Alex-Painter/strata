@@ -399,7 +399,14 @@ code,
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
+  /*
+   * The sidebar and the card are positioned, so that they contain the absolute
+   * descendants inside them, such as the sr-only labels. Otherwise those sit
+   * where the content would be without the scroll, and make the page taller
+   * than the window.
+   */
   .side {
+    position: relative;
     min-height: 0;
     margin-left: -8px;
     display: flex;
@@ -526,6 +533,7 @@ code,
   }
 
   .main {
+    position: relative;
     min-width: 0;
     min-height: 0;
     display: flex;
