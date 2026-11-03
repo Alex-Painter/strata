@@ -193,7 +193,7 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(others[0]?.[1]).toContain("Not analysed");
   expect(others[0]?.[1]).toContain("kim, sam");
   expect(others[0]?.[1]).toContain("Needs review");
-  expect(others[0]?.[1]).toContain("1/2");
+  expect(others[0]?.[1]).toContain("–/2");
   const github = section("others-acme-app").querySelector('a[aria-label="Open #30 on GitHub"]');
   expect(github?.getAttribute("href")).toBe("https://github.com/acme/app/pull/30");
   expect(github?.getAttribute("target")).toBe("_blank");

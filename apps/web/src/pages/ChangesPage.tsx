@@ -266,7 +266,11 @@ function OtherStacks({
         <ChangeTable
           rows={others.map((stack) => ({
             ...stackRow(stack),
-            place: placeOf([stack.root], stack.defaultPath),
+            // No PR here asks for you: show only the path length.
+            place: {
+              label: `–/${stack.defaultPath.length}`,
+              detail: `No PR in this stack asks for you. The path from #${stack.root} has ${stack.defaultPath.length} PRs.`,
+            },
           }))}
         />
       )}
@@ -493,7 +497,7 @@ interface Row {
   prs: PathPr[];
   /** The PR the GitHub button opens. */
   githubPr: number;
-  /** Where the row's PRs sit in the path, as "2/4" or "2, 3/4". */
+  /** Where the row's PRs sit in the path, as "2/4" or "2, 3/4"; "–/4" when none of them is yours. */
   place: { label: string; detail: string } | null;
   status: ReviewStatus | null;
   strata: string | null;
