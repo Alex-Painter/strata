@@ -84,7 +84,13 @@ afterEach(() => {
 
 const flush = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
 
-function render(props: { anchors: Anchor[]; onCite?: (id: string) => void; focus?: number }) {
+function render(props: {
+  anchors: Anchor[];
+  onCite?: (id: string) => void;
+  focus?: number;
+  startNew?: boolean;
+  onStartNew?: () => void;
+}) {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -100,6 +106,8 @@ function render(props: { anchors: Anchor[]; onCite?: (id: string) => void; focus
           onClearAnchors={cleared}
           onCite={props.onCite ?? (() => {})}
           focus={props.focus ?? 0}
+          startNew={props.startNew}
+          onStartNew={props.onStartNew}
         />
       </QueryClientProvider>,
     ),
@@ -165,4 +173,103 @@ it("focuses the question box after Ask on a selection", async () => {
   await flush();
   expect(document.activeElement).toBe(again.container.querySelector("textarea"));
   act(() => again.root.unmount());
+});
+
+it("starts a new thread and focuses the question box when N asks for one", async () => {
+  const base = { threadId: "thr_1", analysedAt: "2026-10-29T10:00:00Z", createdAt: "" };
+  saved = [
+    { ...base, id: "m1", role: "user", text: "Why six hours?", anchors: [] },
+    { ...base, id: "m2", role: "assistant", text: "Because.", anchors: [] },
+  ];
+  const first = render({ anchors: [] });
+  await flush();
+  expect(first.container.textContent).toContain("Why six hours?");
+  act(() => first.root.unmount());
+
+  const started = vi.fn();
+  const { container, root } = render({ anchors: [], startNew: true, onStartNew: started });
+  await flush();
+  expect(started).toHaveBeenCalled();
+  expect(container.querySelector(".ask-log")?.textContent).not.toContain("Because.");
+  const thread = container.querySelector('select[aria-label="Thread"]') as HTMLSelectElement;
+  expect(thread.value).toBe("");
+  expect(document.activeElement).toBe(container.querySelector("textarea"));
+  act(() => root.unmount());
+});
+
+it("lets the reviewer open a different thread while an answer streams in", async () => {
+  const base = { analysedAt: "2026-10-29T10:00:00Z", createdAt: "" };
+  const threads = [
+    { id: "thr_1", changeId: "chg_1", title: "Why six hours?", createdAt: "" },
+    { id: "thr_2", changeId: "chg_1", title: "Who reads the cache?", createdAt: "" },
+  ];
+  const old: ChatMessage[] = [
+    { ...base, threadId: "thr_2", id: "m9", role: "user", text: "Who reads it?", anchors: [] },
+  ];
+  let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/repos/acme/app/settings") {
+        return Response.json({
+          repo: "acme/app",
+          sendCodeToAnthropic: true,
+          claudeAvailable: true,
+        });
+      }
+      if (url === "/api/changes/chg_1/threads") return Response.json(threads);
+      if (url === "/api/threads/thr_1/messages" && init?.method === "POST") {
+        const body = new ReadableStream<Uint8Array>({
+          start: (controller) => {
+            stream = controller;
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream" } });
+      }
+      if (url === "/api/threads/thr_1/messages") return Response.json([]);
+      if (url === "/api/threads/thr_2/messages") return Response.json(old);
+      return Response.json({ error: "Not found." }, { status: 404 });
+    }),
+  );
+  const { container, root } = render({ anchors: [] });
+  await flush();
+
+  const box = container.querySelector("textarea") as HTMLTextAreaElement;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+  act(() => {
+    setValue?.call(box, "Why six hours?");
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  act(() => box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+  await flush();
+  stream?.enqueue(
+    new TextEncoder().encode('event: delta\ndata: {"type":"delta","text":"The cache"}\n\n'),
+  );
+  await flush();
+  expect(container.querySelector(".ask-log")?.textContent).toContain("The cache");
+
+  const thread = container.querySelector('select[aria-label="Thread"]') as HTMLSelectElement;
+  expect(thread.disabled).toBe(false);
+  const newThread = [...container.querySelectorAll("button")].find(
+    (button) => button.textContent === "New thread",
+  ) as HTMLButtonElement;
+  expect(newThread.disabled).toBe(false);
+  const setSelect = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+  act(() => {
+    setSelect?.call(thread, "thr_2");
+    thread.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await flush();
+  const log = container.querySelector(".ask-log") as HTMLElement;
+  expect(log.textContent).toContain("Who reads it?");
+  expect(log.textContent).not.toContain("The cache");
+  expect(container.textContent).toContain("Claude writes an answer in a different thread.");
+
+  act(() => {
+    setSelect?.call(thread, "thr_1");
+    thread.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await flush();
+  expect(container.querySelector(".ask-log")?.textContent).toContain("The cache");
+  act(() => root.unmount());
 });

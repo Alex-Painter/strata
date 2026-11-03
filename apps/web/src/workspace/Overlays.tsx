@@ -187,6 +187,7 @@ export const KEYS: Array<[keys: string[], action: string]> = [
   [["S"], "PR seams"],
   [["M"], "Layers by PR"],
   [["\\"], "Show or hide the chat"],
+  [["N"], "New chat thread"],
   [["Esc"], "Go back one step"],
 ];
 

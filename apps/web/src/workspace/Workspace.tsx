@@ -111,6 +111,8 @@ export function Workspace({
   const [pop, setPop] = useState<{ anchor: Anchor; x: number; y: number } | null>(null);
   /** Counts the times Ask was chosen on a selection, to focus the question box. */
   const [askFocus, setAskFocus] = useState(0);
+  /** True from the N key until the chat starts a new thread. */
+  const [askNew, setAskNew] = useState(false);
 
   // A selection on a surface that can be highlighted shows the Ask button.
   useEffect(() => {
@@ -261,6 +263,12 @@ export function Workspace({
       case "\\":
         if (changeId) setPanel(!panel);
         break;
+      case "n":
+        if (changeId) {
+          setPanel(true);
+          setAskNew(true);
+        }
+        break;
       case "Escape":
         if (displayOpen) setDisplayOpen(false);
         else if (selection) setSelection(null);
@@ -353,7 +361,19 @@ export function Workspace({
         run: () => setDisplay({ ...display, matrix: !display.matrix }),
       });
     }
-    return changeId ? list : list.filter((command) => command.id !== "panel");
+    if (!changeId) return list.filter((command) => command.id !== "panel");
+    list.push({
+      id: "new-thread",
+      group: "Chat",
+      label: "New thread",
+      icon: "panel",
+      hint: "N",
+      run: () => {
+        setPanel(true);
+        setAskNew(true);
+      },
+    });
+    return list;
   }, [report, diff, stack, layers, display, panel, changeId, go, reveal, setDisplay, setPanel]);
 
   const name = report?.change.title ?? title ?? "Change";
@@ -632,6 +652,8 @@ export function Workspace({
               onClearAnchors={() => setAsking([])}
               onCite={cite}
               focus={askFocus}
+              startNew={askNew}
+              onStartNew={() => setAskNew(false)}
             />
           </Panel>
         )}

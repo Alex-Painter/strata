@@ -9,6 +9,8 @@ import { Markdown } from "../lib/markdown";
 
 /** A question on its way: what was asked, and the answer so far. */
 interface Pending {
+  /** The thread of the question. Null until Strata makes the new thread. */
+  threadId: string | null;
   text: string;
   anchors: Anchor[];
   answer: string;
@@ -29,6 +31,8 @@ export function Ask({
   onClearAnchors,
   onCite,
   focus = 0,
+  startNew = false,
+  onStartNew,
 }: {
   changeId: string;
   report: ChangeReport | null;
@@ -40,6 +44,10 @@ export function Ask({
   onCite: (hunkId: string) => void;
   /** Goes up each time the reviewer chooses Ask on a selection: the question box then gets focus. */
   focus?: number;
+  /** True when the reviewer pressed N: the chat opens a new thread and focuses the question box. */
+  startNew?: boolean;
+  /** Tells the parent that the chat used startNew. */
+  onStartNew?: () => void;
 }) {
   const queryClient = useQueryClient();
   const repo = report?.change.repo.kind === "github" ? report.change.repo : null;
@@ -67,9 +75,12 @@ export function Ask({
   const end = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const shown = threadId ? (messages.data ?? []) : [];
+  // The reviewer can open other threads while an answer streams in. The answer shows only in its own thread.
+  const live = pending && pending.threadId === threadId ? pending : null;
+  const streaming = pending !== null && !pending.error;
 
   // Keep the newest text in view while the answer streams in.
-  const length = shown.length + (pending?.answer.length ?? 0);
+  const length = shown.length + (live?.answer.length ?? 0);
   useEffect(() => {
     if (length > 0) end.current?.scrollIntoView?.({ block: "end" });
   }, [length]);
@@ -81,19 +92,38 @@ export function Ask({
   useEffect(() => {
     if (focus > 0 && !gated) box.current?.focus();
   }, [focus, gated]);
+  // N starts a new thread, also while an answer streams in.
+  useEffect(() => {
+    if (!startNew) return;
+    setPicked(null);
+    box.current?.focus();
+    onStartNew?.();
+  }, [startNew, onStartNew]);
 
   const send = async () => {
     const question = text.trim();
-    if (!question || pending) return;
+    if (!question || streaming) return;
     const asked = anchors;
-    setPending({ text: question, anchors: asked, answer: "", status: null, error: null });
+    setPending({
+      threadId,
+      text: question,
+      anchors: asked,
+      answer: "",
+      status: null,
+      error: null,
+    });
     setText("");
     onClearAnchors();
     const controller = new AbortController();
     abort.current = controller;
     try {
       const id = threadId ?? (await api.createThread(changeId)).id;
-      if (!threadId) setPicked(id);
+      if (!threadId) {
+        setPending((now) => (now ? { ...now, threadId: id } : now));
+        // Stay on the new thread, unless the reviewer opened a different thread.
+        setPicked((now) => (now == null ? id : now));
+        void queryClient.invalidateQueries({ queryKey: ["threads", changeId] });
+      }
       await api.ask(
         id,
         { text: question, anchors: asked },
@@ -156,7 +186,6 @@ export function Ask({
             aria-label="Thread"
             className="ask-thread"
             value={threadId ?? ""}
-            disabled={pending !== null}
             onChange={(event) => setPicked(event.target.value || null)}
           >
             {threadId === null && <option value="">New thread</option>}
@@ -170,15 +199,19 @@ export function Ask({
         <button
           type="button"
           className="btn ghost sm"
-          disabled={pending !== null || threadId === null}
-          onClick={() => setPicked(null)}
+          title="New thread  N"
+          disabled={threadId === null}
+          onClick={() => {
+            setPicked(null);
+            box.current?.focus();
+          }}
         >
           New thread
         </button>
       </div>
 
       <div className="ask-log" aria-live="polite">
-        {shown.length === 0 && !pending && (
+        {shown.length === 0 && !live && (
           <p className="text-muted">
             Ask Claude about this Change. To ask about a part of a diff, select the text, then
             select Ask.
@@ -202,26 +235,19 @@ export function Ask({
             </div>
           ),
         )}
-        {pending && (
+        {live && (
           <>
-            <Question
-              text={pending.text}
-              anchors={pending.anchors}
-              report={report}
-              onCite={onCite}
-            />
+            <Question text={live.text} anchors={live.anchors} report={report} onCite={onCite} />
             <div className="ask-a">
-              {pending.answer && (
-                <Markdown text={pending.answer} onCite={onCite} citeLabel={citeLabel} />
-              )}
-              {!pending.error && (
+              {live.answer && <Markdown text={live.answer} onCite={onCite} citeLabel={citeLabel} />}
+              {!live.error && (
                 <p className="sub" role="status">
-                  {pending.status ?? (pending.answer ? "Writing…" : "Thinking…")}
+                  {live.status ?? (live.answer ? "Writing…" : "Thinking…")}
                 </p>
               )}
-              {pending.error && (
+              {live.error && (
                 <p className="alert" role="alert">
-                  {pending.error}
+                  {live.error}
                 </p>
               )}
             </div>
@@ -271,23 +297,23 @@ export function Ask({
           }}
         />
         <div className="flex items-center gap-2">
-          <span className="sub flex-1">Enter sends. Shift+Enter adds a line.</span>
-          {pending && !pending.error ? (
+          <span className="sub flex-1">
+            {streaming && !live
+              ? "Claude writes an answer in a different thread."
+              : "Enter sends. Shift+Enter adds a line."}
+          </span>
+          {live && !live.error ? (
             <button type="button" className="btn ghost sm" onClick={() => abort.current?.abort()}>
               Stop
             </button>
           ) : (
             <>
-              {pending?.error && (
+              {live?.error && (
                 <button type="button" className="btn ghost sm" onClick={() => setPending(null)}>
                   Close
                 </button>
               )}
-              <button
-                type="submit"
-                className="btn primary sm"
-                disabled={!text.trim() || pending !== null}
-              >
+              <button type="submit" className="btn primary sm" disabled={!text.trim() || streaming}>
                 Send
               </button>
             </>
