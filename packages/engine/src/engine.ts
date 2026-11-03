@@ -7,6 +7,7 @@ import { NotImplementedError } from "./errors.js";
 import { RepoCache } from "./git/cache.js";
 import { git } from "./git/run.js";
 import { findAssigned } from "./github/assigned.js";
+import { findAuthored } from "./github/authored.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
@@ -48,6 +49,9 @@ export const createEngine: CreateEngine = (config) => {
     // Two small searches; nothing in the repo's caches, so no lock.
     findAssigned(repo) {
       return findAssigned(githubPort(config), repo);
+    },
+    findAuthored(repo) {
+      return findAuthored(githubPort(config), repo);
     },
     async resolveChange(input, options = {}) {
       const gh = githubInput(input);

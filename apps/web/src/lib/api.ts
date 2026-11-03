@@ -5,6 +5,7 @@
 import type {
   ApiError,
   AssignedStatus,
+  AuthoredResponse,
   ChangeDetail,
   ChangeSummary,
   ChatMessage,
@@ -115,6 +116,8 @@ export const api = {
     request<StacksResponse | PendingResponse>(
       `/api/repos/${repo.split("/").map(encodeURIComponent).join("/")}/stacks`,
     ),
+  /** `repo` is `owner/name`. Your own open PRs there, newest update first. */
+  authored: (repo: string) => request<AuthoredResponse>(`/api/repos/${repoPath(repo)}/authored`),
   changes: () => request<ChangeSummary[]>("/api/changes"),
   /** Where the search for PRs assigned to you stands. */
   assigned: () => request<AssignedStatus>("/api/assigned"),

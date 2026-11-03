@@ -109,13 +109,13 @@ export interface PrTimelinePage {
 
 const STATES = { OPEN: "open", MERGED: "merged", CLOSED: "closed" } as const;
 
-const REVIEWS = {
+export const REVIEWS = {
   APPROVED: "approved",
   CHANGES_REQUESTED: "changes-requested",
   REVIEW_REQUIRED: "review-required",
 } as const;
 
-const CHECKS: Record<string, StackPr["checks"]> = {
+export const CHECKS: Record<string, StackPr["checks"]> = {
   SUCCESS: "success",
   FAILURE: "failure",
   ERROR: "failure",

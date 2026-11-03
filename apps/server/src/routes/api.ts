@@ -7,8 +7,18 @@
  * The rest are declared with their final paths and answer 501, so the web app
  * can be wired against them and later slices fill them in.
  */
-import type { AssignedStatus, MeResponse, RepoSettingsResponse } from "@strata/core/model";
-import { loadRepoSettings, SettingsError, saveSendCodeToAnthropic } from "@strata/engine";
+import type {
+  AssignedStatus,
+  AuthoredResponse,
+  MeResponse,
+  RepoSettingsResponse,
+} from "@strata/core/model";
+import {
+  GitHubError,
+  loadRepoSettings,
+  SettingsError,
+  saveSendCodeToAnthropic,
+} from "@strata/engine";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -32,6 +42,19 @@ export function apiRoutes(deps: AppDeps) {
     const userId = c.get("user").id;
     void deps.assigned.search(userId);
     return c.json<AssignedStatus>(deps.assigned.status(userId), 202);
+  });
+
+  // Your own open PRs in a repo, from one GitHub search. The web app groups
+  // them into stacks with the repo's stack list.
+  app.get("/repos/:owner/:name/authored", async (c) => {
+    const repo = `${c.req.param("owner")}/${c.req.param("name")}`;
+    try {
+      const found = await deps.engineFor(c.get("user").id).findAuthored(repo);
+      return c.json<AuthoredResponse>({ repo, viewer: found.viewer, prs: found.prs });
+    } catch (error) {
+      if (error instanceof GitHubError) return c.json({ error: error.message }, 502);
+      throw error;
+    }
   });
 
   // Per-repo settings live in <dataDir>/settings/<owner>/<name>.json.

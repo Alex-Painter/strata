@@ -1,12 +1,15 @@
 import type {
   AssignedStatus,
+  AuthoredPr,
+  AuthoredResponse,
   ChangeSummary,
   MeResponse,
   PathPr,
   RunStatus,
   StackSummary,
+  StacksResponse,
 } from "@strata/core/model";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { Icon } from "../components/Icon";
@@ -20,9 +23,10 @@ import { ReadAt } from "./StacksPage";
 
 /**
  * The home page, by how much each Change asks of you: waiting on you (from
- * your GitHub assignments), assigned or reviewed but not waiting, ones you
- * opened yourself, and the rest of each searched repo's open stacks. Strata
- * analyses the first two by itself; a stack only once you choose Analyse.
+ * your GitHub assignments), assigned or reviewed but not waiting, your own
+ * open PRs and their stacks, ones you added yourself, and the rest of each
+ * searched repo's open stacks. Strata analyses the first two by itself; a
+ * stack or PR only once you choose it.
  */
 export function ChangesPage({ me }: { me: MeResponse }) {
   const queryClient = useQueryClient();
@@ -47,9 +51,38 @@ export function ChangesPage({ me }: { me: MeResponse }) {
   const all = showTeams ? changes.data : changes.data?.filter((c) => !teamOnly(c));
   const error = changes.error?.message ?? null;
   const repos = assigned.data?.repos ?? [];
+  const authored = useQueries({
+    queries: repos.map((repo) => ({
+      queryKey: ["authored", repo],
+      queryFn: () => api.authored(repo),
+      // One GitHub search each time; GitHub limits searches to 30 a minute.
+      refetchInterval: 60_000,
+    })),
+  });
+  // The same queries as each repo's "Other stacks", so the list is read once.
+  const stackLists = useQueries({
+    queries: repos.map((repo) => ({
+      queryKey: ["stacks", repo],
+      queryFn: () => api.stacks(repo),
+      refetchInterval: pollStacks,
+    })),
+  });
+  const yours = repos.map((repo, i) => {
+    const stacksData = stackLists[i]?.data;
+    return yourRepo(
+      repo,
+      authored[i]?.data ?? null,
+      stacksData && !isPending(stacksData) ? stacksData : null,
+      changes.data ?? [],
+    );
+  });
+  const shownChanges = new Set(yours.flatMap((y) => y.changeIds));
+  const shownStacks = new Set(yours.flatMap((y) => y.stackIds));
   // A path the search made that no longer holds your PRs (they moved to a
-  // longer path) is one you were on before, not one you opened.
-  const opened = all?.filter((c) => c.yours.length === 0 && c.origin === "added") ?? [];
+  // longer path) is one you were on before, not one you added.
+  const added =
+    all?.filter((c) => c.yours.length === 0 && c.origin === "added" && !shownChanges.has(c.id)) ??
+    [];
   return (
     <AppShell
       me={me}
@@ -81,18 +114,31 @@ export function ChangesPage({ me }: { me: MeResponse }) {
               empty="There are no stacks here at this time."
             />
           </section>
-          {opened.length > 0 && (
-            <section className="grid gap-3" aria-labelledby="opened-h">
-              <h2 id="opened-h" className="h2">
-                Opened by you
+          {repos.length > 0 && (
+            <YourPrs
+              repos={yours}
+              errors={authored.flatMap((q, i) =>
+                q.error ? [`${repos[i]}: ${q.error.message}`] : [],
+              )}
+            />
+          )}
+          {added.length > 0 && (
+            <section className="grid gap-3" aria-labelledby="added-h">
+              <h2 id="added-h" className="h2">
+                Added by you
                 <Info text="Stacks that you selected for analysis. Nobody asked you to review them." />
               </h2>
-              <ChangeList changes={opened} error={null} empty="" />
+              <ChangeList changes={added} error={null} empty="" />
             </section>
           )}
           {all &&
             repos.map((repo) => (
-              <OtherStacks key={repo} repo={repo} changes={all.filter((c) => c.repo === repo)} />
+              <OtherStacks
+                key={repo}
+                repo={repo}
+                changes={all.filter((c) => c.repo === repo)}
+                hide={shownStacks}
+              />
             ))}
         </div>
       </main>
@@ -170,7 +216,16 @@ function WaitingOnYou({
  * The repo's open stacks with no Change yet. They're only analysed once you
  * choose Analyse on the stack; then they move up to your Changes.
  */
-function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[] }) {
+function OtherStacks({
+  repo,
+  changes,
+  hide,
+}: {
+  repo: string;
+  changes: ChangeSummary[];
+  /** Stacks that another section shows, such as your own. */
+  hide: ReadonlySet<string>;
+}) {
   const stacks = useQuery({
     queryKey: ["stacks", repo],
     queryFn: () => api.stacks(repo),
@@ -183,7 +238,9 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
     stack.prs.some((pr) => pr.number === change.tipPr);
   const others = (found ?? []).filter(
     (stack) =>
-      stack.prs.some((pr) => pr.state === "open") && !changes.some((c) => covers(stack, c)),
+      stack.prs.some((pr) => pr.state === "open") &&
+      !hide.has(stack.id) &&
+      !changes.some((c) => covers(stack, c)),
   );
   const id = `others-${repo.replace("/", "-")}`;
   return (
@@ -207,24 +264,159 @@ function OtherStacks({ repo, changes }: { repo: string; changes: ChangeSummary[]
         <div className="empty">There are no other open stacks.</div>
       ) : (
         <ChangeTable
-          rows={others.map((stack) => {
-            const root = stack.prs.find((pr) => pr.number === stack.root);
-            return {
-              key: stack.id,
-              href: `/repos/${repo}#stack-${stack.root}`,
-              title: root?.title ?? `#${stack.root}`,
-              note: countPrs(stack.prs),
-              repo,
-              rootPr: stack.root,
-              tipPr: null,
-              prs: stack.prs,
-              githubPr: stack.root,
-              place: placeOf([stack.root], stack.defaultPath),
-              status: reviewStatus(stack.prs, { waiting: false, reviewed: false }),
-              strata: "Not analysed",
-            };
-          })}
+          rows={others.map((stack) => ({
+            ...stackRow(stack),
+            place: placeOf([stack.root], stack.defaultPath),
+          }))}
         />
+      )}
+    </section>
+  );
+}
+
+/** A stack with no Change yet, as a row that opens it on the Stacks page. */
+function stackRow(stack: StackSummary): Row {
+  const root = stack.prs.find((pr) => pr.number === stack.root);
+  return {
+    key: stack.id,
+    href: `/repos/${stack.repo}#stack-${stack.root}`,
+    title: root?.title ?? `#${stack.root}`,
+    note: countPrs(stack.prs),
+    repo: stack.repo,
+    rootPr: stack.root,
+    tipPr: null,
+    prs: stack.prs,
+    githubPr: stack.root,
+    place: null,
+    status: reviewStatus(stack.prs, { waiting: false, reviewed: false }),
+    strata: "Not analysed",
+  };
+}
+
+interface YourRepo {
+  repo: string;
+  /** Null until both your PRs and the repo's stacks are read. */
+  rows: (Row | LonePr)[] | null;
+  /** The Changes and stacks the rows show, so other sections do not show them again. */
+  changeIds: string[];
+  stackIds: string[];
+}
+
+/** One of your PRs with no stack and no Change: selecting it makes and runs its Change. */
+interface LonePr {
+  lone: AuthoredPr;
+  repo: string;
+}
+
+/**
+ * Your open PRs in one repo as rows: the Change that holds a PR if there is
+ * one, else its stack, else the PR alone. A Change or stack shows once,
+ * however many of your PRs it holds.
+ */
+function yourRepo(
+  repo: string,
+  authored: AuthoredResponse | null,
+  stacks: StacksResponse | null,
+  changes: ChangeSummary[],
+): YourRepo {
+  const result: YourRepo = { repo, rows: null, changeIds: [], stackIds: [] };
+  if (!authored || !stacks) return result;
+  const rows: (Row | LonePr)[] = [];
+  const mine = authored.prs.map((pr) => pr.number);
+  for (const pr of authored.prs) {
+    const change = changes.find(
+      (c) => c.repo === repo && c.prs.some((p) => p.number === pr.number),
+    );
+    if (change) {
+      if (result.changeIds.includes(change.id)) continue;
+      result.changeIds.push(change.id);
+      const path = change.prs.map((p) => p.number);
+      rows.push({
+        ...changeRow(change),
+        note: null,
+        place: placeOf(
+          path.filter((n) => mine.includes(n)),
+          path,
+        ),
+        // Your own PRs do not wait on you.
+        status: reviewStatus(change.prs, { waiting: false, reviewed: false }),
+      });
+      continue;
+    }
+    const stack = stacks.stacks.find((s) => s.prs.some((p) => p.number === pr.number));
+    if (stack) {
+      if (result.stackIds.includes(stack.id)) continue;
+      result.stackIds.push(stack.id);
+      rows.push({
+        ...stackRow(stack),
+        place: placeOf(
+          stack.defaultPath.filter((n) => mine.includes(n)),
+          stack.defaultPath,
+        ),
+      });
+      continue;
+    }
+    rows.push({ lone: pr, repo });
+  }
+  result.rows = rows;
+  return result;
+}
+
+function YourPrs({ repos, errors }: { repos: YourRepo[]; errors: string[] }) {
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  const open = useMutation({
+    mutationFn: (input: string) => api.createChange({ input }),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(["change", detail.change.id], detail);
+      queryClient.invalidateQueries({ queryKey: ["changes"] });
+      navigate(`/changes/${detail.change.id}`);
+    },
+  });
+  const waitingFor = repos.filter((r) => !r.rows).map((r) => r.repo);
+  const rows = repos
+    .flatMap((r) => r.rows ?? [])
+    .map((row): Row => {
+      if (!("lone" in row)) return row;
+      const { lone: pr, repo } = row;
+      const input = `${repo}#${pr.number}`;
+      return {
+        key: `pr-${input}`,
+        href: null,
+        onOpen: () => {
+          if (!open.isPending) open.mutate(input);
+        },
+        title: pr.title,
+        note: null,
+        repo,
+        rootPr: pr.number,
+        tipPr: null,
+        prs: [pr],
+        githubPr: pr.number,
+        place: null,
+        status: reviewStatus([pr], { waiting: false, reviewed: false }),
+        strata: open.isPending && open.variables === input ? "Opening…" : "Not analysed",
+      };
+    });
+  return (
+    <section className="grid gap-3" aria-labelledby="yours-h">
+      <h2 id="yours-h" className="h2">
+        Your PRs and stacks
+        <Info text="Open PRs that you opened on GitHub, with their stacks. Strata analyses a PR or a stack only when you select it." />
+      </h2>
+      {[...errors, ...(open.error ? [open.error.message] : [])].map((problem) => (
+        <p key={problem} className="alert">
+          {problem}
+        </p>
+      ))}
+      {rows.length > 0 && <ChangeTable rows={rows} />}
+      {waitingFor.length > 0 && errors.length === 0 ? (
+        <p role="status" className="text-[13px] text-muted">
+          Strata reads your PRs in {waitingFor.join(", ")}…
+        </p>
+      ) : (
+        rows.length === 0 &&
+        errors.length === 0 && <div className="empty">You have no open PRs at this time.</div>
       )}
     </section>
   );
@@ -261,38 +453,38 @@ function ChangeList({
   if (error) return <p className="alert">{error}</p>;
   if (!changes) return null;
   if (changes.length === 0) return <div className="empty">{empty}</div>;
-  return (
-    <ChangeTable
-      rows={changes.map((change) => {
-        const path = change.prs.map((pr) => pr.number);
-        // Your PRs that GitHub still lists for you, bottom first; the button opens the lowest.
-        const mine = path.filter((n) => change.yours.some((pr) => pr.active && pr.number === n));
-        const active = mine[0] ?? change.yours.find((pr) => pr.active)?.number;
-        return {
-          key: change.id,
-          href: `/changes/${change.id}`,
-          title: change.title,
-          note: change.yours.length > 0 ? yoursLabel(change.yours) : null,
-          repo: change.repo,
-          rootPr: change.rootPr,
-          tipPr: change.tipPr,
-          prs: change.prs,
-          githubPr: active ?? change.rootPr,
-          place: placeOf(mine.length > 0 ? mine : [active ?? change.rootPr], path),
-          status: reviewStatus(change.prs, {
-            waiting: change.waiting,
-            reviewed: change.yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
-          }),
-          strata: change.status ? STATUS[change.status] : null,
-        };
-      })}
-    />
-  );
+  return <ChangeTable rows={changes.map(changeRow)} />;
+}
+
+function changeRow(change: ChangeSummary): Row {
+  const path = change.prs.map((pr) => pr.number);
+  // Your PRs that GitHub still lists for you, bottom first; the button opens the lowest.
+  const mine = path.filter((n) => change.yours.some((pr) => pr.active && pr.number === n));
+  const active = mine[0] ?? change.yours.find((pr) => pr.active)?.number;
+  return {
+    key: change.id,
+    href: `/changes/${change.id}`,
+    title: change.title,
+    note: change.yours.length > 0 ? yoursLabel(change.yours) : null,
+    repo: change.repo,
+    rootPr: change.rootPr,
+    tipPr: change.tipPr,
+    prs: change.prs,
+    githubPr: active ?? change.rootPr,
+    place: placeOf(mine.length > 0 ? mine : [active ?? change.rootPr], path),
+    status: reviewStatus(change.prs, {
+      waiting: change.waiting,
+      reviewed: change.yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
+    }),
+    strata: change.status ? STATUS[change.status] : null,
+  };
 }
 
 interface Row {
   key: string;
-  href: string;
+  /** Where the row goes; null when `onOpen` does the work instead. */
+  href: string | null;
+  onOpen?: () => void;
   title: string;
   note: string | null;
   repo: string;
@@ -372,13 +564,25 @@ function ChangeTable({ rows }: { rows: Row[] }) {
                 key={row.key}
                 className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover"
                 onClick={(event) => {
-                  if (!(event.target as Element).closest("a")) navigate(row.href);
+                  if ((event.target as Element).closest("a, button")) return;
+                  if (row.href) navigate(row.href);
+                  else row.onOpen?.();
                 }}
               >
                 <td className="min-w-0 px-3 py-1.5">
-                  <Link href={row.href} className="block truncate font-medium text-text">
-                    {row.title}
-                  </Link>
+                  {row.href ? (
+                    <Link href={row.href} className="block truncate font-medium text-text">
+                      {row.title}
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={row.onOpen}
+                      className="block w-full truncate text-left font-medium text-text"
+                    >
+                      {row.title}
+                    </button>
+                  )}
                   <span className="block truncate text-[13px] text-faint">
                     <span className="font-mono">
                       {row.repo}#{row.rootPr}

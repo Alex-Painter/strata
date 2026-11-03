@@ -16,6 +16,7 @@ import type {
   RepoRef,
   Stack,
 } from "@strata/core";
+import type { AuthoredPrs } from "./github/authored.js";
 import type { GitHubPort } from "./github/port.js";
 import type { LayerJudge } from "./layers/judge.js";
 
@@ -126,6 +127,8 @@ export interface Engine {
    * review (directly or through a team), leaving out their own.
    */
   findAssigned(repo: string): Promise<AssignedPrs>;
+  /** Open PRs in `repo` that the token's user opened, newest update first. */
+  findAuthored(repo: string): Promise<AuthoredPrs>;
   resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */

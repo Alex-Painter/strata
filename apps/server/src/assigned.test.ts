@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AssignedStatus, ChangeSummary } from "@strata/core/model";
+import type { AssignedStatus, AuthoredResponse, ChangeSummary } from "@strata/core/model";
 import type { Engine } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -236,5 +236,22 @@ describe("the assignment search", () => {
     expect(status).toMatchObject({ running: false, errors: [] });
     expect(status.lastFinishedAt).not.toBeNull();
     expect((await list()).map((c) => c.input)).toEqual(["acme/app#4"]);
+  });
+
+  it("lists the open PRs that you opened, and makes no Change for them", async () => {
+    const mine = demo.github.prs.filter((pr) => pr.number === 4 || pr.number === 5);
+    for (const pr of mine) pr.author = { login: "alex" };
+    const { app, list } = setup();
+    const res = await app.request("/api/repos/acme/app/authored");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as AuthoredResponse;
+    expect(body).toMatchObject({ repo: "acme/app", viewer: "alex" });
+    expect(body.prs.map((pr) => pr.number).sort()).toEqual(
+      mine
+        .filter((pr) => pr.state === "OPEN")
+        .map((pr) => pr.number)
+        .sort(),
+    );
+    expect(await list()).toEqual([]);
   });
 });

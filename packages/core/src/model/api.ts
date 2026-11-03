@@ -186,6 +186,17 @@ export interface AssignedStatus {
   errors: string[];
 }
 
+/** One open PR that you opened, for the list of your own PRs and stacks. */
+export type AuthoredPr = PathPr & Pick<StackPrSummary, "title" | "url" | "updatedAt">;
+
+/** GET /api/repos/:owner/:name/authored: your open PRs in the repo, newest update first. */
+export interface AuthoredResponse {
+  repo: string;
+  /** The GitHub login the token belongs to. */
+  viewer: string;
+  prs: AuthoredPr[];
+}
+
 export interface ApiError {
   error: string;
 }

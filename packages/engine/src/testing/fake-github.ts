@@ -10,6 +10,7 @@ import {
   VIEWER_QUERY,
   type ViewerPage,
 } from "../github/assigned.js";
+import { AUTHORED_QUERY, type AuthoredNode, type AuthoredPage } from "../github/authored.js";
 import {
   PR_PAGE_QUERY,
   PR_TIMELINE_QUERY,
@@ -70,6 +71,10 @@ export function fakeGitHub(
         fake.calls.push({ query: "search", variables });
         return search(fake, repo, String(variables.q), variables.cursor, pageSize) as T;
       }
+      if (query === AUTHORED_QUERY) {
+        fake.calls.push({ query: "search", variables });
+        return authoredSearch(fake, repo, String(variables.q), variables.cursor, pageSize) as T;
+      }
       if (`${variables.owner}/${variables.name}` !== repo) {
         return { repository: null } as T;
       }
@@ -126,14 +131,8 @@ export function fakeGitHub(
   return fake;
 }
 
-/** Understands only the searches findAssigned sends, for the viewer's own login. */
-function search(
-  fake: FakeGitHub,
-  repo: string,
-  q: string,
-  cursor: unknown,
-  pageSize: number,
-): AssignedPage {
+/** Understands only the searches findAssigned and findAuthored send, for the viewer's own login. */
+function searchMatches(fake: FakeGitHub, repo: string, q: string): PrNode[] {
   const terms = q.toLowerCase().split(/\s+/);
   const me = fake.viewer.toLowerCase();
   const matches = fake.prs.filter((pr) => {
@@ -142,6 +141,7 @@ function search(
     if (!terms.includes(`repo:${repo.toLowerCase()}`)) return false;
     if (terms.includes("is:open") && pr.state !== "OPEN") return false;
     if (terms.includes(`-author:${me}`) && pr.author?.login.toLowerCase() === me) return false;
+    if (terms.includes(`author:${me}`) && pr.author?.login.toLowerCase() !== me) return false;
     if (terms.includes(`assignee:${me}`) && !has(asks.assignees)) return false;
     if (terms.includes(`reviewed-by:${me}`) && !has(asks.reviewedBy)) return false;
     if (
@@ -152,7 +152,45 @@ function search(
       return false;
     return true;
   });
-  const sorted = matches.sort((a, b) => b.number - a.number);
+  return matches.sort((a, b) => b.number - a.number);
+}
+
+function authoredSearch(
+  fake: FakeGitHub,
+  repo: string,
+  q: string,
+  cursor: unknown,
+  pageSize: number,
+): AuthoredPage {
+  const sorted = searchMatches(fake, repo, q);
+  const start = cursor ? Number(cursor) : 0;
+  const nodes: AuthoredNode[] = sorted.slice(start, start + pageSize).map((pr) => ({
+    __typename: "PullRequest",
+    number: pr.number,
+    title: pr.title,
+    url: pr.url,
+    isDraft: pr.isDraft,
+    createdAt: pr.createdAt,
+    updatedAt: pr.updatedAt,
+    author: pr.author,
+    repository: { nameWithOwner: repo },
+    reviewDecision: pr.reviewDecision,
+    commits: pr.commits,
+  }));
+  const end = start + nodes.length;
+  return {
+    search: { pageInfo: { hasNextPage: end < sorted.length, endCursor: String(end) }, nodes },
+  };
+}
+
+function search(
+  fake: FakeGitHub,
+  repo: string,
+  q: string,
+  cursor: unknown,
+  pageSize: number,
+): AssignedPage {
+  const sorted = searchMatches(fake, repo, q);
   const start = cursor ? Number(cursor) : 0;
   const nodes: AssignedNode[] = sorted.slice(start, start + pageSize).map((pr) => {
     const asks = fake.requests[pr.number] ?? {};

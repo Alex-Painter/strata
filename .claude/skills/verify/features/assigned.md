@@ -8,7 +8,7 @@ Strata searches the repos it's told to (`STRATA_ASSIGNED_REPOS`, GlyphicAI/maver
 - `whole-path` means a PR in the middle of a stack gives the Change for the whole path.
 - `refresh` starts a search now and shows its progress.
 - `not-waiting` lists Changes with a PR you've reviewed already, or that GitHub no longer lists for you, under "Assigned to you, not waiting". They're analysed too.
-- `opened` lists Changes you made yourself (Analyse on a stack nobody asked you about) under "Opened by you".
+- `opened` lists Changes you made yourself (Analyse on a stack nobody asked you about) under "Added by you".
 - `other-stacks` lists the searched repo's open stacks with no Change yet under "Other stacks in <repo>", unanalysed until you choose Analyse on the stack page. A stack page path that already has a Change shows Open instead.
 - `table` shows each section as a table with the columns Change, Author, In stack (the PR's place on the path, such as `2/3`), Opened, Status (from GitHub's reviews and checks, and from what GitHub asks of you), Strata and GitHub (`link "Open #<n> on GitHub"`, a new tab).
 - `team-toggle` is `checkbox "Show team requests"` in "Waiting on you". Off, it hides rows that only a team's review request put there, and its name says how many it hides. The choice is kept in the browser.
@@ -30,7 +30,7 @@ Preconditions:
 - **Whole path.** `strata-verify http $R assigned/changes GET /api/changes`, take the id of the Change whose `input` is `acme/app#10`, then `strata-verify http $R assigned/change GET /api/changes/<id>`. Its `report.stack.selectedPath` is `[9,10,11]`.
 - **Team toggle.** Uncheck `Show team requests`. The #10 row goes, and the checkbox reads `Show team requests (1 hidden)`. Check it again and the row comes back.
 - **Yours marker.** `navigate` to `URL/changes/<id>`. `button "Whole stack"` is current, and the Change pane's Pull requests list row `Show #10 Warm the forecast cache nightly` does not contain the text `yours`.
-- **Not waiting, and other stacks.** On the same page, `heading "Assigned to you, not waiting"` lists `Add the forecast model` with `#3 reviewed by you`, `3/3` and `Changes requested`. `heading "Other stacks in acme/app"` lists `Add billing admins` (`3 PRs: 3 open`, `dev`, `1/2`, `Needs review`, `Not analysed`), linking to `/repos/acme/app#stack-5`; the stacks from #9 and #1 aren't listed again. Choosing it scrolls the Stacks page to `Stack from #5`, whose `button "Analyse 2 PRs"` makes and runs the Change. Back home, the stack has moved to `heading "Opened by you"`, and on the stack page that path now shows `link "Open"` and `This path already has a Change.`
+- **Not waiting, and other stacks.** On the same page, `heading "Assigned to you, not waiting"` lists `Add the forecast model` with `#3 reviewed by you`, `3/3` and `Changes requested`. `heading "Other stacks in acme/app"` lists `Add billing admins` (`3 PRs: 3 open`, `dev`, `1/2`, `Needs review`, `Not analysed`), linking to `/repos/acme/app#stack-5`; the stacks from #9 and #1 aren't listed again. Choosing it scrolls the Stacks page to `Stack from #5`, whose `button "Analyse 2 PRs"` makes and runs the Change. Back home, the stack has moved to `heading "Added by you"`, and on the stack page that path now shows `link "Open"` and `This path already has a Change.`
 - **Refresh.** Choose `Refresh`. The note under the heading shows a search step, such as `Searching acme/app`, then `Searched acme/app just now`. No new rows appear and nothing runs again, since no head moved.
 
 ## Claude per repo

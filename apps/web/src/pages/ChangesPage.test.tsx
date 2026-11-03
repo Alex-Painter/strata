@@ -80,10 +80,26 @@ const stacks = {
     stack(5, [pr(5), pr(6)]),
     stack(20, [pr(20), pr(21)]),
     stack(30, [pr(30, { author: "kim" }), pr(31)]),
+    // Yours: listed under "Your PRs and stacks", not with the others.
+    stack(50, [pr(50, { author: "alex" }), pr(51, { author: "alex" })]),
     // All merged: not open, so not listed.
     stack(40, [pr(40, { state: "merged" }), pr(41, { state: "merged" })]),
   ],
 };
+const mine = (number: number) => ({
+  number,
+  title: `My PR ${number}`,
+  url: `https://github.com/acme/app/pull/${number}`,
+  author: "alex",
+  state: "open" as const,
+  draft: number === 60,
+  createdAt: seenAt,
+  updatedAt: seenAt,
+  review: null,
+  checks: null,
+});
+// Newest first: #51 and #50 share a stack; #60 is alone.
+const authored = { repo: "acme/app", viewer: "alex", prs: [mine(51), mine(60), mine(50)] };
 let status: AssignedStatus;
 const posts: string[] = [];
 
@@ -99,6 +115,10 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url === "/api/changes") {
+        posts.push(`${url} ${init.body}`);
+        return Response.json({ change: change("60", {}) }, { status: 201 });
+      }
       if (init?.method === "POST") {
         posts.push(url);
         status = { ...status, running: true, progress: "Searching acme/app" };
@@ -107,6 +127,7 @@ beforeEach(() => {
       if (url === "/api/assigned") return Response.json(status);
       if (url === "/api/changes") return Response.json(list);
       if (url === "/api/repos/acme/app/stacks") return Response.json(stacks);
+      if (url === "/api/repos/acme/app/authored") return Response.json(authored);
       return Response.json({ error: "Not found." }, { status: 404 });
     }),
   );
@@ -153,8 +174,20 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
   expect(section("assigned-h").textContent).toContain("acme/app#2 → #4");
 
-  // #20's stack has a Change you opened, so it's listed there, not with the others.
-  expect(rows("opened-h").map(([href]) => href)).toEqual(["/changes/20"]);
+  // #20's stack has a Change you added, so it's listed there, not with the others.
+  expect(rows("added-h").map(([href]) => href)).toEqual(["/changes/20"]);
+
+  // Your own PRs: #50 and #51 as one stack row, then #60 alone.
+  const yours = rows("yours-h");
+  expect(yours).toHaveLength(2);
+  expect(yours[0]?.[0]).toBe("/repos/acme/app#stack-50");
+  expect(yours[0]?.[1]).toContain("1, 2/2");
+  expect(yours[0]?.[1]).toContain("Not analysed");
+  expect(yours[1]?.[1]).toContain("My PR 60");
+  expect(yours[1]?.[1]).toContain("Draft");
+  expect(section("yours-h").querySelector("tbody tr:last-child a")?.getAttribute("href")).toBe(
+    "https://github.com/acme/app/pull/60",
+  );
   const others = rows("others-acme-app");
   expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
   expect(others[0]?.[1]).toContain("Not analysed");
@@ -184,5 +217,13 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   await flush();
   expect(posts).toEqual(["/api/assigned/search"]);
   expect(waiting.textContent).toContain("Searching acme/app");
+
+  // Selecting a lone PR of yours makes its Change.
+  const lone = [...section("yours-h").querySelectorAll("tbody button")].find(
+    (b) => b.textContent === "My PR 60",
+  ) as HTMLButtonElement;
+  act(() => lone.click());
+  await flush();
+  expect(posts).toContain('/api/changes {"input":"acme/app#60"}');
   act(() => root.unmount());
 });
