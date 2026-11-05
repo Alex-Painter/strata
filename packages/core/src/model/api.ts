@@ -55,11 +55,16 @@ export interface StackPrSummary {
   checks: StackPr["checks"];
 }
 
-/** What a list of Changes shows for each PR on a path. */
+/**
+ * What a list of Changes, and a Change page before its first report, shows
+ * for each PR on a path. Changes saved before Strata kept the title, URL and
+ * branches lack them until Strata reads the path again.
+ */
 export type PathPr = Pick<
   StackPrSummary,
   "number" | "author" | "createdAt" | "state" | "draft" | "review" | "checks"
->;
+> &
+  Partial<Pick<StackPrSummary, "title" | "url" | "baseRef" | "headRef">>;
 
 export interface StackSummary {
   id: string;

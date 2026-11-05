@@ -277,6 +277,14 @@ describe("Changes", () => {
     const other = (await (
       await post("/api/changes", { input: "acme/app#5", leaf: 6 })
     ).json()) as ChangeDetail;
+    // The page can show the path's PRs before the first run ends.
+    expect(other.change.prs[1]).toMatchObject({
+      number: 6,
+      title: expect.any(String),
+      url: expect.any(String),
+      baseRef: expect.any(String),
+      headRef: expect.any(String),
+    });
     await runs.idle();
 
     expect(newest.change.id).not.toBe(other.change.id);

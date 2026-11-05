@@ -33,7 +33,10 @@ export function pathPrsOf(stack: Stack | null | undefined): string | null {
     const pr = byNumber.get(n);
     if (!pr) return [];
     const { number, author, createdAt, state, draft, review, checks } = pr;
-    return [{ number, author, createdAt, state, draft, review, checks }];
+    const { title, url, baseRef, headRef } = pr;
+    return [
+      { number, author, createdAt, state, draft, review, checks, title, url, baseRef, headRef },
+    ];
   });
   return JSON.stringify(prs);
 }

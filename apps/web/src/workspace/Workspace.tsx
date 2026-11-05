@@ -38,6 +38,7 @@ import { type Command, CommandMenu, DisplayPopover, Shortcuts } from "./Overlays
 import { PrOverview, RangeOverview, RunBanner, type RunView, StackOverview } from "./Overview";
 import { PaneHandle } from "./PaneHandle";
 import { Details, Panel, statusWord, working } from "./Panel";
+import { PendingOverview } from "./PendingOverview";
 import { StackRail } from "./StackRail";
 
 /**
@@ -59,6 +60,7 @@ export function Workspace({
   pickError = null,
   yours = [],
   prs = [],
+  repo,
   pageNav = null,
   changeId = null,
   approvals,
@@ -73,6 +75,8 @@ export function Workspace({
   changeId?: string | null;
   /** The path's PRs as the last assignment search saw them; fresher than the report's. */
   prs?: PathPr[];
+  /** The Change's repo, "owner/name", for links before there is a report. */
+  repo?: string | undefined;
   report: ChangeReport | null;
   run: RunView | null;
   nav: Nav;
@@ -630,6 +634,8 @@ export function Workspace({
                     ) : (
                       <RangeOverview {...overviewProps} />
                     )
+                  ) : prs.length > 0 ? (
+                    <PendingOverview title={title} repo={repo} prs={prs} />
                   ) : (
                     !run && (
                       <p className="text-muted">
