@@ -113,6 +113,7 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
       title={data?.change.title}
       yours={data?.change.yours ?? []}
       prs={data?.change.prs ?? []}
+      repo={data?.change.repo}
       pageNav={<HomeNav current={null} />}
       changeId={id}
       report={data?.report ?? null}
