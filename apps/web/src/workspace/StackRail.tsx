@@ -1,7 +1,9 @@
 import type { StackSummary } from "@strata/core/model";
 import { layoutStackMap } from "@strata/core/stack";
 import { useMemo } from "react";
+import { Icon } from "../components/Icon";
 import { Dot, EdgeLine, gutterWidth, laneX } from "../components/StackMap";
+import { prUrl } from "../lib/github";
 import { type ApprovalsView, RowApprove } from "./Approve";
 
 /** One row: the PR's title, and its branch under it. */
@@ -87,7 +89,7 @@ export function StackRail({
             >
               <button
                 type="button"
-                className={`flex h-full w-full min-w-0 flex-col justify-center rounded-md px-2 text-left hover:bg-hover aria-[current=true]:bg-active ${here ? "" : "faint opacity-50"} ${here && approvals?.data ? "pr-9" : ""}`}
+                className={`flex h-full w-full min-w-0 flex-col justify-center rounded-md px-2 text-left hover:bg-hover aria-[current=true]:bg-active ${here ? "" : "faint opacity-50"} ${here && approvals?.data ? "pr-16" : "pr-9"}`}
                 aria-label={here ? `Show #${n} ${title}` : `Open the path through #${n} ${title}`}
                 aria-current={pr === n ? "true" : undefined}
                 title={
@@ -118,7 +120,19 @@ export function StackRail({
                   </span>
                 )}
               </button>
-              {here && approvals && <RowApprove approvals={approvals} pr={n} title={title} />}
+              <span className="row-acts">
+                {here && approvals && <RowApprove approvals={approvals} pr={n} title={title} />}
+                <a
+                  href={prUrl(stack.repo, n)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ib text-faint"
+                  aria-label={`Open #${n} on GitHub`}
+                  title={`Open #${n} on GitHub`}
+                >
+                  <Icon name="external" />
+                </a>
+              </span>
             </li>
           );
         })}

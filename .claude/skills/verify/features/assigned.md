@@ -10,7 +10,7 @@ Strata searches the repos it's told to (`STRATA_ASSIGNED_REPOS`, GlyphicAI/maver
 - `not-waiting` lists Changes with a PR you've reviewed already, or that GitHub no longer lists for you, under "Assigned to you, not waiting". They're analysed too.
 - `opened` lists Changes you made yourself (Analyse on a stack nobody asked you about) under "Added by you".
 - `other-stacks` lists the searched repo's open stacks with no Change yet under "Other stacks in <repo>", unanalysed until you choose Analyse on the stack page. A stack page path that already has a Change shows Open instead.
-- `table` shows each section as a table with the columns Change, Author, In stack (the PR's place on the path, such as `2/3`; `–/<n>` under Other stacks, where no PR asks for you), Opened, Status (from GitHub's reviews and checks, and from what GitHub asks of you), Strata and GitHub (`link "Open #<n> on GitHub"`, a new tab).
+- `table` shows each section as a table with the columns Change, Author, In stack (the PR's place on the path, such as `2/3`; `–/<n>` under Other stacks, where no PR asks for you), Opened, Status (from GitHub's reviews and checks, and from what GitHub asks of you), Strata and GitHub (`link "Open #<n> on GitHub"`, a new tab). Each PR number under the title (`acme/app#9 → #11`) is a link to that PR on GitHub, in a new tab; a click on it does not open the Change.
 - `team-toggle` is `checkbox "Show team requests"` in "Waiting on you". Off, it hides rows that only a team's review request put there, and its name says how many it hides. The choice is kept in the browser.
 - `yours-marker` checks that the workspace opens on the whole stack, and that its Pull requests list has no `yours` label.
 

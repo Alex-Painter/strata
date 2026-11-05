@@ -173,6 +173,22 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(rows("assigned-h").map(([href]) => href)).toEqual(["/changes/6", "/changes/8"]);
   expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
   expect(section("assigned-h").textContent).toContain("acme/app#2 → #4");
+  // Each PR number opens that PR on GitHub in a new tab, and does not open the Change.
+  const numbers = [...section("assigned-h").querySelectorAll('a[title^="Open #"]')].filter((a) =>
+    a.textContent?.startsWith("#"),
+  );
+  expect(numbers.map((a) => a.getAttribute("href"))).toEqual(
+    expect.arrayContaining([
+      "https://github.com/acme/app/pull/2",
+      "https://github.com/acme/app/pull/4",
+    ]),
+  );
+  expect(numbers.every((a) => a.getAttribute("target") === "_blank")).toBe(true);
+  const before = location.pathname;
+  // jsdom cannot open a tab: stop the link itself, and let the click reach the row.
+  numbers[0]?.addEventListener("click", (event) => event.preventDefault());
+  act(() => (numbers[0] as HTMLAnchorElement).click());
+  expect(location.pathname).toBe(before);
 
   // #20's stack has a Change you added, so it's listed there, not with the others.
   expect(rows("added-h").map(([href]) => href)).toEqual(["/changes/20"]);

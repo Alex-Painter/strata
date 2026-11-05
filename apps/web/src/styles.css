@@ -717,16 +717,20 @@ code,
     gap: 4px;
     color: var(--add);
   }
-  .row-act {
+  /* The actions at the right of a PR row: Approve (on hover) and the GitHub link. */
+  .row-acts {
     position: absolute;
     top: 50%;
     right: 4px;
     translate: 0 -50%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
   }
   .row-act.ib {
     opacity: 0;
   }
-  li:hover > .row-act.ib,
+  li:hover .row-act.ib,
   .row-act.ib:focus-visible,
   .row-act.ib[data-open="true"] {
     opacity: 1;

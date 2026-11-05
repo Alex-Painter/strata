@@ -65,6 +65,13 @@ it("draws every PR, dims the other branch, and opens its path when chosen", () =
   expect(row(6).textContent).toContain("feat/pr-6");
   expect(container.querySelectorAll("path[data-edge]")).toHaveLength(3);
 
+  // Every PR, on the path or not, has a link to GitHub at the right of its row.
+  for (const n of [5, 6, 7]) {
+    const link = container.querySelector(`li[data-pr="${n}"] a[aria-label="Open #${n} on GitHub"]`);
+    expect(link?.getAttribute("href")).toBe(`https://github.com/acme/app/pull/${n}`);
+    expect(link?.getAttribute("target")).toBe("_blank");
+  }
+
   act(() => row(6).click());
   act(() => row(7).click());
   expect(scoped).toEqual([6]);

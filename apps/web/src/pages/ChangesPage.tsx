@@ -528,6 +528,21 @@ const TONE: Record<ReviewStatusKind, string> = {
   "needs-review": "text-muted",
 };
 
+/** A PR number that opens the PR on GitHub in a new tab, not the Change. */
+function PrLink({ repo, number }: { repo: string; number: number }) {
+  return (
+    <a
+      href={prUrl(repo, number)}
+      target="_blank"
+      rel="noreferrer"
+      title={`Open #${number} on GitHub`}
+      className="hover:text-text hover:underline"
+    >
+      #{number}
+    </a>
+  );
+}
+
 /** Changes or stacks as a table: what, who, when opened, review status, Strata's run, GitHub. */
 function ChangeTable({ rows }: { rows: Row[] }) {
   const [, navigate] = useLocation();
@@ -589,8 +604,14 @@ function ChangeTable({ rows }: { rows: Row[] }) {
                   )}
                   <span className="block truncate text-[13px] text-faint">
                     <span className="font-mono">
-                      {row.repo}#{row.rootPr}
-                      {row.tipPr !== null && row.tipPr !== row.rootPr && ` → #${row.tipPr}`}
+                      {row.repo}
+                      <PrLink repo={row.repo} number={row.rootPr} />
+                      {row.tipPr !== null && row.tipPr !== row.rootPr && (
+                        <>
+                          {" → "}
+                          <PrLink repo={row.repo} number={row.tipPr} />
+                        </>
+                      )}
                     </span>
                     {row.note && <span className="ml-2 text-muted">{row.note}</span>}
                   </span>
