@@ -692,6 +692,52 @@ describe("each PR's diff", () => {
     expect(report.parts[0]?.github).toMatchObject({ same: true, reason: null });
   });
 
+  it("moves the stack when main bumped a file again after the PR below it merged", async () => {
+    // Every PR bumps version.txt, as a release counter does.
+    const m0 = await remote.write("main", { "version.txt": lines("1") });
+    const h1 = await remote.write(
+      "b1",
+      { "a.txt": lines("one"), "version.txt": lines("2") },
+      "main",
+    );
+    await remote.write("b2", { "b.txt": lines("two") }, "b1");
+    const s1 = await remote.squashMerge("b1", "main");
+    const m3 = await remote.write("main", { "version.txt": lines("3") });
+    await remote.rebase("b2", m3, h1);
+    const h2 = await remote.write("b2", { "version.txt": lines("4") });
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2);
+    const github = fakeGitHub("acme/app", [
+      prNode(1, h1, {
+        state: "MERGED",
+        mergedAt: ghTime(30),
+        closedAt: ghTime(30),
+        mergeCommit: { oid: s1 },
+        baseRefOid: m0,
+      }),
+      prNode(2, h2, {
+        timelineItems: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [retargeted("b1", "main", 30)],
+        },
+      }),
+    ]);
+    const report = await analyze(github, "acme/app#2");
+
+    expect(anchor(report, 2)).toBe(m3);
+    expect(report.parts.map((part) => [part.pr, part.how, part.files.map((f) => f.path)])).toEqual([
+      [1, "replayed", ["a.txt"]],
+      [2, "direct", ["b.txt", "version.txt"]],
+    ]);
+    expect(report.change.files.map((file) => file.path)).toEqual(["a.txt", "b.txt", "version.txt"]);
+    expect(report.raw.diff).toContain("-3\n+4");
+    expect(report.stack?.issues).toEqual([]);
+    expect(report.stack?.notes).toEqual([
+      `#2 sits on newer main code than the PRs below it. Thus the whole-stack diff starts at ${m3.slice(0, 7)} on main, without the changes of this stack.`,
+      "main also changed version.txt after the stack left it. Thus, in this file, the whole-stack diff shows only the changes of #2 and the PRs above it.",
+    ]);
+  });
+
   it("sorts every part into layers with the repo's rules and .gitattributes", async () => {
     await remote.write("main", { ".gitattributes": "clients/** linguist-generated\n" });
     const h1 = await remote.write(

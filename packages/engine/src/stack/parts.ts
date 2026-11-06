@@ -30,7 +30,15 @@ import {
   type StackIssue,
   type StackNode,
 } from "@strata/core";
-import { branchTip, commitTree, diffText, mergeBase, replay, treeOf } from "../git/diff.js";
+import {
+  branchTip,
+  commitTree,
+  diffText,
+  mergeBase,
+  replay,
+  takePaths,
+  treeOf,
+} from "../git/diff.js";
 import { buildWholeDiff, type WholeDiff, type WholeDiffOptions } from "../whole.js";
 import { buildProvenance } from "./provenance.js";
 
@@ -48,8 +56,10 @@ export interface StackDiffs {
    * The newer trunk commit Strata moved the stack to, when a PR sat on newer
    * trunk code than the stack below it. The whole-stack diff then starts at
    * that code without the stack's changes. `by` is the PR that sits on it.
+   * `kept` names files the trunk changed again after the PRs below landed:
+   * those show the trunk's version.
    */
-  moved: { to: string; by: number } | null;
+  moved: { to: string; by: number; kept: string[] } | null;
 }
 
 export type StackDiffOptions = WholeDiffOptions;
@@ -67,6 +77,7 @@ export async function buildStackDiffs(
   const trunkTip = await branchTip(gitDir, stack.trunk.name);
   let chained = await chainParts(gitDir, stack, nodes, edges, stack.base, null);
   let movedBy: number | null = null;
+  let kept: string[] = [];
   // A PR that sits on newer trunk code than the stack below it, such as one
   // rebased after the PR below it merged, moves the whole stack to that code.
   // Each move goes to newer trunk code, thus the loop ends.
@@ -80,11 +91,11 @@ export async function buildStackDiffs(
       (await mergeBase(gitDir, anchor, trunkTip)) === anchor;
     if (!newer || !chained.start) break;
     const start = await withoutStack(gitDir, chained.start, chained.at as string, anchor);
-    if (!start) break;
-    const moved = await chainParts(gitDir, stack, nodes, edges, start, anchor);
+    const moved = await chainParts(gitDir, stack, nodes, edges, start.commit, anchor);
     if (moved.placed.length <= chained.placed.length) break;
     chained = moved;
     movedBy = stop;
+    kept = [...new Set([...start.paths, ...moved.kept])].sort();
   }
   const { steps, issues, placed, end } = chained;
   const base = chained.start;
@@ -125,7 +136,7 @@ export async function buildStackDiffs(
     issues,
     placed,
     layerNotes,
-    moved: chained.movedTo && movedBy ? { to: chained.movedTo, by: movedBy } : null,
+    moved: chained.movedTo && movedBy ? { to: chained.movedTo, by: movedBy, kept } : null,
   };
 }
 
@@ -146,6 +157,8 @@ interface Chain {
   at: string | null;
   /** The PR the chain stopped at, on a replay conflict. */
   stop: number | null;
+  /** Files of landed PRs that keep the newer trunk's version, after a move. */
+  kept: string[];
 }
 
 async function chainParts(
@@ -164,6 +177,7 @@ async function chainParts(
   let end: string | null = null;
   let stop: number | null = null;
   let stoppedAt: string | null = null;
+  const kept: string[] = [];
 
   for (const number of stack.selectedPath) {
     const node = nodes.get(number) as StackNode;
@@ -178,9 +192,18 @@ async function chainParts(
       continue;
     }
     const direct = (await treeOf(gitDir, at)) === (await treeOf(gitDir, node.anchor));
-    const result = direct
+    let result = direct
       ? ({ kind: "clean", tree: await treeOf(gitDir, head) } as const)
       : await replay(gitDir, node.anchor, at, head);
+    // After a move, a PR that already landed in the newer trunk code keeps the
+    // trunk's version of a file the trunk changed again.
+    if (result.kind === "conflict" && movedTo && (await landedIn(gitDir, node, movedTo))) {
+      kept.push(...result.paths);
+      result = {
+        kind: "clean",
+        tree: await takePaths(gitDir, result.tree, movedTo, result.paths),
+      } as const;
+    }
     if (result.kind === "conflict") {
       issues.push(conflictIssue(node, edges.get(number) ?? null, placed, result.paths));
       steps.push({ pr: number, how: "apart", from: node.anchor, to: head });
@@ -205,20 +228,30 @@ async function chainParts(
     end,
     at: stoppedAt,
     stop,
+    kept,
   };
+}
+
+/** True when the PR merged and its merge commit is in `commit`. */
+async function landedIn(gitDir: string, node: StackNode, commit: string): Promise<boolean> {
+  const merge = node.pr.mergeCommitOid;
+  return (
+    node.pr.state === "merged" && !!merge && (await mergeBase(gitDir, merge, commit)) === merge
+  );
 }
 
 /**
  * Newer trunk code without the stack's changes: the changes from the stack so
  * far back to `base`, applied onto `anchor`. When the PRs below merged into
- * the trunk, this takes their landed commits back out. Null on a conflict.
+ * the trunk, this takes their landed commits back out. A file the trunk
+ * changed again after that keeps the trunk's version; `paths` names them.
  */
 async function withoutStack(
   gitDir: string,
   base: string,
   at: string,
   anchor: string,
-): Promise<string | null> {
+): Promise<{ commit: string; paths: string[] }> {
   // replay() needs its base to be an ancestor of `theirs`: a commit of base's code on top of `at`.
   const back = await commitTree(
     gitDir,
@@ -227,8 +260,14 @@ async function withoutStack(
     "Strata: without the stack",
   );
   const result = await replay(gitDir, at, anchor, back);
-  if (result.kind === "conflict") return null;
-  return commitTree(gitDir, result.tree, anchor, "Strata: trunk without the stack");
+  const tree =
+    result.kind === "clean"
+      ? result.tree
+      : await takePaths(gitDir, result.tree, anchor, result.paths);
+  return {
+    commit: await commitTree(gitDir, tree, anchor, "Strata: trunk without the stack"),
+    paths: result.kind === "clean" ? [] : result.paths,
+  };
 }
 
 function conflictIssue(

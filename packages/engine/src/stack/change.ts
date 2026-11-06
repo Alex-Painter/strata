@@ -232,6 +232,12 @@ function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
     ? [
         `#${diffs.moved.by} sits on newer ${stack.trunk.name} code than the PRs below it. ` +
           `Thus the whole-stack diff starts at ${diffs.moved.to.slice(0, 7)} on ${stack.trunk.name}, without the changes of this stack.`,
+        ...(diffs.moved.kept.length > 0
+          ? [
+              `${stack.trunk.name} also changed ${describeFiles(diffs.moved.kept)} after the stack left it. ` +
+                `Thus, in ${diffs.moved.kept.length === 1 ? "this file" : "these files"}, the whole-stack diff shows only the changes of #${diffs.moved.by} and the PRs above it.`,
+            ]
+          : []),
       ]
     : [];
   if (diffs.placed.length < path.length) {
@@ -250,6 +256,10 @@ function describePrs(numbers: number[]): string {
   return refs.length <= 2
     ? refs.join(" and ")
     : `${refs.slice(0, -1).join(", ")} and ${refs.at(-1)}`;
+}
+
+function describeFiles(paths: string[]): string {
+  return paths.length <= 3 ? paths.join(", ") : `${paths.length} files`;
 }
 
 function describePath(path: number[]): string {

@@ -4,6 +4,9 @@
  * result as a commit. Everything runs in Strata's own bare cache; no index or
  * working tree is involved.
  */
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { git, gitEnv, gitOk } from "./run.js";
 
 /**
@@ -140,7 +143,10 @@ export async function commitTree(
   return out.trim();
 }
 
-export type ReplayResult = { kind: "clean"; tree: string } | { kind: "conflict"; paths: string[] };
+export type ReplayResult =
+  | { kind: "clean"; tree: string }
+  /** `tree` holds the merge with conflict markers in `paths`. */
+  | { kind: "conflict"; paths: string[]; tree: string };
 
 /**
  * Applies the changes from `base` to `theirs` onto `ours`: a three-way merge
@@ -171,7 +177,7 @@ export async function replay(
   if (code === 0) return { kind: "clean", tree: tree.trim() };
   if (code === 1) {
     const paths = [...new Set(rest.map((line) => line.trim()).filter(Boolean))].sort();
-    return { kind: "conflict", paths };
+    return { kind: "conflict", paths, tree: tree.trim() };
   }
   const [major, minor] = await gitVersion();
   if (major < 2 || (major === 2 && minor < 38)) {
@@ -180,6 +186,36 @@ export async function replay(
     );
   }
   throw new Error(`git merge-tree failed (${code}): ${stderr.trim()}`);
+}
+
+/**
+ * `tree` with each of `paths` as it is at `commit`, or gone when `commit` does
+ * not have it. Uses a throwaway index file, thus the cache stays bare.
+ */
+export async function takePaths(
+  gitDir: string,
+  tree: string,
+  commit: string,
+  paths: string[],
+): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "strata-index-"));
+  const env = { ...gitEnv(), GIT_INDEX_FILE: join(dir, "index") };
+  try {
+    await gitOk(gitDir, ["read-tree", tree], env);
+    const theirs = await gitOk(gitDir, ["ls-tree", "-z", commit, "--", ...paths]);
+    const found = new Map<string, string>();
+    for (const entry of theirs.split("\0").filter(Boolean)) {
+      const [meta = "", path = ""] = entry.split("\t");
+      const [mode, , oid] = meta.split(" ");
+      found.set(path, `${mode} ${oid}\t${path}`);
+    }
+    const zero = "0".repeat(40);
+    const info = paths.map((path) => found.get(path) ?? `0 ${zero}\t${path}`);
+    await gitOk(gitDir, ["update-index", "-z", "--index-info"], env, `${info.join("\0")}\0`);
+    return (await gitOk(gitDir, ["write-tree"], env)).trim();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 /** `git version 2.43.0` gives [2, 43]. */
