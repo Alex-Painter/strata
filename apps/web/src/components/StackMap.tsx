@@ -1,4 +1,4 @@
-import type { StackPrSummary, StackSummary } from "@strata/core/model";
+import type { PrState, StackPrSummary, StackSummary } from "@strata/core/model";
 import { LAYERS } from "@strata/core/model";
 import {
   layoutStackMap,
@@ -75,6 +75,7 @@ export function StackMap({
               cy={y(node.row, row)}
               active={node.pr === active}
               dim={!onPath(node.pr)}
+              state={prs.get(node.pr)?.state}
             />
           );
         })}
@@ -283,19 +284,29 @@ export function Dot({
   cy,
   active,
   dim,
+  state = "open",
 }: {
   cx: number;
   cy: number;
   active: boolean;
   dim: boolean;
+  state?: PrState | undefined;
 }) {
-  // Every PR is the same node; its state is a word on its row, never a colour.
+  // A PR's state is a word on its row, never a colour. The node only adds a
+  // shape: filled when it merged, dashed when it closed.
   return (
-    <g opacity={dim ? 0.5 : 1}>
+    <g opacity={dim ? 0.5 : 1} data-state={state}>
       {active && (
         <circle cx={cx} cy={cy} r={8} className="fill-none stroke-accent" strokeWidth={1.5} />
       )}
-      <circle cx={cx} cy={cy} r={4} strokeWidth={1.5} className="fill-surface stroke-muted" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={4}
+        strokeWidth={1.5}
+        strokeDasharray={state === "closed" ? "2 2" : undefined}
+        className={state === "merged" ? "fill-muted stroke-muted" : "fill-surface stroke-muted"}
+      />
     </g>
   );
 }

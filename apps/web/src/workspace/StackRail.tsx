@@ -70,6 +70,7 @@ export function StackRail({
             cy={node.row * ROW + ROW / 2}
             active={node.pr === pr}
             dim={!onPath(node.pr)}
+            state={prs.get(node.pr)?.state}
           />
         ))}
       </svg>
@@ -80,6 +81,10 @@ export function StackRail({
           const branch = prs.get(n)?.headRef;
           const here = onPath(n);
           const tip = tipFor(n);
+          const state = prs.get(n)?.state;
+          // A merged or closed PR says so; its CI is no longer news.
+          const mark =
+            state === "merged" ? "Merged" : state === "closed" ? "Closed" : marks?.get(n);
           return (
             <li
               key={n}
@@ -94,7 +99,7 @@ export function StackRail({
                 aria-current={pr === n ? "true" : undefined}
                 title={
                   here
-                    ? `#${n} ${title}`
+                    ? `#${n} ${title}${state === "merged" ? "\nThis PR is merged" : state === "closed" ? "\nThis PR is closed" : ""}`
                     : `#${n} ${title}\nThis PR is on another branch. Open its path`
                 }
                 disabled={!here && (!onPickPath || pickingPath !== null)}
@@ -102,12 +107,18 @@ export function StackRail({
               >
                 <span className="flex w-full min-w-0 items-baseline gap-2">
                   <span className="shrink-0 font-mono text-[12.5px] text-faint">{n}</span>
-                  <span className="min-w-0 flex-1 truncate text-[14px] text-text">{title}</span>
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[14px] ${state === "open" || !state ? "text-text" : "text-muted"}`}
+                  >
+                    {title}
+                  </span>
                   {!here && pickingPath === tip ? (
                     <span className="shrink-0 text-[12px] text-muted">Opening…</span>
                   ) : (
-                    marks?.get(n) && (
-                      <span className="shrink-0 text-[12px] text-muted">{marks.get(n)}</span>
+                    mark && (
+                      <span className="shrink-0 text-[12px] text-muted" data-mark={state}>
+                        {mark}
+                      </span>
                     )
                   )}
                 </span>

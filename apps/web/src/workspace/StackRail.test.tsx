@@ -77,3 +77,45 @@ it("draws every PR, dims the other branch, and opens its path when chosen", () =
   expect(scoped).toEqual([6]);
   expect(picked).toEqual([7]);
 });
+
+it("marks a merged PR with a word and a filled node, over its CI mark", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  const withStates = {
+    ...stack,
+    prs: stack.prs.map((p) => ({
+      ...p,
+      state: p.number === 5 ? "merged" : p.number === 6 ? "closed" : "open",
+    })),
+  } as StackSummary;
+  act(() =>
+    root?.render(
+      <StackRail
+        stack={withStates}
+        path={[5, 7]}
+        pr={null}
+        onScope={() => {}}
+        pickingPath={null}
+        marks={
+          new Map([
+            [5, "CI fails"],
+            [7, "CI runs"],
+          ])
+        }
+      />,
+    ),
+  );
+  const mark = (n: number) =>
+    container.querySelector(`li[data-pr="${n}"] [data-mark]`)?.textContent;
+  expect(mark(5)).toBe("Merged");
+  expect(mark(6)).toBe("Closed");
+  expect(mark(7)).toBe("CI runs");
+  expect(container.querySelector('li[data-pr="5"] button')?.getAttribute("title")).toBe(
+    "#5 PR 5\nThis PR is merged",
+  );
+  const node = (state: string) => container.querySelector(`g[data-state="${state}"] circle`);
+  expect(node("merged")?.getAttribute("class")).toContain("fill-muted");
+  expect(node("closed")?.getAttribute("stroke-dasharray")).toBe("2 2");
+  expect(node("open")?.getAttribute("class")).toContain("fill-surface");
+});
