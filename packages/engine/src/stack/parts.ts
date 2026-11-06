@@ -44,6 +44,12 @@ export interface StackDiffs {
   placed: number[];
   /** Anything the report should say about how files were sorted into layers. */
   layerNotes: string[];
+  /**
+   * The newer trunk commit Strata moved the stack to, when a PR sat on newer
+   * trunk code than the stack below it. The whole-stack diff then starts at
+   * that code without the stack's changes. `by` is the PR that sits on it.
+   */
+  moved: { to: string; by: number } | null;
 }
 
 export type StackDiffOptions = WholeDiffOptions;
@@ -58,12 +64,106 @@ export async function buildStackDiffs(
 ): Promise<StackDiffs> {
   const nodes = new Map(stack.nodes.map((node) => [node.pr.number, node]));
   const edges = new Map(stack.edges.map((edge) => [edge.child, edge]));
+  const trunkTip = await branchTip(gitDir, stack.trunk.name);
+  let chained = await chainParts(gitDir, stack, nodes, edges, stack.base, null);
+  let movedBy: number | null = null;
+  // A PR that sits on newer trunk code than the stack below it, such as one
+  // rebased after the PR below it merged, moves the whole stack to that code.
+  // Each move goes to newer trunk code, thus the loop ends.
+  for (;;) {
+    const stop = chained.stop;
+    if (!stop || !trunkTip || !chained.trunkAt) break;
+    const anchor = (nodes.get(stop) as StackNode).anchor as string;
+    const newer =
+      anchor !== chained.trunkAt &&
+      (await mergeBase(gitDir, chained.trunkAt, anchor)) === chained.trunkAt &&
+      (await mergeBase(gitDir, anchor, trunkTip)) === anchor;
+    if (!newer || !chained.start) break;
+    const start = await withoutStack(gitDir, chained.start, chained.at as string, anchor);
+    if (!start) break;
+    const moved = await chainParts(gitDir, stack, nodes, edges, start, anchor);
+    if (moved.placed.length <= chained.placed.length) break;
+    chained = moved;
+    movedBy = stop;
+  }
+  const { steps, issues, placed, end } = chained;
+  const base = chained.start;
+
+  // Classified with the repo's .gitattributes as the whole stack leaves it, so
+  // every diff is sorted the same way however the work was split.
+  const { whole, classifier, layerNotes } = await buildWholeDiff(gitDir, base, end, options);
+
+  const built: Array<Omit<PrPart, "provenance" | "summary">> = [];
+  for (const step of steps) {
+    const node = nodes.get(step.pr) as StackNode;
+    const { files, hunks } =
+      step.from && step.to
+        ? buildDiff(await diffText(gitDir, step.from, step.to), { classifier })
+        : { files: [], hunks: [] };
+    const part = { ...step, files, hunks };
+    const edge = edges.get(step.pr) ?? null;
+    const github = await compareWithGitHub(gitDir, stack, node, edge, part, chained.movedTo);
+    built.push({ ...part, github });
+  }
+
+  const chain = steps.flatMap((step) =>
+    (step.how === "direct" || step.how === "replayed") && step.to
+      ? [{ pr: step.pr, commit: step.to }]
+      : [],
+  );
+  const provenance =
+    base && whole ? await buildProvenance(gitDir, base, chain, whole.model, built) : new Map();
+  const parts: PrPart[] = built.map((part) => ({
+    ...part,
+    provenance: provenance.get(part.pr) ?? null,
+    // Claude's summary of the part's own diff comes later, when the repo allows it.
+    summary: [],
+  }));
+  return {
+    parts,
+    whole,
+    issues,
+    placed,
+    layerNotes,
+    moved: chained.movedTo && movedBy ? { to: chained.movedTo, by: movedBy } : null,
+  };
+}
+
+/** Strata's chain of commits for the path, from `start`, up to the first PR it cannot place. */
+interface Chain {
+  /** Where the whole-stack diff starts: the trunk point, or Strata's commit of newer trunk code without the stack. */
+  start: string | null;
+  /** The trunk commit the chain stands on. */
+  trunkAt: string | null;
+  /** The newer trunk commit the stack moved to, if it moved. */
+  movedTo: string | null;
+  steps: Step[];
+  issues: StackIssue[];
+  placed: number[];
+  /** The last commit of the chain. */
+  end: string | null;
+  /** The stack so far when the chain stopped. */
+  at: string | null;
+  /** The PR the chain stopped at, on a replay conflict. */
+  stop: number | null;
+}
+
+async function chainParts(
+  gitDir: string,
+  stack: Stack,
+  nodes: Map<number, StackNode>,
+  edges: Map<number, StackEdge>,
+  start: string | null,
+  movedTo: string | null,
+): Promise<Chain> {
   const steps: Step[] = [];
   const issues: StackIssue[] = [];
   const placed: number[] = [];
   // The stack so far, as Strata's own commit. Null once a PR couldn't be placed.
-  let at: string | null = stack.base;
+  let at: string | null = start;
   let end: string | null = null;
+  let stop: number | null = null;
+  let stoppedAt: string | null = null;
 
   for (const number of stack.selectedPath) {
     const node = nodes.get(number) as StackNode;
@@ -84,6 +184,8 @@ export async function buildStackDiffs(
     if (result.kind === "conflict") {
       issues.push(conflictIssue(node, edges.get(number) ?? null, placed, result.paths));
       steps.push({ pr: number, how: "apart", from: node.anchor, to: head });
+      stop = number;
+      stoppedAt = at;
       at = null;
       continue;
     }
@@ -93,40 +195,40 @@ export async function buildStackDiffs(
     at = to;
     end = to;
   }
+  return {
+    start,
+    trunkAt: movedTo ?? stack.base,
+    movedTo,
+    steps,
+    issues,
+    placed,
+    end,
+    at: stoppedAt,
+    stop,
+  };
+}
 
-  // Classified with the repo's .gitattributes as the whole stack leaves it, so
-  // every diff is sorted the same way however the work was split.
-  const { whole, classifier, layerNotes } = await buildWholeDiff(gitDir, stack.base, end, options);
-
-  const built: Array<Omit<PrPart, "provenance" | "summary">> = [];
-  for (const step of steps) {
-    const node = nodes.get(step.pr) as StackNode;
-    const { files, hunks } =
-      step.from && step.to
-        ? buildDiff(await diffText(gitDir, step.from, step.to), { classifier })
-        : { files: [], hunks: [] };
-    const part = { ...step, files, hunks };
-    const edge = edges.get(step.pr) ?? null;
-    const github = await compareWithGitHub(gitDir, stack, node, edge, part);
-    built.push({ ...part, github });
-  }
-
-  const chain = steps.flatMap((step) =>
-    (step.how === "direct" || step.how === "replayed") && step.to
-      ? [{ pr: step.pr, commit: step.to }]
-      : [],
+/**
+ * Newer trunk code without the stack's changes: the changes from the stack so
+ * far back to `base`, applied onto `anchor`. When the PRs below merged into
+ * the trunk, this takes their landed commits back out. Null on a conflict.
+ */
+async function withoutStack(
+  gitDir: string,
+  base: string,
+  at: string,
+  anchor: string,
+): Promise<string | null> {
+  // replay() needs its base to be an ancestor of `theirs`: a commit of base's code on top of `at`.
+  const back = await commitTree(
+    gitDir,
+    await treeOf(gitDir, base),
+    at,
+    "Strata: without the stack",
   );
-  const provenance =
-    stack.base && whole
-      ? await buildProvenance(gitDir, stack.base, chain, whole.model, built)
-      : new Map();
-  const parts: PrPart[] = built.map((part) => ({
-    ...part,
-    provenance: provenance.get(part.pr) ?? null,
-    // Claude's summary of the part's own diff comes later, when the repo allows it.
-    summary: [],
-  }));
-  return { parts, whole, issues, placed, layerNotes };
+  const result = await replay(gitDir, at, anchor, back);
+  if (result.kind === "conflict") return null;
+  return commitTree(gitDir, result.tree, anchor, "Strata: trunk without the stack");
 }
 
 function conflictIssue(
@@ -164,6 +266,7 @@ async function compareWithGitHub(
   node: StackNode,
   edge: StackEdge | null,
   part: Omit<PrPart, "github" | "provenance" | "summary">,
+  movedTo: string | null,
 ): Promise<GitHubDiffCheck | null> {
   if (part.how === "unknown") return null;
   const { pr } = node;
@@ -196,7 +299,14 @@ async function compareWithGitHub(
     onlyHere: [...ourPaths].filter((path) => !theirPaths.has(path)),
     reason: same
       ? null
-      : differsBecause(stack, node, edge, part, await gitHubStart(gitDir, stack, node, edge, base)),
+      : differsBecause(
+          stack,
+          node,
+          edge,
+          part,
+          await gitHubStart(gitDir, stack, node, edge, base),
+          movedTo,
+        ),
     evidence,
   };
 }
@@ -252,6 +362,7 @@ function differsBecause(
   edge: StackEdge | null,
   part: Omit<PrPart, "github" | "provenance" | "summary">,
   { base, repeats, inParent }: GitHubStart,
+  movedTo: string | null,
 ): string {
   const n = `#${node.pr.number}`;
   const baseRef = node.pr.baseRef;
@@ -306,6 +417,9 @@ function differsBecause(
       }
       break;
     }
+  }
+  if (part.how === "replayed" && movedTo) {
+    return `A PR above ${n} sits on newer ${stack.trunk.name} code. Thus Strata moved the stack to ${movedTo.slice(0, 7)} and diffs ${n} from that code. GitHub diffs it from ${baseRef}.`;
   }
   if (part.how === "replayed") {
     return `Strata replayed a PR below ${n} onto newer code. Thus Strata diffs ${n} from that code, and GitHub diffs it from ${baseRef}.`;

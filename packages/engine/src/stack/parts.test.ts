@@ -636,6 +636,62 @@ describe("each PR's diff", () => {
     expect(stableStringify(canonicalReport(range))).toBe(stableStringify(canonicalReport(report)));
   });
 
+  it("moves the stack to newer main code when a PR was rebased after the PR below it merged", async () => {
+    // #1 squash-merges. Then #2 is rebased onto main, which has moved on and
+    // changed a line #2 also changes. #3 sits on #2.
+    const m0 = await remote.write("main", { "x.txt": lines("a") });
+    const h1 = await remote.write("b1", { "a.txt": lines("one") }, "main");
+    await remote.write("b2", { "b.txt": lines("two") }, "b1");
+    await remote.write("main", { "x.txt": lines("b") });
+    const s1 = await remote.squashMerge("b1", "main");
+    const h2 = await remote.rebase("b2", s1, h1);
+    const h2b = await remote.write("b2", { "x.txt": lines("c") });
+    const h3 = await remote.write("b3", { "c.txt": lines("three") }, "b2");
+    await remote.holdPr(1, h1);
+    await remote.holdPr(2, h2b);
+    await remote.holdPr(3, h3);
+    const github = fakeGitHub("acme/app", [
+      prNode(1, h1, {
+        state: "MERGED",
+        mergedAt: ghTime(30),
+        closedAt: ghTime(30),
+        mergeCommit: { oid: s1 },
+        baseRefOid: m0,
+      }),
+      prNode(2, h2b, {
+        timelineItems: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [retargeted("b1", "main", 30)],
+        },
+      }),
+      prNode(3, h3, { baseRefName: "b2" }),
+    ]);
+    const report = await analyze(github, "acme/app#3");
+    expect(h2).not.toBe(h2b);
+
+    expect(report.stack?.selectedPath).toEqual([1, 2, 3]);
+    expect(anchor(report, 2)).toBe(s1);
+    expect(report.parts.map((part) => [part.pr, part.how, part.files.map((f) => f.path)])).toEqual([
+      [1, "replayed", ["a.txt"]],
+      [2, "direct", ["b.txt", "x.txt"]],
+      [3, "direct", ["c.txt"]],
+    ]);
+    // The whole-stack diff holds all three PRs, on main as #2 sits on it.
+    expect(report.change.files.map((file) => file.path)).toEqual([
+      "a.txt",
+      "b.txt",
+      "c.txt",
+      "x.txt",
+    ]);
+    expect(report.raw.diff).toContain("-b\n+c");
+    expect(report.stack?.issues.filter((i) => i.kind === "replay-conflict")).toEqual([]);
+    expect(report.stack?.notes).toContain(
+      `#2 sits on newer main code than the PRs below it. Thus the whole-stack diff starts at ${s1.slice(0, 7)} on main, without the changes of this stack.`,
+    );
+    // #1's own diff on the newer code is still the one GitHub shows.
+    expect(report.parts[0]?.github).toMatchObject({ same: true, reason: null });
+  });
+
   it("sorts every part into layers with the repo's rules and .gitattributes", async () => {
     await remote.write("main", { ".gitattributes": "clients/** linguist-generated\n" });
     const h1 = await remote.write(

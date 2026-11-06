@@ -228,14 +228,21 @@ function diffNotes(stack: Stack, diffs: StackDiffs): string[] {
       `Strata cannot put #${path[0]} on ${stack.trunk.name}. Thus there is no whole-stack diff.`,
     ];
   }
+  const moved = diffs.moved
+    ? [
+        `#${diffs.moved.by} sits on newer ${stack.trunk.name} code than the PRs below it. ` +
+          `Thus the whole-stack diff starts at ${diffs.moved.to.slice(0, 7)} on ${stack.trunk.name}, without the changes of this stack.`,
+      ]
+    : [];
   if (diffs.placed.length < path.length) {
     const left = path.filter((n) => !diffs.placed.includes(n));
     return [
       `The whole-stack diff covers ${describePath(diffs.placed)} only. ` +
         `${describePrs(left)} ${left.length === 1 ? "is not" : "are not"} in it. The stack's issues give the cause.`,
+      ...moved,
     ];
   }
-  return [];
+  return moved;
 }
 
 function describePrs(numbers: number[]): string {
