@@ -110,7 +110,7 @@ describe("replay", () => {
     });
     const tree = await takePaths(repo.dir, await treeOf(repo.dir, one), two, ["a.txt", "d/b.txt"]);
     const files = await gitOk(repo.dir, ["ls-tree", "-r", "--name-only", tree]);
-    expect(files.split("\n").filter(Boolean)).toEqual(["a.txt"]);
+    expect(files.split("\n").filter(Boolean)).toEqual(["a.txt", "main-1.txt"]);
     expect(await gitOk(repo.dir, ["cat-file", "blob", `${tree}:a.txt`])).toBe(lines("two"));
   });
 
