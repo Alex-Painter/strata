@@ -188,6 +188,62 @@ describe("chat", () => {
     expect(results[2]?.content).toBe("No file at the head has this text.");
   });
 
+  it("lists the hunks of a PR outside the whole-stack diff, and reads at a PR's head", async () => {
+    await allowClaude();
+    const analysed = await report();
+    // As if Strata could not put #3 on the stack below it.
+    const apart: ChangeReport = {
+      ...analysed,
+      parts: analysed.parts.map((part) => (part.pr === 3 ? { ...part, how: "apart" } : part)),
+      stack: analysed.stack && {
+        ...analysed.stack,
+        notes: ["The whole-stack diff covers #1 → #2 only. #3 is not in it."],
+      },
+    };
+    const three = apart.parts.find((part) => part.pr === 3);
+    const file = three?.files[0];
+    if (!three || !file) throw new Error("#3 has no files.");
+    const { client, requests } = scripted([
+      {
+        stop_reason: "tool_use",
+        content: [
+          toolUse("t1", "read_file", { path: file.path, side: "head", pr: 3 }),
+          toolUse("t2", "search", { text: "nothing matches this", pr: 3 }),
+          toolUse("t3", "read_file", { path: file.path, side: "head", pr: 99 }),
+        ],
+      },
+      { stop_reason: "end_turn", content: [text(`It adds a file [${file.hunkIds[0]}].`)] },
+    ]);
+
+    const chunks = await collect(
+      engine({ anthropicClient: client }).chat({
+        report: apart,
+        history: [],
+        text: "What does #3 do?",
+        anchors: [],
+      }),
+    );
+
+    expect(chunks.filter((c) => c.type === "status").map((c) => c.text)).toEqual([
+      `Claude reads ${file.path} at the head of #3`,
+      'Claude searches the code for "nothing matches this"',
+      `Claude reads ${file.path} at the head of #99`,
+    ]);
+    const [first, second] = requests;
+    const system = ((first?.system ?? []) as Anthropic.TextBlockParam[])
+      .map((b) => b.text)
+      .join("\n");
+    expect(system).toContain("## Files of #3's own diff");
+    expect(system).toContain(
+      `- ${file.path} +${file.additions} -${file.deletions}: ${file.hunkIds[0]}`,
+    );
+    expect(system).toContain("The whole-stack diff covers #1 → #2 only. #3 is not in it.");
+    const results = second?.messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(results[0]?.content).toContain(`${file.path} at the head of #3, lines 1-`);
+    expect(results[1]?.content).toBe("No file at the head of #3 has this text.");
+    expect(results[2]).toMatchObject({ is_error: true, content: "#99 is not on this path." });
+  });
+
   it("does not ask Claude about a repo whose settings do not allow it", async () => {
     const { client, requests } = scripted([]);
     const analysed = await report();

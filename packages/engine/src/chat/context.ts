@@ -202,15 +202,31 @@ export function digest(report: ChangeReport): string {
       const file = byPath.get(entry.path);
       const counts = file ? ` +${file.additions} -${file.deletions}` : "";
       const mechanical = file?.mechanical ? ` (mechanical: ${file.mechanical.kind})` : "";
-      const ids = entry.hunkIds.slice(0, DIGEST_HUNKS).join(", ");
-      const more =
-        entry.hunkIds.length > DIGEST_HUNKS
-          ? ` and ${entry.hunkIds.length - DIGEST_HUNKS} more`
-          : "";
-      out.push(`- ${entry.path}${counts}${mechanical}: ${ids}${more}`);
+      out.push(`- ${entry.path}${counts}${mechanical}: ${hunkList(entry.hunkIds)}`);
     }
   }
   if (listed > DIGEST_FILES) out.push(`(${listed - DIGEST_FILES} more files are not listed.)`);
+  // A PR Strata could not put on the stack below it has no hunks in the whole-stack diff.
+  for (const part of report.parts) {
+    if (part.how !== "apart" || part.files.length === 0) continue;
+    out.push(
+      "",
+      `## Files of #${part.pr}'s own diff`,
+      `#${part.pr} is not in the whole-stack diff. Read these hunks with \`pr: ${part.pr}\`.`,
+    );
+    for (const [i, file] of part.files.entries()) {
+      if (i >= DIGEST_FILES) {
+        out.push(`(${part.files.length - DIGEST_FILES} more files are not listed.)`);
+        break;
+      }
+      out.push(`- ${file.path} +${file.additions} -${file.deletions}: ${hunkList(file.hunkIds)}`);
+    }
+  }
+  if (stack && (stack.issues.length > 0 || stack.notes.length > 0)) {
+    out.push("", "## Issues and notes about the stack");
+    for (const issue of stack.issues) out.push(`- ${issue.message}`);
+    for (const note of stack.notes) out.push(`- ${note}`);
+  }
   if (report.summary.length > 0) {
     out.push("", "## The summary Claude wrote earlier");
     for (const claim of report.summary) out.push(`- ${claim.text}`);
@@ -220,4 +236,9 @@ export function digest(report: ChangeReport): string {
     for (const section of report.guide.sections) out.push(`- ${section.title}`);
   }
   return out.join("\n");
+}
+
+function hunkList(ids: readonly string[]): string {
+  const more = ids.length > DIGEST_HUNKS ? ` and ${ids.length - DIGEST_HUNKS} more` : "";
+  return `${ids.slice(0, DIGEST_HUNKS).join(", ")}${more}`;
 }

@@ -15,7 +15,7 @@ import { ClaudeError, STE_RULE } from "../llm.js";
 import { digest, findHunk, hunkIds, hunkText, type ReadFile } from "./context.js";
 
 /** Increase when the prompt or the tools change. */
-export const CHAT_PROMPT_VERSION = 1;
+export const CHAT_PROMPT_VERSION = 2;
 /** Tool calls for one question. Past it, Claude is told to answer with what it has. */
 const MAX_TOOL_CALLS = 8;
 /** Lines of a file returned by one read. */
@@ -26,8 +26,10 @@ const MAX_TOKENS = 16_000;
 
 export interface ChatTools {
   readFile: ReadFile;
-  /** `git grep` at the head revision: "path:line:text" lines. */
-  search: (text: string) => Promise<string>;
+  /** A file where one PR's own diff starts or ends. Null when it is not a file there. */
+  readPrFile: (pr: number, path: string, side: "base" | "head") => Promise<string | null>;
+  /** `git grep` at the head revision, or at the head of one PR's own diff: "path:line:text" lines. */
+  search: (text: string, pr?: number) => Promise<string>;
 }
 
 export interface ChatRun {
@@ -43,6 +45,8 @@ export interface ChatRun {
 }
 
 const SYSTEM = `You help a person review a code change in Strata. A Change is one feature that can span a stack of pull requests. The person reads the whole-stack diff (all the PRs together) and each PR's own diff.
+
+The digest lists the hunks of the whole-stack diff. When a PR is not in the whole-stack diff, the digest lists the hunks of that PR's own diff. Read those with the \`pr\` option of the tools.
 
 Answer the person's question about the Change. When they highlight text, the question is about that text first.
 
@@ -70,12 +74,13 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "read_file",
-    description: `Returns a file of the repo at the base or the head of the Change, with line numbers, ${READ_LINES} lines at most. Any file in the repo can be read, not only changed files.`,
+    description: `Returns a file of the repo at the base or the head of the Change, with line numbers, ${READ_LINES} lines at most. Any file in the repo can be read, not only changed files. With \`pr\`, reads the file where that PR's own diff starts (base) or ends (head).`,
     input_schema: {
       type: "object",
       properties: {
         path: { type: "string", description: "The path from the repo root." },
         side: { type: "string", enum: ["base", "head"] },
+        pr: { type: "integer", description: "A PR number on this path." },
         start_line: { type: "integer", description: "The first line to return, from 1." },
       },
       required: ["path", "side"],
@@ -84,10 +89,13 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "search",
     description:
-      "Searches every file of the repo at the head of the Change for a fixed string. Returns path:line:text lines.",
+      "Searches every file of the repo at the head of the Change for a fixed string. With `pr`, searches at the head of that PR's own diff. Returns path:line:text lines.",
     input_schema: {
       type: "object",
-      properties: { text: { type: "string", description: "The exact text to find." } },
+      properties: {
+        text: { type: "string", description: "The exact text to find." },
+        pr: { type: "integer", description: "A PR number on this path." },
+      },
       required: ["text"],
     },
   },
@@ -192,8 +200,10 @@ function userTurn(text: string, anchors: ResolvedAnchor[]): string {
 
 function statusOf(name: string, input: Record<string, unknown>): string {
   if (name === "read_hunk") return `Claude reads ${String(input.id)}`;
-  if (name === "read_file")
-    return `Claude reads ${String(input.path)} at the ${input.side === "base" ? "base" : "head"}`;
+  if (name === "read_file") {
+    const of = typeof input.pr === "number" ? ` of #${input.pr}` : "";
+    return `Claude reads ${String(input.path)} at the ${input.side === "base" ? "base" : "head"}${of}`;
+  }
   if (name === "search") return `Claude searches the code for "${String(input.text)}"`;
   return `Claude uses ${name}`;
 }
@@ -215,21 +225,28 @@ async function runTool(
     case "read_file": {
       if (typeof input.path !== "string") throw new Error("Give the file as `path`.");
       const side = input.side === "base" ? "base" : "head";
-      const content = await tools.readFile(input.path, side);
-      if (content === null) throw new Error(`There is no ${input.path} at the ${side}.`);
+      const pr = typeof input.pr === "number" ? input.pr : undefined;
+      const content =
+        pr === undefined
+          ? await tools.readFile(input.path, side)
+          : await tools.readPrFile(pr, input.path, side);
+      const at = pr === undefined ? `the ${side}` : `the ${side} of #${pr}`;
+      if (content === null) throw new Error(`There is no ${input.path} at ${at}.`);
       const lines = content.split("\n");
       const start = Math.max(1, typeof input.start_line === "number" ? input.start_line : 1);
       const shown = lines.slice(start - 1, start - 1 + READ_LINES);
       const body = shown.map((line, i) => `${String(start + i).padStart(5)}  ${line}`).join("\n");
       const end = start - 1 + shown.length;
-      return `${input.path} at the ${side}, lines ${start}-${end} of ${lines.length}:\n${body}`;
+      return `${input.path} at ${at}, lines ${start}-${end} of ${lines.length}:\n${body}`;
     }
     case "search": {
       if (typeof input.text !== "string" || input.text.trim() === "") {
         throw new Error("Give the text to find as `text`.");
       }
-      const found = await tools.search(input.text);
-      return found.trim() === "" ? "No file at the head has this text." : found;
+      const pr = typeof input.pr === "number" ? input.pr : undefined;
+      const found = await tools.search(input.text, pr);
+      const at = pr === undefined ? "the head" : `the head of #${pr}`;
+      return found.trim() === "" ? `No file at ${at} has this text.` : found;
     }
     default:
       throw new Error(`There is no tool ${name}.`);

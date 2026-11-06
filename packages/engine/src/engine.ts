@@ -139,7 +139,14 @@ export const createEngine: CreateEngine = (config) => {
         anchors: await resolveAnchors(report, request.anchors, readFile),
         tools: {
           readFile,
-          search: async (text) => (head ? grep(gitDir, head, text) : ""),
+          readPrFile: async (pr, path, side) => {
+            const at = partRevision(report, pr, side);
+            return at ? showFile(gitDir, at, path) : null;
+          },
+          search: async (text, pr) => {
+            const at = pr === undefined ? head : partRevision(report, pr, "head");
+            return at ? grep(gitDir, at, text) : "";
+          },
         },
         ...(request.signal ? { signal: request.signal } : {}),
       });
@@ -159,6 +166,13 @@ function reportRepo(report: ChangeReport): string {
   const repo = report.change.repo;
   if (repo.kind !== "github") throw new NotImplementedError("Chat about a local checkout");
   return `${repo.owner}/${repo.name}`;
+}
+
+/** Where one PR's own diff starts (base) or ends (head). Throws for a PR that is not on the path. */
+function partRevision(report: ChangeReport, pr: number, side: "base" | "head"): string | null {
+  const part = report.parts.find((p) => p.pr === pr);
+  if (!part) throw new Error(`#${pr} is not on this path.`);
+  return side === "base" ? part.from : part.to;
 }
 
 /** Reads files at the report's base or head, from the repo's cache. */
