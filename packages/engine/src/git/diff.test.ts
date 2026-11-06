@@ -1,7 +1,7 @@
 import { parseDiff } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { StackRepo } from "../testing/stack-repo.js";
-import { commitTree, diffText, gitVersion, readBlob, replay, treeOf } from "./diff.js";
+import { commitTree, diffText, gitVersion, readBlob, replay, takePaths, treeOf } from "./diff.js";
 import { gitOk } from "./run.js";
 
 let repo: StackRepo;
@@ -89,10 +89,29 @@ describe("replay", () => {
     );
     const parent = await repo.write("parent", { "a.txt": lines("parent's one") });
 
-    expect(await replay(repo.dir, base, parent, child)).toEqual({
-      kind: "conflict",
-      paths: ["a.txt"],
+    const result = await replay(repo.dir, base, parent, child);
+    expect(result).toMatchObject({ kind: "conflict", paths: ["a.txt"] });
+    // The merge, with markers in a.txt, can still be read.
+    if (result.kind !== "conflict") throw new Error("Expected a conflict.");
+    expect(await gitOk(repo.dir, ["cat-file", "blob", `${result.tree}:a.txt`])).toContain(
+      "<<<<<<<",
+    );
+    expect(await gitOk(repo.dir, ["cat-file", "blob", `${result.tree}:c.txt`])).toBe(
+      lines("child's c"),
+    );
+  });
+
+  it("takes files from a commit into a tree, and drops ones the commit does not have", async () => {
+    const one = await repo.write("t", { "a.txt": lines("one"), "d/b.txt": lines("b") }, "main");
+    const two = await repo.write("t", {
+      "a.txt": lines("two"),
+      "d/b.txt": null,
+      "c.txt": lines("c"),
     });
+    const tree = await takePaths(repo.dir, await treeOf(repo.dir, one), two, ["a.txt", "d/b.txt"]);
+    const files = await gitOk(repo.dir, ["ls-tree", "-r", "--name-only", tree]);
+    expect(files.split("\n").filter(Boolean)).toEqual(["a.txt"]);
+    expect(await gitOk(repo.dir, ["cat-file", "blob", `${tree}:a.txt`])).toBe(lines("two"));
   });
 
   it("leaves the repo's branches and working tree alone", async () => {
