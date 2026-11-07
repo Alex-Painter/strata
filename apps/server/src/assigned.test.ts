@@ -1,9 +1,14 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
+import path, { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AssignedStatus, AuthoredResponse, ChangeSummary } from "@strata/core/model";
-import type { Engine } from "@strata/engine";
+import type {
+  AssignedStatus,
+  AuthoredResponse,
+  ChangeDetail,
+  ChangeSummary,
+} from "@strata/core/model";
+import { type Engine, type EngineConfig, settingsPath } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
@@ -15,6 +20,8 @@ import { changes as changesTable, runs as runsTable } from "./db/schema.js";
 import { engineFactory } from "./engines.js";
 import { Jobs } from "./jobs.js";
 import { RunQueue } from "./runs.js";
+
+type Claude = NonNullable<EngineConfig["anthropicClient"]>;
 
 const migrations = fileURLToPath(new URL("../drizzle", import.meta.url));
 const USER = "usr_dev";
@@ -35,7 +42,9 @@ afterEach(async () => {
   await rm(dataDir, { recursive: true, force: true });
 });
 
-function setup(options: { wrap?: (engine: Engine) => Engine } = {}) {
+function setup(
+  options: { wrap?: (engine: Engine) => Engine; engine?: Partial<EngineConfig> } = {},
+) {
   const config = loadConfig({ NODE_ENV: "test", DEV_AUTH_BYPASS: "1", DATA_DIR: dataDir });
   const { db, close } = openDatabase(":memory:", migrations);
   const real = engineFactory(config, db, {
@@ -43,6 +52,7 @@ function setup(options: { wrap?: (engine: Engine) => Engine } = {}) {
     gitRemote: () => remote.dir,
     now: () => new Date(Date.UTC(2026, 9, 2)),
     log: () => {},
+    ...options.engine,
   });
   const { wrap } = options;
   const engineFor = wrap ? (userId: string) => wrap(real(userId)) : real;
@@ -140,6 +150,88 @@ describe("the assignment search", () => {
     const pr4 = demo.github.prs.find((pr) => pr.number === 4);
     Object.assign(pr4 ?? {}, { headRefOid: moved, updatedAt: "2026-10-01T23:59:00Z" });
     await assigned.search(USER);
+    expect(runCount()).toBe(2);
+  });
+
+  it("leaves Claude's summaries until you open the Change, then runs it again with them", async () => {
+    const path = settingsPath(dataDir, "acme/app");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, JSON.stringify({ sendCodeToAnthropic: true }));
+    const systems: string[] = [];
+    const client = {
+      messages: {
+        create: async (body: { system: string }) => {
+          systems.push(body.system);
+          const answer = { name: "Cache forecasts", summary: [], sections: [], files: [] };
+          return {
+            stop_reason: "end_turn",
+            content: [{ type: "text", text: JSON.stringify(answer), citations: null }],
+          };
+        },
+      },
+    } as unknown as Claude;
+    demo.github.requests = { 4: { assignees: ["alex"] } };
+    const { app, assigned, runs, runCount, list } = setup({
+      engine: { anthropicClient: client, recordUsage: () => {} },
+    });
+    const open = async () => {
+      const res = await app.request(`/api/changes/${(await list())[0]?.id}`);
+      return (await res.json()) as ChangeDetail;
+    };
+
+    await assigned.search(USER);
+    await runs.idle();
+    expect(systems).toEqual([]);
+    const bottomTitle = (await list())[0]?.title;
+
+    const opened = await open();
+    expect(opened.report?.analysis.summariesDeferred).toBe(true);
+    expect(opened.run?.status).toBe("queued");
+    await runs.idle();
+    expect(systems.length).toBeGreaterThan(0);
+    const full = await open();
+    expect(full.report?.analysis.summariesDeferred).toBeUndefined();
+    expect(full.change.title).toBe("Cache forecasts");
+    expect(runCount()).toBe(2);
+
+    // A head moves: the new run leaves the summaries out again, and keeps Claude's name.
+    const moved = await remote.commit("b4");
+    await remote.holdPr(4, moved);
+    const pr4 = demo.github.prs.find((pr) => pr.number === 4);
+    Object.assign(pr4 ?? {}, { headRefOid: moved, updatedAt: "2026-10-01T23:59:00Z" });
+    const asked = systems.length;
+    await assigned.search(USER);
+    await runs.idle();
+    expect(systems.length).toBe(asked);
+    expect((await list())[0]?.title).toBe("Cache forecasts");
+    expect(bottomTitle).not.toBe("Cache forecasts");
+    expect(runCount()).toBe(3);
+  });
+
+  it("does not run again on each poll after a run with Claude fails", async () => {
+    const path = settingsPath(dataDir, "acme/app");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, JSON.stringify({ sendCodeToAnthropic: true }));
+    demo.github.requests = { 4: { assignees: ["alex"] } };
+    let fail = false;
+    const { app, assigned, runs, runCount, list } = setup({
+      engine: { anthropicClient: {} as Claude, recordUsage: () => {} },
+      wrap: (engine) => ({
+        ...engine,
+        analyzeChange: (input, options) => {
+          if (fail) return Promise.reject(new Error("Claude is down"));
+          return engine.analyzeChange(input, options);
+        },
+      }),
+    });
+    await assigned.search(USER);
+    await runs.idle();
+    fail = true;
+    const id = (await list())[0]?.id;
+    await app.request(`/api/changes/${id}`);
+    await runs.idle();
+    await app.request(`/api/changes/${id}`);
+    await app.request(`/api/changes/${id}`);
     expect(runCount()).toBe(2);
   });
 

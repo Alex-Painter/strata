@@ -169,8 +169,14 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
  * Queues a run of the Change and notes the heads it will read, so the
  * assignment search re-runs it only once one of them moves.
  */
-export function queueRun(db: Db, runs: RunQueue, row: ChangeRow, resolved: ResolvedChange) {
+export function queueRun(
+  db: Db,
+  runs: RunQueue,
+  row: ChangeRow,
+  resolved: ResolvedChange,
+  options: { deferSummaries?: boolean } = {},
+) {
   const queuedHeads = headsOf(resolved);
   db.update(changes).set({ queuedHeads }).where(eq(changes.id, row.id)).run();
-  return runs.enqueue({ ...row, queuedHeads });
+  return runs.enqueue({ ...row, queuedHeads }, options);
 }

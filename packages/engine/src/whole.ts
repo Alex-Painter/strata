@@ -79,8 +79,10 @@ export interface ClaudeSteps {
   settings: RepoSettings;
   /** Null unless the repo's settings let its code go to Claude and there's a key. */
   judge: LayerJudge | null;
-  /** Asks Claude for the summaries. Null when the judge would be. */
+  /** Asks Claude for the summaries. Null when the judge would be, or when they are deferred. */
   ask: AskJson | null;
+  /** True when Claude may write the summaries, but this run leaves them for later. */
+  deferred?: boolean;
 }
 
 /** Claude's summaries when the repo allows them; otherwise Strata's own Guide and none. */
@@ -121,7 +123,9 @@ export function wholeNotes(repo: RepoRef, whole: DiffModel | null, steps: Claude
             `sendCodeToAnthropic in ${settings}.`,
     );
   }
-  if (!steps.ask) {
+  if (!steps.ask && steps.deferred) {
+    notes.push("Claude writes the summary and the Guide when you open this Change.");
+  } else if (!steps.ask) {
     const without = "There is no summary, and the Guide shows Strata's own groups";
     notes.push(
       steps.settings.sendCodeToAnthropic

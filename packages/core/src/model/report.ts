@@ -115,6 +115,12 @@ export interface ChangeReport {
   analysis: {
     engineVersion: string;
     model?: string;
+    /**
+     * True when the repo lets Claude write the summaries, but this run left
+     * them for later: the server runs again with them when someone opens the
+     * Change.
+     */
+    summariesDeferred?: boolean;
     startedAt: string;
     durationMs: number;
   };

@@ -100,6 +100,12 @@ export interface DiscoverStacksOptions extends ProgressOptions {
 export interface AnalyzeOptions extends ProgressOptions {
   /** Intent sources linked to the Change (spec, ticket, design, notes). */
   sources?: ContextSource[];
+  /**
+   * Leaves out Claude's summaries and Guide (the costly part of a run), and
+   * marks the report so a later run can add them. For runs nobody waits for,
+   * such as the server's runs when an assigned PR moves. Layers still use Claude.
+   */
+  deferSummaries?: boolean;
 }
 
 /** Where a ChangeInput points, once PR numbers and refs are resolved to SHAs. */

@@ -276,6 +276,33 @@ describe("engine.analyzeChange summaries", () => {
     expect(again.summary).toEqual(report.summary);
   });
 
+  it("leaves the summaries for later when asked, and says so", async () => {
+    await allowClaude();
+    const { client, bodies } = fakeClaude();
+    const steps: string[] = [];
+    const report = await engine({ anthropicClient: client }).analyzeChange(
+      parseChangeInput("acme/app#3"),
+      { deferSummaries: true, onProgress: (step) => steps.push(step) },
+    );
+    expect(bodies).toEqual([]);
+    expect(steps).not.toContain("Claude writes the summaries");
+    expect(report.summary).toEqual([]);
+    expect(report.guide.by).not.toBe("llm");
+    expect(report.notes).toEqual([
+      "Claude writes the summary and the Guide when you open this Change.",
+    ]);
+    expect(report.analysis.summariesDeferred).toBe(true);
+    expect(report.analysis.model).toBeUndefined();
+
+    // A repo that does not let Claude write them has nothing to defer.
+    await writeFile(settingsPath(dataDir, "acme/app"), JSON.stringify({}));
+    const off = await engine({ anthropicClient: client }).analyzeChange(
+      parseChangeInput("acme/app#3"),
+      { deferSummaries: true },
+    );
+    expect(off.analysis.summariesDeferred).toBeUndefined();
+  });
+
   it("keeps a PR summary that failed out of the whole-stack notes", async () => {
     await allowClaude();
     const { client } = fakeClaude();

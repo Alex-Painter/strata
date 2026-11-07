@@ -116,7 +116,10 @@ export class AssignedSearch {
           now: this.now(),
         });
         changeId = row.id;
-        if (row.queuedHeads !== headsOf(resolved)) queueRun(this.db, this.runs, row, resolved);
+        // Nobody waits for this run: Claude writes the summaries when someone opens the Change.
+        if (row.queuedHeads !== headsOf(resolved)) {
+          queueRun(this.db, this.runs, row, resolved, { deferSummaries: true });
+        }
       } catch (e) {
         error = message(e);
         errors.push(`${repo}#${pr.number}: ${error}`);

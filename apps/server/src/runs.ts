@@ -32,7 +32,11 @@ export class RunQueue {
       .run();
   }
 
-  enqueue(change: ChangeRow): RunInfo {
+  /**
+   * `deferSummaries` leaves Claude's summaries out of the run, for runs that
+   * nobody waits for; opening the Change runs it again with them.
+   */
+  enqueue(change: ChangeRow, options: { deferSummaries?: boolean } = {}): RunInfo {
     const run: RunRow = {
       id: newId("run"),
       changeId: change.id,
@@ -44,7 +48,7 @@ export class RunQueue {
       finishedAt: null,
     };
     this.db.insert(runs).values(run).run();
-    this.chain = this.chain.then(() => this.execute(run.id, change));
+    this.chain = this.chain.then(() => this.execute(run.id, change, options.deferSummaries));
     return runInfo(run);
   }
 
@@ -53,7 +57,7 @@ export class RunQueue {
     return this.chain;
   }
 
-  private async execute(runId: string, change: ChangeRow): Promise<void> {
+  private async execute(runId: string, change: ChangeRow, deferSummaries = false): Promise<void> {
     const update = (fields: Partial<RunRow>) =>
       this.db.update(runs).set(fields).where(eq(runs.id, runId)).run();
     update({ status: "running", startedAt: this.now() });
@@ -65,7 +69,7 @@ export class RunQueue {
           repo: { kind: "github", owner, name },
           seed: { pr: change.rootPr, leaf: change.tipPr },
         },
-        { onProgress: (step) => update({ progress: step }) },
+        { onProgress: (step) => update({ progress: step }), deferSummaries },
       );
       const at = this.now();
       this.db.transaction((tx) => {
@@ -85,7 +89,8 @@ export class RunQueue {
           .run();
         tx.update(changes)
           .set({
-            title: report.change.title,
+            // Without Claude's summaries the title is the bottom PR's: keep the name Claude gave.
+            ...(report.analysis.summariesDeferred ? {} : { title: report.change.title }),
             // The PRs as this run found them: states change, and a merged bottom can leave.
             ...(report.stack ? { pathPrs: pathPrsOf(report.stack) } : {}),
             updatedAt: at,

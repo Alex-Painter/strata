@@ -80,13 +80,16 @@ export const createEngine: CreateEngine = (config) => {
       // run under the same lock as the fetch.
       return serialize(lockKey(config, repo), async () => {
         const settings = await loadRepoSettings(config.dataDir, repo);
-        const ask = settings.sendCodeToAnthropic && llm ? summaryAsk(config, llm) : null;
+        const allowed = Boolean(settings.sendCodeToAnthropic && llm);
+        const deferred = allowed && options.deferSummaries === true;
+        const ask = allowed && llm && !deferred ? summaryAsk(config, llm) : null;
         const meta = {
           engineVersion: ENGINE_VERSION,
           startedAt,
           settings,
           judge: layerJudge(config, llm, settings),
           ask,
+          deferred,
           ...(llm ? { model: llm.models["whole-summary"] } : {}),
         };
         if (gh.kind === "range") {

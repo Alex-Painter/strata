@@ -139,9 +139,18 @@ export function changeRoutes(deps: AppDeps) {
     return c.json<ChangeDetail>(detail(row), created ? 201 : 200);
   });
 
+  // Opening a Change whose latest run left out Claude's summaries runs it
+  // again with them. Only after a run that finished: a failed one waits for
+  // "Run again", so a broken run does not repeat on each poll.
   app.get("/changes/:id", (c) => {
     const row = owned(c);
-    return row ? c.json<ChangeDetail>(detail(row)) : c.json({ error: "Not found." }, 404);
+    if (!row) return c.json({ error: "Not found." }, 404);
+    const shown = detail(row);
+    if (shown.report?.analysis.summariesDeferred && shown.run?.status === "done") {
+      deps.runs.enqueue(row);
+      return c.json<ChangeDetail>(detail(row));
+    }
+    return c.json<ChangeDetail>(shown);
   });
 
   app.post("/changes/:id/runs", (c) => {

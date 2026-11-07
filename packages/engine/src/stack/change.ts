@@ -187,6 +187,7 @@ export async function stackReport(
     analysis: {
       engineVersion: meta.engineVersion,
       ...(meta.ask && meta.model ? { model: meta.model } : {}),
+      ...(meta.deferred ? { summariesDeferred: true } : {}),
       startedAt: meta.startedAt.toISOString(),
       durationMs: Date.now() - meta.startedAt.getTime(),
     },
