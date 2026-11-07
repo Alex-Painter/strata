@@ -178,7 +178,8 @@ describe("chat", () => {
     expect(system).toContain(hunk.id);
     expect(system).toContain("ASD-STE100");
     expect(first?.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
-    const question = first?.messages[2]?.content as string;
+    const [asked] = first?.messages[2]?.content as Anthropic.TextBlockParam[];
+    const question = asked?.text ?? "";
     expect(question).toContain(`<highlight source="${hunk.path}`);
     expect(question).toContain(`Highlighted text:\n${lines[0]}`);
     expect(question.endsWith("Why this line?")).toBe(true);
@@ -189,6 +190,17 @@ describe("chat", () => {
     expect(results[1]?.content).toContain(`${file} at the head, lines 1-`);
     expect(results[2]?.content).toBe("No file at the head has this text.");
     expect(usage.map((entry) => entry.task)).toEqual(["chat", "chat"]);
+    // Each round marks only its last block for the cache, so later rounds read the rest from it.
+    const marked = (request: Anthropic.MessageStreamParams | undefined) =>
+      (request?.messages ?? []).flatMap((m) =>
+        typeof m.content === "string"
+          ? []
+          : m.content.flatMap((b, i) => ("cache_control" in b && b.cache_control ? [i] : [])),
+      );
+    expect(marked(first)).toEqual([0]);
+    expect(marked(second)).toEqual([2]);
+    const lastResults = second?.messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(lastResults[2]?.cache_control).toEqual({ type: "ephemeral" });
   });
 
   it("lists the hunks of a PR outside the whole-stack diff, and reads at a PR's head", async () => {

@@ -133,7 +133,7 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
         max_tokens: MAX_TOKENS,
         system,
         tools: TOOLS,
-        messages,
+        messages: withCacheBreakpoint(messages),
         output_config: { effort: "medium" },
       },
       signal ? { signal } : undefined,
@@ -183,6 +183,23 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
     }
     messages.push({ role: "user", content: results });
   }
+}
+
+/**
+ * The messages with a cache breakpoint on the last block, so each tool round
+ * reads the thread and the earlier rounds from the cache. Only the copy sent
+ * is marked: one breakpoint here and one on the digest, of the four the API
+ * permits.
+ */
+export function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages.at(-1);
+  if (!last || last.role === "system") return messages;
+  const blocks: Anthropic.ContentBlockParam[] =
+    typeof last.content === "string" ? [{ type: "text", text: last.content }] : [...last.content];
+  const end = blocks.at(-1);
+  if (!end || end.type === "thinking" || end.type === "redacted_thinking") return messages;
+  blocks[blocks.length - 1] = { ...end, cache_control: { type: "ephemeral" } };
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
 }
 
 /** The question, after the highlights it is about. */
