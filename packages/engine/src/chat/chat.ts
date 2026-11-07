@@ -11,7 +11,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { type ChangeReport, type ChatMessage, CITATION_PATTERN } from "@strata/core";
 import type { ChatChunk, ResolvedAnchor } from "../api.js";
-import { ClaudeError, STE_RULE } from "../llm.js";
+import { ClaudeError, STE_RULE, type UsageEntry, usageEntry } from "../llm.js";
 import { digest, findHunk, hunkIds, hunkText, type ReadFile } from "./context.js";
 
 /** Increase when the prompt or the tools change. */
@@ -41,6 +41,8 @@ export interface ChatRun {
   text: string;
   anchors: ResolvedAnchor[];
   tools: ChatTools;
+  /** Gets the token usage of each round. */
+  recordUsage?: (entry: UsageEntry) => void;
   signal?: AbortSignal;
 }
 
@@ -147,6 +149,7 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
       }
     }
     const message = await stream.finalMessage();
+    run.recordUsage?.(usageEntry("chat", message.model ?? model, message.usage));
     if (message.stop_reason === "refusal") throw new ClaudeError("Claude did not answer.");
     if (message.stop_reason !== "tool_use") return;
 

@@ -67,6 +67,18 @@ describe("parseCommand", () => {
     expect(() => parseCommand(["stacks", "acme/app", "--out", "x.html"])).toThrow(UsageError);
   });
 
+  it("parses usage with its days and data folder, and refuses other flags", () => {
+    expect(parseCommand(["usage"])).toEqual({ kind: "usage", days: 30 });
+    expect(parseCommand(["usage", "--days", "7", "--data-dir", "d"])).toEqual({
+      kind: "usage",
+      days: 7,
+      dataDir: "d",
+    });
+    expect(() => parseCommand(["usage", "--days", "0"])).toThrow(UsageError);
+    expect(() => parseCommand(["usage", "--json", "x"])).toThrow(UsageError);
+    expect(() => parseCommand(["stacks", "a/b", "--days", "3"])).toThrow(UsageError);
+  });
+
   it("makes paths absolute against the folder the CLI was started in", () => {
     const command = parseCommand(["analyze", "a/b#1", "--repo-path", "../app", "--out", "p.html"]);
     expect(resolvePaths(command, "/home/me/work")).toEqual({

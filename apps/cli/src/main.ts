@@ -1,6 +1,7 @@
 #!/usr/bin/env -S npx tsx
 /**
- * strata: analyse a stack from the terminal, or list a repo's stacks.
+ * strata: analyse a stack from the terminal, list a repo's stacks, or show
+ * what Strata spent on Claude.
  * `analyze` prints each PR's diff and the whole-stack diff in brief, then
  * writes the review page and the full report as JSON (see html.ts for where).
  */
@@ -19,6 +20,7 @@ import {
 import { progressPrinter } from "./progress.js";
 import { formatReport } from "./report.js";
 import { formatStacks } from "./stacks.js";
+import { formatUsage, readUsage } from "./usage.js";
 
 async function stacks(command: Extract<Command, { kind: "stacks" }>): Promise<void> {
   if (command.json) await refuseCheckouts([command.json]);
@@ -103,7 +105,11 @@ async function main(argv: string[]): Promise<number> {
   }
   try {
     if (command.kind === "stacks") await stacks(command);
-    else await run(command, cwd);
+    else if (command.kind === "usage") {
+      const dataDir = dataDirOf(command.dataDir);
+      const since = new Date(Date.now() - command.days * 24 * 60 * 60 * 1000);
+      process.stdout.write(formatUsage(await readUsage(dataDir), since, dataDir));
+    } else await run(command, cwd);
     return 0;
   } catch (error) {
     if (process.env.STRATA_DEBUG === "1") console.error(error);

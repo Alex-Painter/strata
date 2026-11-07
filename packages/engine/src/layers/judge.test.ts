@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildDiff, createClassifier, LAYER_IDS } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ClaudeError } from "../llm.js";
+import { ClaudeError, type UsageEntry } from "../llm.js";
 import { createLlmLayerJudge, judgeLayers, type LayerJudge, type LayerRequest } from "./judge.js";
 
 let cacheDir: string;
@@ -18,6 +18,7 @@ afterEach(async () => {
 /** A stand-in for the Anthropic client that answers with `reply` and records each request. */
 function fakeClaude(reply: (body: Record<string, unknown>) => Partial<Anthropic.Message>) {
   const calls: Array<{ body: Record<string, unknown>; options: unknown }> = [];
+  const usage: UsageEntry[] = [];
   const client = {
     messages: {
       create: async (body: Record<string, unknown>, options: unknown) => {
@@ -26,7 +27,11 @@ function fakeClaude(reply: (body: Record<string, unknown>) => Partial<Anthropic.
       },
     },
   } as unknown as Anthropic;
-  return { llm: { client, model: "claude-test" }, calls };
+  return {
+    llm: { client, model: "claude-test", recordUsage: (entry: UsageEntry) => usage.push(entry) },
+    calls,
+    usage,
+  };
 }
 
 const text = (value: unknown): Partial<Anthropic.Message> => ({
@@ -102,6 +107,33 @@ describe("the Anthropic layer judge", () => {
     expect(calls).toHaveLength(2);
     await createLlmLayerJudge({ ...llm, model: "claude-other" }, cacheDir)(REQUEST);
     expect(calls).toHaveLength(3);
+  });
+
+  it("logs the tokens of each request, and each answer from the cache at no cost", async () => {
+    const { llm, usage } = fakeClaude(() => ({
+      ...text({ files: [] }),
+      model: "claude-sonnet-5-5",
+      usage: {
+        input_tokens: 1000,
+        output_tokens: 200,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      } as Anthropic.Usage,
+    }));
+    const judge = createLlmLayerJudge(llm, cacheDir);
+    await judge(REQUEST);
+    await judge(REQUEST);
+    expect(usage).toEqual([
+      expect.objectContaining({
+        task: "layers",
+        model: "claude-sonnet-5-5",
+        cached: false,
+        inputTokens: 1000,
+        outputTokens: 200,
+        costUsd: (2 * 1000 + 10 * 200) / 1_000_000,
+      }),
+      expect.objectContaining({ task: "layers", cached: true, inputTokens: 0, costUsd: 0 }),
+    ]);
   });
 
   it("fails clearly on a refusal, a cut-off answer or bad JSON, and caches none of them", async () => {

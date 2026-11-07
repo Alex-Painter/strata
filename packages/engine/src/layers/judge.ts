@@ -178,6 +178,7 @@ export function createLlmLayerJudge(llm: LlmSettings, cacheDir: string): LayerJu
   return async (request, signal) => {
     const answer = await ask(
       {
+        task: "layers",
         version: PROMPT_VERSION,
         system: SYSTEM,
         prompt: prompt(request),

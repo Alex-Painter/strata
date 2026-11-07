@@ -79,6 +79,7 @@ export async function writeSummaries(
     try {
       const answer = (await ask(
         {
+          task: "whole-summary",
           version: PROMPT_VERSION,
           system: WHOLE_SYSTEM,
           prompt: [
@@ -130,6 +131,7 @@ export async function writeSummaries(
       try {
         const answer = (await ask(
           {
+            task: "pr-summary",
             version: PROMPT_VERSION,
             system: PART_SYSTEM,
             prompt: [

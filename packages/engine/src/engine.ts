@@ -133,6 +133,7 @@ export const createEngine: CreateEngine = (config) => {
       yield* runChat({
         client: llm.client,
         model: llm.model,
+        recordUsage: llm.recordUsage,
         report,
         history,
         text: request.text,

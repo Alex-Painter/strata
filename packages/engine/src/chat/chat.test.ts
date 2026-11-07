@@ -13,6 +13,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ChatChunk, EngineConfig } from "../api.js";
 import { ChatUnavailableError, createEngine } from "../engine.js";
+import type { UsageEntry } from "../llm.js";
 import { settingsPath } from "../settings.js";
 import { type DemoRepo, demoRepo } from "../testing/demo-repo.js";
 import { StackRepo } from "../testing/stack-repo.js";
@@ -147,8 +148,9 @@ describe("chat", () => {
       },
     ];
 
+    const usage: UsageEntry[] = [];
     const chunks = await collect(
-      engine({ anthropicClient: client }).chat({
+      engine({ anthropicClient: client, recordUsage: (entry) => usage.push(entry) }).chat({
         report: analysed,
         history,
         text: "Why this line?",
@@ -186,6 +188,7 @@ describe("chat", () => {
     expect(results[0]?.content).toContain(`${hunk.path} @@`);
     expect(results[1]?.content).toContain(`${file} at the head, lines 1-`);
     expect(results[2]?.content).toBe("No file at the head has this text.");
+    expect(usage.map((entry) => entry.task)).toEqual(["chat", "chat"]);
   });
 
   it("lists the hunks of a PR outside the whole-stack diff, and reads at a PR's head", async () => {

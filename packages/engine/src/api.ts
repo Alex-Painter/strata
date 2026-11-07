@@ -20,6 +20,7 @@ import type { AuthoredPrs } from "./github/authored.js";
 import type { GitHubPort } from "./github/port.js";
 import type { LivePrRead } from "./github/reviews.js";
 import type { LayerJudge } from "./layers/judge.js";
+import type { UsageEntry } from "./llm.js";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
@@ -53,6 +54,11 @@ export interface EngineConfig {
   layerJudge?: LayerJudge;
   /** Defaults to DEFAULT_MODEL. */
   model?: string;
+  /**
+   * Receives the token usage of each Claude request. Defaults to appending it
+   * to llm-usage.jsonl in the data folder; tests pass a spy.
+   */
+  recordUsage?: (entry: UsageEntry) => void;
   log?: (message: string) => void;
   /**
    * Also sends clone and fetch steps to `log` when a caller follows progress.

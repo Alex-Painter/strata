@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 
 export const USAGE = `Usage: strata analyze [input] [options]
        strata stacks <owner/repo> [options]
+       strata usage [options]
 
 analyze: [input] is one of these:
   - A PR (owner/repo#123 or its URL) or a branch (owner/repo:feature/x).
@@ -22,6 +23,10 @@ stacks: lists all stacks in the PRs that changed in the last 90 days. A
 stack is a set of PRs whose branches feed into each other. You must set
 GITHUB_TOKEN.
 
+usage: shows the tokens that Strata sent to Claude and their cost, for
+each task and each model. Strata reads llm-usage.jsonl in the data folder.
+For the server, use its data folder (DATA_DIR) as --data-dir.
+
 Strata does not write in a git checkout. Thus nobody can commit a page of
 work code by accident.
 
@@ -36,11 +41,13 @@ Options:
   --json <file>         JSON to write (analyze: default next to the page;
                         stacks: none)
   --data-dir <dir>      Clone, cache and report folder (default: ~/.strata)
+  --days <n>            usage: the number of days to show (default: 30)
   -h, --help            Show this help`;
 
 export type Command =
   | { kind: "help" }
   | { kind: "stacks"; repo: string; repoPath?: string; json?: string; dataDir?: string }
+  | { kind: "usage"; days: number; dataDir?: string }
   | {
       kind: "analyze";
       /** Without one, the stack around the checkout's branch. */
@@ -66,11 +73,24 @@ export function parseCommand(argv: string[]): Command {
   if (values.help || positionals.length === 0) return { kind: "help" };
 
   const [command, input, ...extra] = positionals;
-  if (command !== "analyze" && command !== "stacks") {
+  if (command !== "analyze" && command !== "stacks" && command !== "usage") {
     throw new UsageError(`Strata does not know the command "${command}".`);
   }
   if (extra.length > 0)
     throw new UsageError(`Strata does not know these arguments: ${extra.join(" ")}`);
+
+  if (command === "usage") {
+    if (input) throw new UsageError(`Strata does not know these arguments: ${input}`);
+    if (values.source || values.out || values.leaf || values.json || values["repo-path"]) {
+      throw new UsageError("usage accepts only --days and --data-dir.");
+    }
+    const days = values.days === undefined ? 30 : Number(values.days);
+    if (!(Number.isInteger(days) && days > 0)) {
+      throw new UsageError(`--days must have a number of days, not "${values.days}".`);
+    }
+    return { kind: "usage", days, ...(values["data-dir"] ? { dataDir: values["data-dir"] } : {}) };
+  }
+  if (values.days !== undefined) throw new UsageError("Only usage accepts --days.");
 
   if (command === "stacks") {
     if (!input) throw new UsageError("stacks must have an <owner/repo>.");
@@ -131,6 +151,7 @@ function parse(argv: string[]) {
       out: { type: "string" },
       json: { type: "string" },
       "data-dir": { type: "string" },
+      days: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });

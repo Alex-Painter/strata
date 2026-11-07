@@ -5,14 +5,19 @@
  * skipped.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODEL, type EngineConfig } from "./api.js";
 
+/** What Strata asks Claude for. Each task is logged apart, so its cost shows. */
+export type LlmTask = "layers" | "pr-summary" | "whole-summary" | "chat";
+
 export interface LlmSettings {
   client: Anthropic;
   model: string;
+  /** Called once for each request to Claude, and for each answer read from the cache. */
+  recordUsage: (entry: UsageEntry) => void;
 }
 
 export function createLlm(config: EngineConfig): LlmSettings | null {
@@ -21,7 +26,82 @@ export function createLlm(config: EngineConfig): LlmSettings | null {
     config.anthropicClient ??
     (apiKey ? new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) }) : null);
   if (!client) return null;
-  return { client, model: config.model ?? DEFAULT_MODEL };
+  return {
+    client,
+    model: config.model ?? DEFAULT_MODEL,
+    recordUsage: config.recordUsage ?? usageFile(config.dataDir, config.log),
+  };
+}
+
+/** One request to Claude, or one answer read from Strata's cache, in `<dataDir>/llm-usage.jsonl`. */
+export interface UsageEntry {
+  at: string;
+  task: LlmTask;
+  model: string;
+  /** True when Strata used a cached answer and Claude was not asked. */
+  cached: boolean;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** From PRICES; null for a model that is not in it. */
+  costUsd: number | null;
+}
+
+export const USAGE_FILE = "llm-usage.jsonl";
+
+/** US dollars per million tokens: input, output. Cache reads cost 0.1 of input, 5-minute writes 1.25. */
+const PRICES: Record<string, [number, number]> = {
+  "claude-opus-5-5": [4, 20],
+  "claude-opus-5": [5, 25],
+  "claude-sonnet-5-5": [2, 10],
+  "claude-sonnet-5": [2, 10],
+  "claude-haiku-5-5": [0.1, 0.5],
+};
+
+export function usageEntry(
+  task: LlmTask,
+  model: string,
+  usage: Partial<Anthropic.Usage> | null | undefined,
+  cached = false,
+): UsageEntry {
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cacheReadTokens = usage?.cache_read_input_tokens ?? 0;
+  const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
+  const price = PRICES[model];
+  const costUsd = cached
+    ? 0
+    : price
+      ? (price[0] * (inputTokens + 0.1 * cacheReadTokens + 1.25 * cacheWriteTokens) +
+          price[1] * outputTokens) /
+        1_000_000
+      : null;
+  return {
+    at: new Date().toISOString(),
+    task,
+    model,
+    cached,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    costUsd,
+  };
+}
+
+/** Appends each entry to the usage file. A failed write is logged; it never fails the run. */
+function usageFile(dataDir: string, log?: (message: string) => void): (entry: UsageEntry) => void {
+  const path = join(dataDir, USAGE_FILE);
+  let chain: Promise<void> = Promise.resolve();
+  return (entry) => {
+    chain = chain
+      .then(async () => {
+        await mkdir(dataDir, { recursive: true });
+        await appendFile(path, `${JSON.stringify(entry)}\n`);
+      })
+      .catch((error: unknown) => log?.(`Strata cannot write the token usage: ${String(error)}`));
+  };
 }
 
 /**
@@ -43,6 +123,7 @@ export const STE_RULE = [
 
 /** A request for JSON that fits a schema. */
 export interface JsonQuestion {
+  task: LlmTask;
   /** Bump when the prompt or schema changes, so cached answers aren't reused. */
   version: number;
   system: string;
@@ -80,9 +161,14 @@ export function cachedAsk(llm: LlmSettings, cacheDir: string): AskJson {
       .digest("hex");
     const path = join(cacheDir, `${key}.json`);
     const cached = await readCached(path);
-    if (cached !== null) return cached;
+    if (cached !== null) {
+      llm.recordUsage(usageEntry(question.task, body.model, null, true));
+      return cached;
+    }
 
     const message = await llm.client.messages.create(body, signal ? { signal } : {});
+    // Claude bills a request whatever its answer, so it is logged before the checks.
+    llm.recordUsage(usageEntry(question.task, message.model ?? body.model, message.usage));
     if (message.stop_reason === "refusal") throw new ClaudeError("Claude did not answer.");
     if (message.stop_reason === "max_tokens") {
       throw new ClaudeError("Claude's answer is not complete.");
