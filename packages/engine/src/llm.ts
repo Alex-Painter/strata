@@ -8,14 +8,16 @@ import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_MODEL, type EngineConfig } from "./api.js";
+import { DEFAULT_MODELS, type EngineConfig } from "./api.js";
 
 /** What Strata asks Claude for. Each task is logged apart, so its cost shows. */
 export type LlmTask = "layers" | "pr-summary" | "whole-summary" | "chat";
 
+export const LLM_TASKS: readonly LlmTask[] = ["layers", "pr-summary", "whole-summary", "chat"];
+
 export interface LlmSettings {
   client: Anthropic;
-  model: string;
+  models: Record<LlmTask, string>;
   /** Called once for each request to Claude, and for each answer read from the cache. */
   recordUsage: (entry: UsageEntry) => void;
 }
@@ -28,9 +30,16 @@ export function createLlm(config: EngineConfig): LlmSettings | null {
   if (!client) return null;
   return {
     client,
-    model: config.model ?? DEFAULT_MODEL,
+    models: modelsOf(config),
     recordUsage: config.recordUsage ?? usageFile(config.dataDir, config.log),
   };
+}
+
+/** For each task: `models`, then `model`, then DEFAULT_MODELS. */
+export function modelsOf(config: Pick<EngineConfig, "model" | "models">): Record<LlmTask, string> {
+  return Object.fromEntries(
+    LLM_TASKS.map((task) => [task, config.models?.[task] ?? config.model ?? DEFAULT_MODELS[task]]),
+  ) as Record<LlmTask, string>;
 }
 
 /** One request to Claude, or one answer read from Strata's cache, in `<dataDir>/llm-usage.jsonl`. */
@@ -147,7 +156,7 @@ export class ClaudeError extends Error {}
 export function cachedAsk(llm: LlmSettings, cacheDir: string): AskJson {
   return async (question, signal) => {
     const body = {
-      model: llm.model,
+      model: llm.models[question.task],
       max_tokens: question.maxTokens,
       system: question.system,
       messages: [{ role: "user" as const, content: question.prompt }],

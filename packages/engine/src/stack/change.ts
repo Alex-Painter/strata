@@ -129,7 +129,7 @@ export async function stackReport(
   meta: ClaudeSteps & {
     engineVersion: string;
     startedAt: Date;
-    /** The model `ask` uses. */
+    /** The model `ask` uses for the whole-stack summary. */
     model?: string;
     /** Reads each PR's checks, reviews and PR body. Absent: the report has no verification. */
     github?: GitHubPort | null;

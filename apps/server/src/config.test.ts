@@ -65,6 +65,21 @@ describe("loadConfig", () => {
     expect(config.sessionSecret.length).toBeGreaterThanOrEqual(32);
   });
 
+  it("reads one model for every task, and one model for each task", () => {
+    expect(loadConfig(PRODUCTION)).toMatchObject({ model: null, models: {} });
+    const config = loadConfig({
+      ...PRODUCTION,
+      STRATA_MODEL: "claude-opus-5-5",
+      STRATA_MODEL_PR_SUMMARY: "claude-sonnet-5-5",
+      STRATA_MODEL_WHOLE_SUMMARY: "claude-opus-5-5",
+    });
+    expect(config.model).toBe("claude-opus-5-5");
+    expect(config.models).toEqual({
+      "pr-summary": "claude-sonnet-5-5",
+      "whole-summary": "claude-opus-5-5",
+    });
+  });
+
   it("reads local checkouts, expanding ~", () => {
     const config = loadConfig({
       ...PRODUCTION,

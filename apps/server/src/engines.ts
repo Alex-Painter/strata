@@ -36,6 +36,7 @@ export function engineFactory(
         ...(config.anthropicApiKey ? { anthropicApiKey: config.anthropicApiKey } : {}),
         ...(config.devAnthropicBaseUrl ? { anthropicBaseUrl: config.devAnthropicBaseUrl } : {}),
         ...(config.model ? { model: config.model } : {}),
+        models: config.models,
         checkouts: config.checkouts,
         log: (message) => console.log(`[strata] ${message}`),
         logProgress: true,

@@ -20,9 +20,20 @@ import type { AuthoredPrs } from "./github/authored.js";
 import type { GitHubPort } from "./github/port.js";
 import type { LivePrRead } from "./github/reviews.js";
 import type { LayerJudge } from "./layers/judge.js";
-import type { UsageEntry } from "./llm.js";
+import type { LlmTask, UsageEntry } from "./llm.js";
 
-export const DEFAULT_MODEL = "claude-opus-5-5";
+/**
+ * The model for each task. Sorting files into layers and summing up one PR
+ * are small, closed jobs, so Haiku does them. The whole-stack summary (its
+ * name, summary and Guide order) and chat need more judgement, so Sonnet does
+ * them. Config can move any task to another model.
+ */
+export const DEFAULT_MODELS: Readonly<Record<LlmTask, string>> = {
+  layers: "claude-haiku-5-5",
+  "pr-summary": "claude-haiku-5-5",
+  "whole-summary": "claude-sonnet-5-5",
+  chat: "claude-sonnet-5-5",
+};
 
 export interface EngineConfig {
   /** Root for the git clone cache and the LLM response cache. */
@@ -52,8 +63,10 @@ export interface EngineConfig {
    * turn on sendCodeToAnthropic.
    */
   layerJudge?: LayerJudge;
-  /** Defaults to DEFAULT_MODEL. */
+  /** One model for every task, in place of DEFAULT_MODELS. `models` overrides it per task. */
   model?: string;
+  /** The model for some tasks, in place of `model` and DEFAULT_MODELS. */
+  models?: Partial<Record<LlmTask, string>>;
   /**
    * Receives the token usage of each Claude request. Defaults to appending it
    * to llm-usage.jsonl in the data folder; tests pass a spy.

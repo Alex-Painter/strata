@@ -4,7 +4,10 @@ import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { buildDiff, createClassifier, LAYER_IDS } from "@strata/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ClaudeError, type UsageEntry } from "../llm.js";
+import { ClaudeError, modelsOf, type UsageEntry } from "../llm.js";
+
+const models = (model: string) => modelsOf({ model });
+
 import { createLlmLayerJudge, judgeLayers, type LayerJudge, type LayerRequest } from "./judge.js";
 
 let cacheDir: string;
@@ -28,7 +31,11 @@ function fakeClaude(reply: (body: Record<string, unknown>) => Partial<Anthropic.
     },
   } as unknown as Anthropic;
   return {
-    llm: { client, model: "claude-test", recordUsage: (entry: UsageEntry) => usage.push(entry) },
+    llm: {
+      client,
+      models: models("claude-test"),
+      recordUsage: (entry: UsageEntry) => usage.push(entry),
+    },
     calls,
     usage,
   };
@@ -105,7 +112,7 @@ describe("the Anthropic layer judge", () => {
 
     await createLlmLayerJudge(llm, cacheDir)({ ...REQUEST, known: [] });
     expect(calls).toHaveLength(2);
-    await createLlmLayerJudge({ ...llm, model: "claude-other" }, cacheDir)(REQUEST);
+    await createLlmLayerJudge({ ...llm, models: models("claude-other") }, cacheDir)(REQUEST);
     expect(calls).toHaveLength(3);
   });
 

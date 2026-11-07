@@ -131,7 +131,7 @@ describe("the fixture GitHub", () => {
       ["Changes app/jobs/warm_cache.py.", "Changes tests/test_warm_cache.py.", "Changes uv.lock."],
       ["Changes app/jobs/warm_cache.py.", "Changes web/admin/CacheStats.tsx."],
     ]);
-    expect(report.analysis.model).toBe("claude-opus-5-5");
+    expect(report.analysis.model).toBe("claude-sonnet-5-5");
     close();
   });
 

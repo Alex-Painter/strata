@@ -1,12 +1,13 @@
 /**
  * The engine as the CLI and its scripts make it. GITHUB_TOKEN and
  * ANTHROPIC_API_KEY come from the environment, as do the server's dev
- * settings for stand-ins: DEV_GITHUB_GRAPHQL_URL, DEV_GIT_REMOTE (with
+ * models (STRATA_MODEL, or STRATA_MODEL_<TASK> such as STRATA_MODEL_CHAT) and
+ * the server's dev settings for stand-ins: DEV_GITHUB_GRAPHQL_URL, DEV_GIT_REMOTE (with
  * {repo} for owner/name) and DEV_ANTHROPIC_BASE_URL.
  */
 import os from "node:os";
 import path from "node:path";
-import { createEngine, createGitHubPort, type Engine } from "@strata/engine";
+import { createEngine, createGitHubPort, type Engine, LLM_TASKS } from "@strata/engine";
 
 export function dataDirOf(dataDir: string | undefined): string {
   return path.resolve(dataDir ?? path.join(os.homedir(), ".strata"));
@@ -27,6 +28,13 @@ export function cliEngine(
     ...(remote ? { gitRemote: (repo: string) => remote.replaceAll("{repo}", repo) } : {}),
     ...(env.ANTHROPIC_API_KEY ? { anthropicApiKey: env.ANTHROPIC_API_KEY } : {}),
     ...(env.DEV_ANTHROPIC_BASE_URL ? { anthropicBaseUrl: env.DEV_ANTHROPIC_BASE_URL } : {}),
+    ...(env.STRATA_MODEL ? { model: env.STRATA_MODEL } : {}),
+    models: Object.fromEntries(
+      LLM_TASKS.flatMap((task) => {
+        const model = env[`STRATA_MODEL_${task.toUpperCase().replace("-", "_")}`];
+        return model ? [[task, model]] : [];
+      }),
+    ),
     ...(options.checkouts ? { checkouts: options.checkouts } : {}),
     log: (message) => console.error(message),
   });

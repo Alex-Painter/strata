@@ -4,6 +4,7 @@
  */
 import os from "node:os";
 import path from "node:path";
+import { LLM_TASKS, type LlmTask } from "@strata/engine";
 import { z } from "zod";
 
 /** Alex's pick for now (2026-10-28); STRATA_ASSIGNED_REPOS replaces it, and "" turns the search off. */
@@ -24,6 +25,11 @@ const Env = z.object({
   ALLOWED_GITHUB_LOGINS: z.string().default(""),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   STRATA_MODEL: z.string().min(1).optional(),
+  /** One model for one task, in place of STRATA_MODEL and the engine's defaults. */
+  STRATA_MODEL_LAYERS: z.string().min(1).optional(),
+  STRATA_MODEL_PR_SUMMARY: z.string().min(1).optional(),
+  STRATA_MODEL_WHOLE_SUMMARY: z.string().min(1).optional(),
+  STRATA_MODEL_CHAT: z.string().min(1).optional(),
   WEB_DIST: z.string().min(1).optional(),
   DEV_AUTH_BYPASS: z.string().optional(),
   DEV_GITHUB_LOGIN: z.string().optional(),
@@ -56,6 +62,8 @@ export interface ServerConfig {
   allowedLogins: ReadonlySet<string>;
   anthropicApiKey: string | null;
   model: string | null;
+  /** Per task, from STRATA_MODEL_<TASK>. */
+  models: Partial<Record<LlmTask, string>>;
   webDist: string | null;
   /** Local checkouts by `owner/name`, absolute paths. Only ever read. */
   checkouts: Record<string, string>;
@@ -162,6 +170,7 @@ export function loadConfig(
     allowedLogins,
     anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
     model: env.STRATA_MODEL ?? null,
+    models: taskModels(env),
     webDist: env.WEB_DIST ? path.resolve(env.WEB_DIST) : (defaults.webDist ?? null),
     checkouts,
     assignedRepos,
@@ -193,4 +202,15 @@ function parseCheckouts(value: string, problems: string[]): Record<string, strin
     checkouts[repo] = path.normalize(expanded);
   }
   return checkouts;
+}
+
+/** STRATA_MODEL_<TASK> for each task that has one, such as STRATA_MODEL_PR_SUMMARY. */
+export function taskModels(env: object): Partial<Record<LlmTask, string>> {
+  return Object.fromEntries(
+    LLM_TASKS.flatMap((task) => {
+      const key = `STRATA_MODEL_${task.toUpperCase().replace("-", "_")}`;
+      const model = (env as Record<string, unknown>)[key];
+      return typeof model === "string" && model ? [[task, model]] : [];
+    }),
+  );
 }

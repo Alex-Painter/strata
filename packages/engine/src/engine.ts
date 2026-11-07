@@ -32,7 +32,11 @@ import { ENGINE_VERSION } from "./version.js";
 export const createEngine: CreateEngine = (config) => {
   const llm = createLlm(config);
   config.log?.(
-    llm ? `LLM steps enabled (${llm.model})` : "LLM steps disabled: there is no Anthropic API key",
+    llm
+      ? `LLM steps enabled (${Object.entries(llm.models)
+          .map(([task, model]) => `${task}: ${model}`)
+          .join(", ")})`
+      : "LLM steps disabled: there is no Anthropic API key",
   );
 
   return {
@@ -83,7 +87,7 @@ export const createEngine: CreateEngine = (config) => {
           settings,
           judge: layerJudge(config, llm, settings),
           ask,
-          ...(llm ? { model: llm.model } : {}),
+          ...(llm ? { model: llm.models["whole-summary"] } : {}),
         };
         if (gh.kind === "range") {
           options.onProgress?.("Strata finds the range");
@@ -132,7 +136,7 @@ export const createEngine: CreateEngine = (config) => {
       );
       yield* runChat({
         client: llm.client,
-        model: llm.model,
+        model: llm.models.chat,
         recordUsage: llm.recordUsage,
         report,
         history,
