@@ -46,7 +46,7 @@ export interface Summaries {
 }
 
 /** Bump when a prompt or schema changes, so cached answers aren't reused. */
-const PROMPT_VERSION = 3;
+const PROMPT_VERSION = 4;
 /** Characters of hunk text per request. Hunks past it are listed by header only. */
 const HUNK_CHARS = 120_000;
 /** Lines shown per hunk, and characters per line. */
@@ -212,7 +212,7 @@ function fileLines(paths: string[], files: FileChange[], labels: Labels): string
 }
 
 /**
- * Each hunk under its label and header. Mechanical hunks show the header only,
+ * Each hunk under its label, path and enclosing section. Mechanical hunks show the header only,
  * and once the budget is spent the rest do too, so every hunk can still be cited.
  */
 function hunkText(hunks: Hunk[], labels: Labels): string {
@@ -220,7 +220,9 @@ function hunkText(hunks: Hunk[], labels: Labels): string {
   return hunks
     .map((hunk) => {
       const section = hunk.section.trim();
-      const header = `${labels.byId.get(hunk.id)} ${hunk.path} @@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@${section ? ` ${section}` : ""}`;
+      // No line numbers: a rebase moves them without changing the code, and the
+      // request (thus its cached answer) stays the same.
+      const header = `${labels.byId.get(hunk.id)} ${hunk.path}${section ? ` @@ ${section}` : ""}`;
       if (hunk.mechanical) return `${header}\n(not shown: ${hunk.mechanical.reason})`;
       const lines = hunk.lines.slice(0, LINES_PER_HUNK).map((line) => {
         const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : " ";

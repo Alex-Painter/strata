@@ -29,6 +29,16 @@ function fakeAsk(reply: (question: JsonQuestion) => unknown) {
 const isWhole = (question: JsonQuestion) => question.prompt.startsWith("Strata's groups");
 
 describe("writeSummaries", () => {
+  it("asks the same question for the same code at other line numbers, as after a rebase", async () => {
+    const { ask, questions } = fakeAsk(() => ({ summary: [] }));
+    const at = (start: number) =>
+      `diff --git a/app/a.py b/app/a.py\n--- a/app/a.py\n+++ b/app/a.py\n@@ -${start},2 +${start},3 @@ def run():\n     x = 1\n+    y = 2\n     return x\n`;
+    await writeSummaries(null, [part(1, at(10)), part(2, at(42))], ask);
+    expect(questions).toHaveLength(2);
+    expect(questions[0]?.prompt).toBe(questions[1]?.prompt);
+    expect(questions[0]?.prompt).toContain("h1 app/a.py @@ def run():");
+  });
+
   it("asks about the whole stack from its diff alone, citing hunks and groups by label", async () => {
     const { ask, questions } = fakeAsk(() => ({
       name: "  Give accounts a forecast flag. ",
@@ -54,15 +64,15 @@ describe("writeSummaries", () => {
         "g3 Config & infra: lockfiles\n  uv.lock (added, +1 -0, Config & infra, mechanical: Dependency lockfile): h3",
         "The hunks:",
         [
-          "h1 app/models/account.py @@ -0,0 +1,2 @@",
+          "h1 app/models/account.py",
           "+class Account:",
           "+    forecast: bool",
           "",
-          "h2 app/services/forecasts.py @@ -0,0 +1,2 @@",
+          "h2 app/services/forecasts.py",
           "+def forecast(account):",
           "+    return []",
           "",
-          "h3 uv.lock @@ -0,0 +1,1 @@",
+          "h3 uv.lock",
           "(not shown: Dependency lockfile)",
         ].join("\n"),
       ].join("\n\n"),
@@ -160,7 +170,7 @@ describe("writeSummaries", () => {
     expect(shown).toHaveLength(3 * 150);
     for (const n of [4, 5, 6]) {
       expect(prompt).toContain(
-        `h${n} app/big${n - 1}.py @@ -0,0 +1,200 @@\n(not shown: the change is too big to show every hunk)`,
+        `h${n} app/big${n - 1}.py\n(not shown: the change is too big to show every hunk)`,
       );
     }
   });
@@ -184,8 +194,8 @@ describe("writeSummaries", () => {
         "  app/models/account.py (added, +2 -0, Data model): h1\n" +
           "  uv.lock (added, +1 -0, Config & infra, mechanical: Dependency lockfile): h2",
         "The hunks:",
-        "h1 app/models/account.py @@ -0,0 +1,2 @@\n+class Account:\n+    forecast: bool\n\n" +
-          "h2 uv.lock @@ -0,0 +1,1 @@\n(not shown: Dependency lockfile)",
+        "h1 app/models/account.py\n+class Account:\n+    forecast: bool\n\n" +
+          "h2 uv.lock\n(not shown: Dependency lockfile)",
       ].join("\n\n"),
     );
     expect(asked[0]?.system).toContain("one pull request's own diff");
