@@ -22,6 +22,17 @@ Read `SPEC.md` before doing anything. It is the source of truth for what we're b
 - TypeScript by default; Python is fine for analysis tooling if it's clearly the better fit. Justify the choice in the plan.
 - Small, reviewable commits with clear messages.
 
+## Cost
+
+Every plan and every change that adds or changes a Claude call, or adds heavy compute, states its cost before it is built:
+
+- Which calls it adds, the model for each (`DEFAULT_MODELS` in `packages/engine/src/api.ts`), and what triggers them.
+- The cache key, and whether a rebase or a restack keeps the cache warm.
+- An estimate in tokens and dollars per Change and per month, from the prices in `packages/engine/src/llm.ts`. Check real numbers with `strata usage` where you can.
+- Disk and CPU, for indexes, clones and caches.
+
+Defaults: no Claude call on a run that nobody opens; one request per Change, not one per item; the cheapest model that passes a side-by-side check; a new task name in the usage log for every new kind of call.
+
 ## UI rules
 
 - Everything clickable (buttons, links, rows that open something, checkboxes, toggles) shows `cursor: pointer`, whatever a UI library or Tailwind's preflight sets by default. A disabled control shows `not-allowed`. The base rule is in `apps/web/src/styles.css`; a new clickable element that it does not match gets `cursor-pointer`.
