@@ -1666,8 +1666,8 @@ code,
  *    Darken in light; dark pages need a light tile and lighten.
  * 2. A noise mask that knocks small specks out of text and icons.
  * 3. A 0.5 px text-shadow that lets the edges of letters bleed a little.
- * Code keeps only layer 1, so it stays sharp to read. Off, the app is the
- * same as before: every rule here hangs off data-paper.
+ * Code gets all three layers too. Off, the app is the same as before:
+ * every rule here hangs off data-paper.
  */
 :root[data-paper] {
   --paper: url("./assets/paper/paper-dark.webp");
@@ -1725,17 +1725,27 @@ code,
   mix-blend-mode: var(--paper-blend);
   opacity: var(--paper-opacity);
 }
-:root[data-paper] :is(h1, h2, h3, p, a, button, label, li, td, th, span, svg):not(.code *) {
+:root[data-paper] body {
   text-shadow: var(--soften);
+}
+/*
+ * The grain mask goes on the sidebar, the page card and the menus and dialogs
+ * that sit outside them: a few elements, not one per line. Thus text, code,
+ * icons and the pane borders all lose the same small specks, like ink on paper.
+ */
+:root[data-paper] :is(.side, .main, [role="dialog"], [role="menu"], [role="listbox"]) {
   -webkit-mask: var(--grain);
   mask: var(--grain);
 }
-:root[data-paper] svg:not(.code *) {
+:root[data-paper] svg {
   filter: drop-shadow(var(--soften));
 }
 :root[data-paper] :is(h1, h2) {
   letter-spacing: -0.022em;
 }
-:root[data-paper] img {
-  filter: grayscale(1) contrast(1.2);
+:root[data-paper] .side img {
+  /* A halftone avatar: grey, more contrast, and a fine screen of dots. */
+  filter: grayscale(1) contrast(1.3);
+  -webkit-mask: radial-gradient(circle, #000 55%, transparent 60%) 0 0 / 2px 2px;
+  mask: radial-gradient(circle, #000 55%, transparent 60%) 0 0 / 2px 2px;
 }

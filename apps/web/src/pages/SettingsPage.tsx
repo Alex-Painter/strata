@@ -56,7 +56,7 @@ function PaperSetting() {
         Show the paper texture
       </label>
       <span className="pl-5 text-[13px] text-faint">
-        The code stays sharp. This browser keeps the setting.
+        Strata shows the pages and the code as printed paper. This browser keeps the setting.
       </span>
     </div>
   );

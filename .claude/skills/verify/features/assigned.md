@@ -36,7 +36,7 @@ Preconditions:
 ## Claude per repo
 
 - The sidebar links `Settings` (`/settings`). There, `heading "Settings"` and, for each searched repo, `region "acme/app"` with `checkbox "Send the code in acme/app to Claude"`, off until `settings/acme/app.json` in the data folder says `"sendCodeToAnthropic": true`. Turning it on writes that file (other settings in it stay). `GET` and `POST /api/repos/:owner/:name/settings` read and change it; a file broken by hand answers `422` with what is wrong. Without an Anthropic API key, the hint under it says the setting has no effect.
-- Above the repos, `region "Display"` holds `checkbox "Show the paper texture"`, off by default. Turning it on sets `data-paper="on"` on `<html>` and `strata-paper` in localStorage, so it stays on after a reload: a fibre layer covers the app and text gets a grain mask, but `.code` lines stay sharp. Turning it off removes both.
+- Above the repos, `region "Display"` holds `checkbox "Show the paper texture"`, off by default. Turning it on sets `data-paper="on"` on `<html>` and `strata-paper` in localStorage, so it stays on after a reload: a fibre layer covers the app and text gets a grain mask, and the code too. Turning it off removes both.
 
 ## Gotchas
 
