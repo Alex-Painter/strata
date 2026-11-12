@@ -61,3 +61,32 @@ it("turns Claude on for each searched repo, off until you do", async () => {
   expect(claude.checked).toBe(true);
   act(() => root.unmount());
 });
+
+it("turns the paper texture on and off, and the browser keeps it", async () => {
+  localStorage.removeItem("strata-paper");
+  delete document.documentElement.dataset.paper;
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SettingsPage me={{ login: "alex", name: null, avatarUrl: null }} />
+      </QueryClientProvider>,
+    ),
+  );
+  await flush();
+  const paper = [...container.querySelectorAll("label")]
+    .find((l) => l.textContent === "Show the paper texture")
+    ?.querySelector("input") as HTMLInputElement;
+  expect(paper.checked).toBe(false);
+  expect(document.documentElement.dataset.paper).toBeUndefined();
+  act(() => paper.click());
+  expect(paper.checked).toBe(true);
+  expect(document.documentElement.dataset.paper).toBe("on");
+  expect(localStorage.getItem("strata-paper")).toBe("on");
+  act(() => paper.click());
+  expect(document.documentElement.dataset.paper).toBeUndefined();
+  expect(localStorage.getItem("strata-paper")).toBe("off");
+  act(() => root.unmount());
+});

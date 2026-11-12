@@ -2,11 +2,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { applyPaper, storedPaper } from "./lib/paper";
 import { applyTheme, storedTheme } from "./lib/theme";
 import "./styles.css";
 
-// A theme picked in this browser applies before the first paint.
+// A theme and a paper texture picked in this browser applies before the first paint.
 applyTheme(storedTheme());
+applyPaper(storedPaper());
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },

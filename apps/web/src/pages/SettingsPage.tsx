@@ -1,9 +1,11 @@
 import type { MeResponse } from "@strata/core/model";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { api } from "../lib/api";
+import { setPaper, storedPaper } from "../lib/paper";
 
-/** Settings for each repo that Strata searches. */
+/** Settings for this browser, then for each repo that Strata searches. */
 export function SettingsPage({ me }: { me: MeResponse }) {
   const assigned = useQuery({ queryKey: ["assigned"], queryFn: api.assigned });
   const repos = assigned.data?.repos ?? [];
@@ -17,6 +19,10 @@ export function SettingsPage({ me }: { me: MeResponse }) {
       <main className="page">
         <div className="page-in gap-6">
           <h1 className="h1">Settings</h1>
+          <section className="grid gap-3" aria-label="Display">
+            <h2 className="h2">Display</h2>
+            <PaperSetting />
+          </section>
           {assigned.error && <p className="alert">{assigned.error.message}</p>}
           {assigned.data && repos.length === 0 && (
             <div className="empty">Strata does not search a repo at this time.</div>
@@ -30,6 +36,29 @@ export function SettingsPage({ me }: { me: MeResponse }) {
         </div>
       </main>
     </AppShell>
+  );
+}
+
+/** The printed-paper texture. This browser keeps the choice. */
+function PaperSetting() {
+  const [on, setOn] = useState(storedPaper);
+  return (
+    <div className="grid gap-0.5 text-[14px]">
+      <label className="flex items-center gap-1.5 text-muted">
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(event) => {
+            setPaper(event.target.checked);
+            setOn(event.target.checked);
+          }}
+        />
+        Show the paper texture
+      </label>
+      <span className="pl-5 text-[13px] text-faint">
+        The code stays sharp. This browser keeps the setting.
+      </span>
+    </div>
   );
 }
 

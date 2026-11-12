@@ -1658,3 +1658,84 @@ code,
     }
   }
 }
+
+/*
+ * The paper texture (Settings > Display), after Linear's Orbit page. Three
+ * cheap layers copy what ink does on paper:
+ * 1. A fibre tile on top of everything, so the paper shows through the ink.
+ *    Darken in light; dark pages need a light tile and lighten.
+ * 2. A noise mask that knocks small specks out of text and icons.
+ * 3. A 0.5 px text-shadow that lets the edges of letters bleed a little.
+ * Code keeps only layer 1, so it stays sharp to read. Off, the app is the
+ * same as before: every rule here hangs off data-paper.
+ */
+:root[data-paper] {
+  --paper: url("./assets/paper/paper-dark.webp");
+  --paper-blend: lighten;
+  --paper-opacity: 0.25;
+  --grain: url("./assets/paper/grain.webp") 0 0 / 128px 128px;
+  --soften: 0 0 0.5px currentColor;
+  --chrome: #121212;
+  --bg: #171717;
+  --raised: #1f1f1f;
+  --node: #1b1b1b;
+  --code-bg: #141414;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.12);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-paper]:not([data-theme="dark"]) {
+    --paper: url("./assets/paper/paper-light.webp");
+    --paper-blend: darken;
+    --paper-opacity: 0.3;
+    --chrome: #efefef;
+    --bg: #f7f7f7;
+    --raised: #fbfbfb;
+    --node: #fbfbfb;
+    --code-bg: #f7f7f7;
+    --line: #e2e2e2;
+    --line-2: #d4d4d4;
+    --fg: #1d1d1d;
+    --fg-2: #5f5f5f;
+    --fg-3: #8e8e8e;
+  }
+}
+:root[data-paper][data-theme="light"] {
+  --paper: url("./assets/paper/paper-light.webp");
+  --paper-blend: darken;
+  --paper-opacity: 0.3;
+  --chrome: #efefef;
+  --bg: #f7f7f7;
+  --raised: #fbfbfb;
+  --node: #fbfbfb;
+  --code-bg: #f7f7f7;
+  --line: #e2e2e2;
+  --line-2: #d4d4d4;
+  --fg: #1d1d1d;
+  --fg-2: #5f5f5f;
+  --fg-3: #8e8e8e;
+}
+:root[data-paper] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: var(--paper) 0 0 / 158px 158px;
+  mix-blend-mode: var(--paper-blend);
+  opacity: var(--paper-opacity);
+}
+:root[data-paper] :is(h1, h2, h3, p, a, button, label, li, td, th, span, svg):not(.code *) {
+  text-shadow: var(--soften);
+  -webkit-mask: var(--grain);
+  mask: var(--grain);
+}
+:root[data-paper] svg:not(.code *) {
+  filter: drop-shadow(var(--soften));
+}
+:root[data-paper] :is(h1, h2) {
+  letter-spacing: -0.022em;
+}
+:root[data-paper] img {
+  filter: grayscale(1) contrast(1.2);
+}
