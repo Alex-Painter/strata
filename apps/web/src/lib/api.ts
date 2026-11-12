@@ -22,6 +22,7 @@ import type {
   RepoSettingsResponse,
   RunInfo,
   StacksResponse,
+  UsageResponse,
 } from "@strata/core/model";
 
 export class HttpError extends Error {
@@ -156,6 +157,8 @@ export const api = {
     request<FileResponse>(
       `/api/changes/${encodeURIComponent(changeId)}/file?path=${encodeURIComponent(path)}&rev=${encodeURIComponent(revision)}`,
     ),
+  /** What Strata sent to Claude in the last `days` days, and what it cost. */
+  usage: (days: number) => request<UsageResponse>(`/api/usage?days=${days}`),
   ask,
 };
 

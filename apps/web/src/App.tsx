@@ -6,6 +6,7 @@ import { ChangesPage } from "./pages/ChangesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { StacksPage } from "./pages/StacksPage";
+import { UsagePage } from "./pages/UsagePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 
 const staticReport = readStaticReport();
@@ -31,6 +32,7 @@ function ServerApp() {
     <Switch>
       <Route path="/" component={() => <ChangesPage me={me.data} />} />
       <Route path="/settings">{() => <SettingsPage me={me.data} />}</Route>
+      <Route path="/usage">{() => <UsagePage me={me.data} />}</Route>
       <Route path="/repos/:owner/:name">{() => <StacksPage me={me.data} />}</Route>
       {/* A new id is a new page, so a path picked on the old one stops asking. */}
       <Route path="/changes/:id">

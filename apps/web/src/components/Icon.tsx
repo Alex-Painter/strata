@@ -75,6 +75,7 @@ const PATHS = {
       <circle cx="6" cy="11.5" r="1.5" />
     </>
   ),
+  chart: <path d="M2.75 13.25h10.5M4.5 11V8M8 11V4.5M11.5 11V6.5" />,
   chev: <path d="M6 3.5L10.5 8 6 12.5" />,
   chevd: <path d="M3.5 6L8 10.5 12.5 6" />,
   x: <path d="M4 4l8 8M12 4l-8 8" />,
