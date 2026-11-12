@@ -1729,11 +1729,16 @@ code,
   text-shadow: var(--soften);
 }
 /*
- * The grain mask goes on the sidebar, the page card and the menus and dialogs
- * that sit outside them: a few elements, not one per line. Thus text, code,
- * icons and the pane borders all lose the same small specks, like ink on paper.
+ * The grain mask goes on the sidebar and the page card: a few elements, not
+ * one per line. Thus text, code, icons and the pane borders all lose the same
+ * small specks, like ink on paper. Their specks show the chrome behind them.
+ * A menu or dialog outside them keeps a solid background, and only its
+ * contents get the mask: a masked background lets the page show through.
  */
-:root[data-paper] :is(.side, .main, [role="dialog"], [role="menu"], [role="listbox"]) {
+:root[data-paper] :is(.side, .main),
+:root[data-paper]
+  :is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]):not(.side *, .main *)
+  > * {
   -webkit-mask: var(--grain);
   mask: var(--grain);
 }
