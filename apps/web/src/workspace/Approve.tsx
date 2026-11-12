@@ -7,6 +7,7 @@ import {
   stackApproval,
 } from "@strata/core/model";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../components/Icon";
 
 /**
@@ -216,6 +217,11 @@ export function ApproveStack({ approvals }: { approvals: ApprovalsView }) {
 /**
  * The confirm step. It names each PR and the commit its approval names, and
  * the PRs it skips. Cancel has the focus, so Enter does not approve by itself.
+ *
+ * It renders into document.body. A row's actions sit in a translated box, and
+ * a transform makes `position: fixed` relative to that box: the popover then
+ * hangs off the row, the Change pane grows, and focusing Cancel scrolls the
+ * pane's content out of view until the popover closes.
  */
 export function ConfirmApprove({
   anchor,
@@ -234,7 +240,7 @@ export function ConfirmApprove({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>("[data-cancel]")?.focus();
+    ref.current?.querySelector<HTMLElement>("[data-cancel]")?.focus({ preventScroll: true });
     const away = (event: PointerEvent) => {
       if (!ref.current?.contains(event.target as Node)) onCancel();
     };
@@ -261,7 +267,7 @@ export function ConfirmApprove({
     prs.length === 1
       ? `Approve #${prs[0]?.number} on GitHub?`
       : `Approve ${prs.length} PRs on GitHub?`;
-  return (
+  return createPortal(
     <div
       ref={ref}
       role="dialog"
@@ -301,6 +307,7 @@ export function ConfirmApprove({
           Approve on GitHub
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -155,3 +155,35 @@ it("marks an approved row and offers Approve on an open one", () => {
   const rowButtons = container.querySelectorAll("button");
   expect([...rowButtons].map((b) => b.getAttribute("aria-label"))).toEqual(["Approve #3 PR 3"]);
 });
+
+it("opens a row's confirm step outside the row, and focuses Cancel without a scroll", () => {
+  // The row's actions sit in a translated box, which makes `position: fixed`
+  // relative to the row. A confirm step inside it widened the Change pane, and
+  // the focus on Cancel scrolled the pane's content out of view.
+  const focus = HTMLElement.prototype.focus;
+  const calls: (FocusOptions | undefined)[] = [];
+  HTMLElement.prototype.focus = function (options?: FocusOptions) {
+    calls.push(options);
+    focus.call(this, options);
+  };
+  try {
+    const container = mount(
+      <ul>
+        <li>
+          <span className="row-acts">
+            <RowApprove approvals={view([pr(3, { kind: "can-approve" })])} pr={3} title="PR 3" />
+          </span>
+        </li>
+      </ul>,
+    );
+    click(container.querySelector("button[aria-label='Approve #3 PR 3']") ?? undefined);
+    const dialog = document.querySelector("[role=dialog]");
+    expect(dialog?.getAttribute("aria-label")).toBe("Approve #3 on GitHub?");
+    expect(container.contains(dialog)).toBe(false);
+    expect(dialog?.parentElement).toBe(document.body);
+    expect(document.activeElement?.textContent).toBe("Cancel");
+    expect(calls).toEqual([{ preventScroll: true }]);
+  } finally {
+    HTMLElement.prototype.focus = focus;
+  }
+});
