@@ -55,6 +55,21 @@ export interface UsageEntry {
   cacheWriteTokens: number;
   /** From PRICES; null for a model that is not in it. */
   costUsd: number | null;
+  /** `owner/name`, when the request was for one repo. Lines written before 2026-11-12 have none. */
+  repo?: string;
+  /** The server's Change id, when the request was for one Change. */
+  changeId?: string;
+}
+
+/** What one run or chat was for, added to each usage line it writes. */
+export interface UsageTag {
+  repo?: string;
+  changeId?: string;
+}
+
+/** The same settings, with every usage line tagged. */
+export function tagUsage(llm: LlmSettings, tag: UsageTag): LlmSettings {
+  return { ...llm, recordUsage: (entry) => llm.recordUsage({ ...entry, ...tag }) };
 }
 
 export const USAGE_FILE = "llm-usage.jsonl";

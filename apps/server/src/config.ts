@@ -24,6 +24,10 @@ const Env = z.object({
   /** Comma-separated GitHub logins allowed to sign in. */
   ALLOWED_GITHUB_LOGINS: z.string().default(""),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** An Admin API key (sk-ant-admin...). Only read to show the real spend on the Usage page. */
+  ANTHROPIC_ADMIN_KEY: z.string().min(1).optional(),
+  /** The id of ANTHROPIC_API_KEY (apikey_...), so the Usage page shows that key's spend, not the organization's. */
+  ANTHROPIC_API_KEY_ID: z.string().min(1).optional(),
   STRATA_MODEL: z.string().min(1).optional(),
   /** One model for one task, in place of STRATA_MODEL and the engine's defaults. */
   STRATA_MODEL_LAYERS: z.string().min(1).optional(),
@@ -61,6 +65,8 @@ export interface ServerConfig {
   /** Lower-cased. */
   allowedLogins: ReadonlySet<string>;
   anthropicApiKey: string | null;
+  /** Reads the real spend from Anthropic's Admin API. Never sent to the web app. */
+  anthropicAdmin: { key: string; apiKeyId: string | null } | null;
   model: string | null;
   /** Per task, from STRATA_MODEL_<TASK>. */
   models: Partial<Record<LlmTask, string>>;
@@ -169,6 +175,9 @@ export function loadConfig(
     github,
     allowedLogins,
     anthropicApiKey: env.ANTHROPIC_API_KEY ?? null,
+    anthropicAdmin: env.ANTHROPIC_ADMIN_KEY
+      ? { key: env.ANTHROPIC_ADMIN_KEY, apiKeyId: env.ANTHROPIC_API_KEY_ID ?? null }
+      : null,
     model: env.STRATA_MODEL ?? null,
     models: taskModels(env),
     webDist: env.WEB_DIST ? path.resolve(env.WEB_DIST) : (defaults.webDist ?? null),

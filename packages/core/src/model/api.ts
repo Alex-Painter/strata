@@ -216,3 +216,67 @@ export interface FileResponse {
   revision: string;
   content: string;
 }
+
+/** Claude requests and their estimated cost, for one group of usage-log lines. */
+export interface UsageTotals {
+  /** Requests sent to Claude. */
+  requests: number;
+  /** Answers read from Strata's own cache; Claude was not asked. */
+  cached: number;
+  /** Input tokens, cache reads and cache writes included. */
+  inputTokens: number;
+  outputTokens: number;
+  /** Strata's estimate from token counts and list prices, in US dollars. */
+  costUsd: number;
+  /** Requests to a model whose price Strata does not know; not in costUsd. */
+  unpriced: number;
+}
+
+/** One feature: a task name in the usage log, such as "pr-summary". */
+export interface UsageTaskRow extends UsageTotals {
+  task: string;
+  models: string[];
+}
+
+export interface UsageModelRow extends UsageTotals {
+  model: string;
+}
+
+/** One UTC day, with the cost of each task on that day. */
+export interface UsageDayRow extends UsageTotals {
+  day: string;
+  costByTask: Record<string, number>;
+}
+
+/** One Change, or `changeId: null` for log lines that do not name one. */
+export interface UsageChangeRow extends UsageTotals {
+  changeId: string | null;
+  repo: string | null;
+  /** The Change's title, when the server still has the Change. */
+  title: string | null;
+}
+
+/** What Strata sent to Claude in a period, grouped four ways. Every list is sorted by cost, days newest first. */
+export interface UsageSummary {
+  /** ISO time; the period runs from here to now. */
+  since: string;
+  total: UsageTotals;
+  byTask: UsageTaskRow[];
+  byModel: UsageModelRow[];
+  byDay: UsageDayRow[];
+  byChange: UsageChangeRow[];
+}
+
+/** The real spend from Anthropic's Admin API, for the server's API key or the whole organization. */
+export interface BilledCost {
+  costUsd: number;
+  scope: "key" | "organization";
+}
+
+/** GET /api/usage?days=7|30|90 */
+export interface UsageResponse extends UsageSummary {
+  days: number;
+  /** Null when the server has no admin key, or Anthropic did not answer (see billedError). */
+  billed: BilledCost | null;
+  billedError: string | null;
+}

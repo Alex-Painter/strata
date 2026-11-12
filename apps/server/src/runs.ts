@@ -69,7 +69,7 @@ export class RunQueue {
           repo: { kind: "github", owner, name },
           seed: { pr: change.rootPr, leaf: change.tipPr },
         },
-        { onProgress: (step) => update({ progress: step }), deferSummaries },
+        { onProgress: (step) => update({ progress: step }), deferSummaries, changeId: change.id },
       );
       const at = this.now();
       this.db.transaction((tx) => {

@@ -16,4 +16,5 @@ export {
   settingsPath,
 } from "./settings.js";
 export { StackInputError } from "./stack/change.js";
+export { readUsage, summariseUsage } from "./usage.js";
 export { ENGINE_VERSION } from "./version.js";

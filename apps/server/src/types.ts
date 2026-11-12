@@ -1,6 +1,7 @@
 import type { Engine } from "@strata/engine";
 import type { AssignedSearch } from "./assigned.js";
 import type { GitHubOAuth } from "./auth/github.js";
+import type { Billing } from "./billing.js";
 import type { ServerConfig } from "./config.js";
 import type { Db } from "./db/client.js";
 import type { Jobs } from "./jobs.js";
@@ -32,4 +33,6 @@ export interface AppDeps {
   jobs?: Jobs;
   /** The last stack list per repo; tests pass one with their own clock. */
   stackCache?: StackCache;
+  /** The real spend from Anthropic's Admin API; tests pass their own. */
+  billing?: Billing;
 }

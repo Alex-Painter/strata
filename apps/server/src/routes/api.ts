@@ -3,7 +3,7 @@
  * so the web app and the server can't drift apart.
  *
  * /api/me, the assignment search, the stack list, the Changes routes
- * (routes/changes.ts) and chat (routes/chat.ts) are live.
+ * (routes/changes.ts), chat (routes/chat.ts) and usage (routes/usage.ts) are live.
  * The rest are declared with their final paths and answer 501, so the web app
  * can be wired against them and later slices fill them in.
  */
@@ -26,6 +26,7 @@ import { requireUser } from "../auth/routes.js";
 import type { AppDeps, AppEnv } from "../types.js";
 import { changeRoutes } from "./changes.js";
 import { chatRoutes } from "./chat.js";
+import { usageRoutes } from "./usage.js";
 
 export function apiRoutes(deps: AppDeps) {
   const app = new Hono<AppEnv>();
@@ -93,6 +94,7 @@ export function apiRoutes(deps: AppDeps) {
 
   app.route("/", changeRoutes(deps));
   app.route("/", chatRoutes(deps));
+  app.route("/", usageRoutes(deps));
 
   const notYet = (c: Context) =>
     c.json({ error: "Not available at this time (milestone 1)." }, 501);

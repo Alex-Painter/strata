@@ -135,7 +135,14 @@ export function chatRoutes(deps: AppDeps) {
         stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
       let answer = "";
       try {
-        for await (const chunk of engine.chat({ report, history, text, anchors, signal })) {
+        for await (const chunk of engine.chat({
+          report,
+          history,
+          text,
+          anchors,
+          signal,
+          changeId: thread.changeId,
+        })) {
           if (chunk.type === "text") {
             answer += chunk.text;
             await send({ type: "delta", text: chunk.text });

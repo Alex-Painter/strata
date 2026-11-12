@@ -106,6 +106,8 @@ export interface AnalyzeOptions extends ProgressOptions {
    * such as the server's runs when an assigned PR moves. Layers still use Claude.
    */
   deferSummaries?: boolean;
+  /** The server's Change id, written on each usage line of the run, so its cost shows per Change. */
+  changeId?: string;
 }
 
 /** Where a ChangeInput points, once PR numbers and refs are resolved to SHAs. */
@@ -141,6 +143,8 @@ export interface ChatRequest {
   text: string;
   anchors: Anchor[];
   signal?: AbortSignal;
+  /** The server's Change id, written on each usage line of the chat. */
+  changeId?: string;
 }
 
 export type ChatChunk = { type: "text"; text: string } | { type: "status"; text: string };

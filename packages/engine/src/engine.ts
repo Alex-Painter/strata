@@ -12,7 +12,7 @@ import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { approvePr, readLivePr } from "./github/reviews.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
-import { type AskJson, cachedAsk, createLlm, type LlmSettings } from "./llm.js";
+import { type AskJson, cachedAsk, createLlm, type LlmSettings, tagUsage } from "./llm.js";
 import { serialize } from "./lock.js";
 import { rangeReport, resolveRangeChange } from "./range.js";
 import { loadRepoSettings, type RepoSettings } from "./settings.js";
@@ -30,10 +30,10 @@ import { ENGINE_VERSION } from "./version.js";
  * anchors and chat work; ranges in a local checkout are still a stub.
  */
 export const createEngine: CreateEngine = (config) => {
-  const llm = createLlm(config);
+  const runLlm = createLlm(config);
   config.log?.(
-    llm
-      ? `LLM steps enabled (${Object.entries(llm.models)
+    runLlm
+      ? `LLM steps enabled (${Object.entries(runLlm.models)
           .map(([task, model]) => `${task}: ${model}`)
           .join(", ")})`
       : "LLM steps disabled: there is no Anthropic API key",
@@ -78,6 +78,10 @@ export const createEngine: CreateEngine = (config) => {
       const repo = repoName(gh);
       // The diffs write commits into the cache and read its branches, so they
       // run under the same lock as the fetch.
+      // Each usage line of the run names the repo and the Change.
+      const llm =
+        runLlm &&
+        tagUsage(runLlm, { repo, ...(options.changeId ? { changeId: options.changeId } : {}) });
       return serialize(lockKey(config, repo), async () => {
         const settings = await loadRepoSettings(config.dataDir, repo);
         const allowed = Boolean(settings.sendCodeToAnthropic && llm);
@@ -122,7 +126,7 @@ export const createEngine: CreateEngine = (config) => {
       const { report } = request;
       const repo = reportRepo(report);
       const settings = await loadRepoSettings(config.dataDir, repo);
-      if (!llm) throw new ChatUnavailableError("Strata does not have an Anthropic API key.");
+      if (!runLlm) throw new ChatUnavailableError("Strata does not have an Anthropic API key.");
       if (!settings.sendCodeToAnthropic) {
         throw new ChatUnavailableError(
           `The settings of ${repo} do not let Strata send its code to Claude.`,
@@ -138,9 +142,12 @@ export const createEngine: CreateEngine = (config) => {
         })),
       );
       yield* runChat({
-        client: llm.client,
-        model: llm.models.chat,
-        recordUsage: llm.recordUsage,
+        client: runLlm.client,
+        model: runLlm.models.chat,
+        recordUsage: tagUsage(runLlm, {
+          repo,
+          ...(request.changeId ? { changeId: request.changeId } : {}),
+        }).recordUsage,
         report,
         history,
         text: request.text,
