@@ -10,6 +10,7 @@ import { findAssigned } from "./github/assigned.js";
 import { findAuthored } from "./github/authored.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
+import { readPrStatus } from "./github/pr-status.js";
 import { approvePr, readLivePr } from "./github/reviews.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
 import { type AskJson, cachedAsk, createLlm, type LlmSettings, tagUsage } from "./llm.js";
@@ -57,6 +58,9 @@ export const createEngine: CreateEngine = (config) => {
     },
     findAuthored(repo) {
       return findAuthored(githubPort(config), repo);
+    },
+    readPrStatus(repo, numbers) {
+      return readPrStatus(githubPort(config), repo, numbers);
     },
     readPr(repo, number) {
       return readLivePr(githubPort(config), repo, number);

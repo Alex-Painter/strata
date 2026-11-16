@@ -31,7 +31,7 @@ import type { VerificationNode, VerificationPage } from "../github/verification.
 
 export interface FakeGitHub extends GitHubPort {
   calls: {
-    query: "page" | "timeline" | "search" | "verification" | "review" | "approve";
+    query: "page" | "timeline" | "search" | "verification" | "review" | "approve" | "status";
     variables: Record<string, unknown>;
   }[];
   prs: PrNode[];
@@ -113,6 +113,16 @@ export function fakeGitHub(
       }
       if (`${variables.owner}/${variables.name}` !== repo) {
         return { repository: null } as T;
+      }
+      if (query.startsWith("query StrataPrStatus")) {
+        fake.calls.push({ query: "status", variables });
+        const repository: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(variables)) {
+          if (!/^n\d+$/.test(key)) continue;
+          const node = fake.prs.find((pr) => pr.number === value);
+          repository[`p${key.slice(1)}`] = node ?? null;
+        }
+        return { repository } as T;
       }
       if (query === PR_PAGE_QUERY) {
         fake.calls.push({ query: "page", variables });

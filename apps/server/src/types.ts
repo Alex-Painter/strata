@@ -5,6 +5,7 @@ import type { Billing } from "./billing.js";
 import type { ServerConfig } from "./config.js";
 import type { Db } from "./db/client.js";
 import type { Jobs } from "./jobs.js";
+import type { PrStatusRefresher } from "./pr-status.js";
 import type { RunQueue } from "./runs.js";
 import type { StackCache } from "./stack-cache.js";
 
@@ -33,6 +34,8 @@ export interface AppDeps {
   jobs?: Jobs;
   /** The last stack list per repo; tests pass one with their own clock. */
   stackCache?: StackCache;
+  /** Reads the PRs' GitHub status again; tests pass one with their own clock. */
+  prStatus?: PrStatusRefresher;
   /** The real spend from Anthropic's Admin API; tests pass their own. */
   billing?: Billing;
 }

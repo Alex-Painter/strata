@@ -25,6 +25,7 @@ import { z } from "zod";
 import { queueRun, saveChange, summarize } from "../change-store.js";
 import { type ChangeRow, changes, reports } from "../db/schema.js";
 import { Jobs } from "../jobs.js";
+import { PrStatusRefresher } from "../pr-status.js";
 import { latestRun, runInfo } from "../runs.js";
 import { StackCache } from "../stack-cache.js";
 import type { AppDeps, AppEnv } from "../types.js";
@@ -61,6 +62,11 @@ export function changeRoutes(deps: AppDeps) {
     new StackCache(deps.config.dataDir, jobs, {
       onError: (error) => console.warn(`[strata] Reading stacks again failed: ${error}`),
     });
+  const prStatus =
+    deps.prStatus ??
+    new PrStatusRefresher(db, deps.engineFor, {
+      onError: (error) => console.warn(`[strata] Reading PR status failed: ${error}`),
+    });
   const app = new Hono<AppEnv>();
   const pending = (c: Context<AppEnv>, progress: string | null) =>
     c.json<PendingResponse>({ pending: true, progress }, 202);
@@ -90,14 +96,18 @@ export function changeRoutes(deps: AppDeps) {
     });
   });
 
-  app.get("/changes", (c) => {
-    const rows = db
-      .select()
-      .from(changes)
-      .where(eq(changes.ownerId, c.get("user").id))
-      .orderBy(desc(changes.updatedAt))
-      .all();
-    return c.json<ChangeSummary[]>(rows.map((row) => summarize(db, row)));
+  app.get("/changes", async (c) => {
+    const userId = c.get("user").id;
+    const read = () =>
+      db
+        .select()
+        .from(changes)
+        .where(eq(changes.ownerId, userId))
+        .orderBy(desc(changes.updatedAt))
+        .all();
+    // GitHub's status is not inference: read it again before the list shows it.
+    await prStatus.refresh(userId, read(), "repo");
+    return c.json<ChangeSummary[]>(read().map((row) => summarize(db, row)));
   });
 
   app.post("/changes", async (c) => {
@@ -142,9 +152,11 @@ export function changeRoutes(deps: AppDeps) {
   // Opening a Change whose latest run left out Claude's summaries runs it
   // again with them. Only after a run that finished: a failed one waits for
   // "Run again", so a broken run does not repeat on each poll.
-  app.get("/changes/:id", (c) => {
-    const row = owned(c);
-    if (!row) return c.json({ error: "Not found." }, 404);
+  app.get("/changes/:id", async (c) => {
+    const found = owned(c);
+    if (!found) return c.json({ error: "Not found." }, 404);
+    await prStatus.refresh(c.get("user").id, [found], "change");
+    const row = owned(c) ?? found;
     const shown = detail(row);
     if (shown.report?.analysis.summariesDeferred && shown.run?.status === "done") {
       deps.runs.enqueue(row);

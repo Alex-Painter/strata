@@ -5,6 +5,7 @@ export { NotImplementedError } from "./errors.js";
 export { type Checkout, CheckoutError, readCheckout } from "./git/checkout.js";
 export type { AuthoredPrs } from "./github/authored.js";
 export { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
+export type { PrStatus } from "./github/pr-status.js";
 export type { LivePrRead } from "./github/reviews.js";
 export type { LayerAnswer, LayerJudge, LayerQuestion, LayerRequest } from "./layers/judge.js";
 export { LLM_TASKS, type LlmTask, USAGE_FILE, type UsageEntry } from "./llm.js";

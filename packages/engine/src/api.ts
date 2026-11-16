@@ -18,6 +18,7 @@ import type {
 } from "@strata/core";
 import type { AuthoredPrs } from "./github/authored.js";
 import type { GitHubPort } from "./github/port.js";
+import type { PrStatus } from "./github/pr-status.js";
 import type { LivePrRead } from "./github/reviews.js";
 import type { LayerJudge } from "./layers/judge.js";
 import type { LlmTask, UsageEntry } from "./llm.js";
@@ -159,6 +160,11 @@ export interface Engine {
   findAssigned(repo: string): Promise<AssignedPrs>;
   /** Open PRs in `repo` that the token's user opened, newest update first. */
   findAuthored(repo: string): Promise<AuthoredPrs>;
+  /**
+   * The live status of some PRs (state, draft, review, checks, title), in one
+   * GraphQL request per 100 PRs. No clone, no lock, no Claude.
+   */
+  readPrStatus(repo: string, numbers: number[]): Promise<Map<number, PrStatus>>;
   /** One PR as GitHub shows it to the token's user now, with their latest review. */
   readPr(repo: string, number: number): Promise<LivePrRead>;
   /**

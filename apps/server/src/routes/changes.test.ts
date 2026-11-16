@@ -269,6 +269,40 @@ describe("Changes", () => {
     expect(((await again.json()) as ChangeDetail).change.id).toBe(change.id);
   });
 
+  it("reads its PRs' GitHub status again when the list or the Change loads", async () => {
+    const { app, runs, post } = setup();
+    const created = (await (
+      await post("/api/changes", { input: "acme/app#2" })
+    ).json()) as ChangeDetail;
+    await runs.idle();
+    const statusCalls = () => demo.github.calls.filter((call) => call.query === "status").length;
+    const before = statusCalls();
+
+    const pr3 = demo.github.prs.find((pr) => pr.number === 3);
+    if (!pr3) throw new Error("The demo repo has no #3.");
+    pr3.state = "MERGED";
+    pr3.reviewDecision = "APPROVED";
+    const list = (await (await app.request("/api/changes")).json()) as ChangeSummary[];
+    const prs = list.find((c) => c.id === created.change.id)?.prs ?? [];
+    expect(prs.find((pr) => pr.number === 3)).toMatchObject({
+      state: "merged",
+      review: "approved",
+    });
+    expect(statusCalls()).toBe(before + 1);
+
+    // Within 30 s the list does not ask again; the Change's own page asks once for itself.
+    await app.request("/api/changes");
+    expect(statusCalls()).toBe(before + 1);
+    // #3 is merged now, thus final; #2 is still open, thus read again.
+    const pr2 = demo.github.prs.find((pr) => pr.number === 2);
+    if (pr2) pr2.title = "A new title";
+    const detail = (await (
+      await app.request(`/api/changes/${created.change.id}`)
+    ).json()) as ChangeDetail;
+    expect(detail.change.prs.find((pr) => pr.number === 2)?.title).toBe("A new title");
+    expect(statusCalls()).toBe(before + 2);
+  });
+
   it("makes a separate Change for each path of a fork", async () => {
     const { app, runs, post } = setup();
     const newest = (await (
