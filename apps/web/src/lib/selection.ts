@@ -35,7 +35,10 @@ export function rangeAnchor(
   } catch {
     return null;
   }
-  const texts = [...root.querySelectorAll<HTMLElement>("[data-anchor-text]")];
+  // A surface can hold another (a summary sentence shows its hunks under it): skip those lines.
+  const texts = [...root.querySelectorAll<HTMLElement>("[data-anchor-text]")].filter(
+    (text) => surfaceOf(text) === root,
+  );
   const lines = texts.map((text) => text.textContent ?? "");
   const start = position(texts, startNode, startOffset, "start");
   const end = position(texts, endNode, endOffset, "end");

@@ -197,7 +197,7 @@ export function Panel({
 }) {
   return (
     <aside
-      aria-label="Ask Claude"
+      aria-label="Ask"
       className="panel"
       style={{ "--panel-w": `${width}px` } as CSSProperties}
     >
@@ -212,7 +212,7 @@ export function Panel({
         />
       )}
       <div className="ptabs">
-        <h2 className="ptitle">Ask Claude</h2>
+        <h2 className="ptitle">Ask</h2>
         <span className="flex-1" />
         <button type="button" className="ib" aria-label="Hide panel" onClick={onClose}>
           <Icon name="x" />

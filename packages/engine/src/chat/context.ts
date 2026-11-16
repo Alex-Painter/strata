@@ -136,6 +136,30 @@ async function resolveOne(
         orphaned,
       };
     }
+    case "summary": {
+      const pr = source.pr;
+      const claims =
+        pr === undefined
+          ? report.summary
+          : (report.parts.find((part) => part.pr === pr)?.summary ?? []);
+      const where = pr === undefined ? "the summary of the whole diff" : `the summary of #${pr}`;
+      const lines = claims.map((claim) => claim.text);
+      const range = lines.length > 0 ? resolveAnchor(anchor, surfaceText(lines)) : null;
+      if (!range) return { anchor, label: where, text: quoted, orphaned: true };
+      const first = lineAt(lines, range.start);
+      const last = lineAt(lines, Math.max(range.start, range.end - 1));
+      // The whole sentences, each with the hunks it cites, so Claude can read them.
+      const text = claims
+        .slice(first, last + 1)
+        .map((claim) => {
+          const cited = claim.evidence
+            .map((item) => item.anchor.source)
+            .flatMap((s) => (s.kind === "hunk" || s.kind === "pr-hunk" ? [s.hunkId] : []));
+          return cited.length > 0 ? `${claim.text} (cites ${cited.join(", ")})` : claim.text;
+        })
+        .join("\n");
+      return { anchor, label: where, text, orphaned: false };
+    }
     case "pr": {
       const node = report.stack?.nodes.find((n) => n.pr.number === source.number);
       return {

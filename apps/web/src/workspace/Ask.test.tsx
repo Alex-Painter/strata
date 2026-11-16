@@ -122,7 +122,7 @@ it("sends a question with its highlight, streams the answer, and links its citat
     onCite: (id) => cited.push(id),
   });
   await flush();
-  expect(container.textContent).toContain("Ask Claude about this Change.");
+  expect(container.textContent).toContain("Ask about this Change.");
   expect(container.querySelector('[aria-label="Highlights"]')?.textContent).toBe(
     "app/forecast_cache.py",
   );

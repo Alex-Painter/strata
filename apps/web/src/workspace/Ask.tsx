@@ -213,8 +213,7 @@ export function Ask({
       <div className="ask-log" aria-live="polite">
         {shown.length === 0 && !live && (
           <p className="text-muted">
-            Ask Claude about this Change. To ask about a part of a diff, select the text, then
-            select Ask.
+            Ask about this Change. To ask about a part of a diff, select the text, then select Ask.
           </p>
         )}
         {shown.map((message) =>
@@ -372,6 +371,8 @@ export function anchorLabel(report: ChangeReport, anchor: Anchor): string {
       return source.path;
     case "pr":
       return `#${source.number}`;
+    case "summary":
+      return source.pr === undefined ? "Summary" : `Summary of #${source.pr}`;
     default:
       return source.kind;
   }

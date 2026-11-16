@@ -668,7 +668,7 @@ export function Workspace({
             type="button"
             className="btn primary sm ask-pop"
             style={{ left: pop.x, top: pop.y }}
-            aria-label="Ask Claude about the selection"
+            aria-label="Ask about the selection"
             // Keep the text selected while the button is pressed.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {

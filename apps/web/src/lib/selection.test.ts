@@ -45,3 +45,23 @@ it("gives nothing for a selection outside a surface or of blank space", () => {
   expect(rangeAnchor(outside.firstChild as Text, 0, first as Text, 2)).toBeNull();
   expect(rangeAnchor(first as Text, 5, first as Text, 8)).toBeNull();
 });
+
+it("skips the lines of a surface inside another, such as a sentence's hunks", () => {
+  document.body.innerHTML = `<ul data-anchor-source='{"kind":"summary"}'>
+    <li data-anchor-line="0"><span data-anchor-text>The stack adds a cache.</span> <button>1 hunk</button>
+      <div data-anchor-source='{"kind":"hunk","hunkId":"hunk_1"}'>
+        <div data-anchor-line="0"><span data-anchor-text>ttl = 6</span></div>
+      </div>
+    </li>
+    <li data-anchor-line="1"><span data-anchor-text>It keeps forecasts.</span></li>
+  </ul>`;
+  const [first, , second] = [...document.querySelectorAll("[data-anchor-text]")].map(
+    (el) => el.firstChild as Text,
+  );
+  const anchor = rangeAnchor(first as Text, 17, second as Text, 8);
+  expect(anchor?.source).toEqual({ kind: "summary" });
+  expect(anchor?.quote?.exact).toBe("cache.\nIt keeps");
+  // A selection in the hunk is still the hunk's.
+  const hunk = document.querySelectorAll("[data-anchor-text]")[1]?.firstChild as Text;
+  expect(rangeAnchor(hunk, 0, hunk, 3)?.source).toEqual({ kind: "hunk", hunkId: "hunk_1" });
+});

@@ -1,4 +1,4 @@
-import type { Claim, Hunk } from "@strata/core/model";
+import type { Claim, Hunk, SourceRef } from "@strata/core/model";
 import { createContext, useContext } from "react";
 import { HunkCard, type HunkChip } from "./Diff";
 
@@ -31,8 +31,11 @@ export function ClaimList({
   hunks,
   selected,
   onSelect,
+  source,
 }: {
   claims: Claim[];
+  /** Makes the sentences a surface that a person can highlight and ask about. */
+  source?: SourceRef;
   /** The diff's hunks by id: the whole stack's, or one PR's. */
   hunks: Map<string, Hunk>;
   selected: Claim | null;
@@ -44,14 +47,14 @@ export function ClaimList({
     .filter(({ cited }) => cited.length > 0);
   if (shown.length === 0) return null;
   return (
-    <ul className="claims">
-      {shown.map(({ claim, cited }) => {
+    <ul className="claims" data-anchor-source={source ? JSON.stringify(source) : undefined}>
+      {shown.map(({ claim, cited }, index) => {
         const count = cited.length === 1 ? "1 hunk" : `${cited.length} hunks`;
         const where = claim.evidence.map((item) => item.label).join(", ");
         const open = evidence !== null && selected === claim;
         return (
-          <li key={claim.text} data-claim>
-            {claim.text}{" "}
+          <li key={claim.text} data-claim data-anchor-line={source ? index : undefined}>
+            {source ? <span data-anchor-text>{claim.text}</span> : claim.text}{" "}
             <button
               type="button"
               data-nav={`claim:${claim.text}`}

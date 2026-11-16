@@ -4,7 +4,7 @@ The reviewer asks Claude about a Change in the chat panel at the right of the wo
 
 ## Sub-features
 
-- `highlight`: selecting text in a hunk's lines shows `button "Ask Claude about the selection"`. Choosing it opens the chat panel with the highlight as a chip in `list "Highlights"`. A selection in a PR's own diff points at that PR's hunk.
+- `highlight`: selecting text in a hunk's lines shows `button "Ask about the selection"`. Choosing it opens the chat panel with the highlight as a chip in `list "Highlights"`. A selection in a PR's own diff points at that PR's hunk.
 - `ask`: `textbox "Question"`, Enter to send (Shift+Enter adds a line). The answer streams in, with status lines such as `Claude reads <hunk id>`, and a `Stop` button while it runs.
 - `citations`: each `[hunk_…]` in an answer is a button named after the file. Choosing it opens the hunk in its layer, in the whole stack or in its PR.
 - `threads`: `combobox "Thread"` lists the Change's threads, newest first, titled by their first question. `New thread` starts another. Threads stay after a reload.
@@ -24,7 +24,7 @@ Preconditions:
 - One instance from `strata-verify up --github fixture --claude fixture`, passing `doctor`. `$C` is its RUN_ID. The stand-in Claude turns on `sendCodeToAnthropic` for `acme/app`. In chat, it first calls `read_hunk` on the first hunk the digest lists, then answers: `The fixture Claude read one hunk. It cites it [<that hunk>]. It also cites a hunk that does not exist [hunk_ffffffffffffffff].`
 - Make the Change for `acme/app#10` (`POST /api/changes`, see stacks.md) and wait for its run to finish.
 
-- **Highlight.** `navigate` to `URL/changes/<id>?layer=logic`. In `app/forecast_cache.py`, select `timedelta(hours=6)` on line 3 (the browser tool's drag, or a script that sets the selection and sends `mouseup`). `button "Ask Claude about the selection"` shows under it. Choose it: `complementary "Ask Claude"` is open, and `list "Highlights"` holds `app/forecast_cache.py`.
+- **Highlight.** `navigate` to `URL/changes/<id>?layer=logic`. In `app/forecast_cache.py`, select `timedelta(hours=6)` on line 3 (the browser tool's drag, or a script that sets the selection and sends `mouseup`). `button "Ask about the selection"` shows under it. Choose it: `complementary "Ask"` is open, and `list "Highlights"` holds `app/forecast_cache.py`.
 - **Ask.** Fill `textbox "Question"` with `Why six hours?` and press Enter. One `POST /api/changes/<id>/threads` and one `POST /api/threads/<thread>/messages` go out. The question shows with its highlight (`app/forecast_cache.py` and `timedelta(hours=6)`), then the answer `The fixture Claude read one hunk. It cites it 0042_forecast_cache.sql. It also cites a hunk that does not exist.`: the made-up citation is gone, and the real one is a button.
 - **Citation.** Choose `button "0042_forecast_cache.sql"`. The URL gets `?layer=data-model`, and that hunk is selected (`data-selected="true"`).
 - **Threads.** Reload. `combobox "Thread"` shows `Why six hours?` with the same question and answer.

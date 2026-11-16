@@ -36,7 +36,9 @@ export type SourceRef =
   /** One hunk of a PR's own diff on the stack (its PrPart). */
   | { kind: "pr-hunk"; pr: number; hunkId: string }
   /** A commit, by full object id. */
-  | { kind: "commit"; oid: string };
+  | { kind: "commit"; oid: string }
+  /** Claude's summary of the whole diff, or of one PR's own diff when `pr` is set. */
+  | { kind: "summary"; pr?: number };
 
 export type SourceKind = SourceRef["kind"];
 
@@ -89,6 +91,8 @@ export function sourceKey(ref: SourceRef): string {
       return `pr-hunk:${ref.pr}:${ref.hunkId}`;
     case "commit":
       return `commit:${ref.oid}`;
+    case "summary":
+      return ref.pr === undefined ? "summary" : `summary:${ref.pr}`;
   }
 }
 

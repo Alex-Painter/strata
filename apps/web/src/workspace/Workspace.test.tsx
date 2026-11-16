@@ -167,6 +167,9 @@ describe("Workspace", () => {
       "This summary uses only the range's diff. Each sentence names the hunks that it rests on.",
     );
     expect(page.querySelector("#summary-heading")?.textContent).toBe("Summary");
+    // The summary's sentences are a surface that a person can highlight and ask about.
+    const summary = page.querySelector('ul[data-anchor-source=\'{"kind":"summary"}\']');
+    expect(summary?.querySelectorAll("[data-anchor-text]").length).toBeGreaterThan(0);
     expect(page.querySelector("#guide-heading .info")?.getAttribute("aria-label")).toContain(
       "Strata's groups of the range",
     );
@@ -448,8 +451,8 @@ describe("Workspace", () => {
     expect(panel(page)?.querySelector("h2")?.textContent).toBe("uv.lock");
 
     // The CLI's page has no server, thus no chat panel.
-    expect(page.querySelector('aside[aria-label="Ask Claude"]')).toBeNull();
+    expect(page.querySelector('aside[aria-label="Ask"]')).toBeNull();
     press("\\");
-    expect(page.querySelector('aside[aria-label="Ask Claude"]')).toBeNull();
+    expect(page.querySelector('aside[aria-label="Ask"]')).toBeNull();
   });
 });

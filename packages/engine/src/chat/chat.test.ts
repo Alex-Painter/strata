@@ -289,6 +289,39 @@ describe("chat", () => {
     expect(resolved?.label).toContain(hunk.path);
   });
 
+  it("resolves a highlight in the summary to its whole sentence and the hunks it cites", async () => {
+    const analysed = await report();
+    const hunk = analysed.change.hunks[0];
+    if (!hunk) throw new Error("The demo stack has no hunks.");
+    const claim = (text: string, hunkId?: string) => ({
+      text,
+      confidence: "high" as const,
+      evidence: hunkId
+        ? [{ label: hunk.path, anchor: { source: { kind: "hunk" as const, hunkId } } }]
+        : [],
+    });
+    const lines = ["The stack adds a cache.", "It keeps forecasts for six hours."];
+    const withSummary = {
+      ...analysed,
+      summary: [claim(lines[0] ?? ""), claim(lines[1] ?? "", hunk.id)],
+    };
+    const text = lines.join("\n");
+    const start = text.indexOf("six hours");
+    const anchor = anchorForRange({ kind: "summary" }, text, { start, end: start + 9 });
+    const [resolved, missing] = await engine().resolveAnchors(withSummary, [
+      anchor,
+      {
+        source: { kind: "summary", pr: 99 },
+        quote: { exact: "six hours", prefix: "", suffix: "" },
+      },
+    ]);
+    expect(resolved?.orphaned).toBe(false);
+    expect(resolved?.label).toBe("the summary of the whole diff");
+    expect(resolved?.text).toBe(`It keeps forecasts for six hours. (cites ${hunk.id})`);
+    expect(missing?.orphaned).toBe(true);
+    expect(missing?.label).toBe("the summary of #99");
+  });
+
   it("reads a file at a revision, and nothing outside the repo", async () => {
     const analysed = await report();
     const path = analysed.change.files[0]?.path ?? "";
