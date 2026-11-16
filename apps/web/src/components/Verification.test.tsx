@@ -142,8 +142,9 @@ describe("StackVerification", () => {
       ),
     );
     expect(host.textContent).toContain("Weakest: CI of #2 fails.");
+    // Tip first, base last: the same order as the Pull requests tree.
     const rows = [...host.querySelectorAll("tbody tr")].map((row) => row.getAttribute("data-pr"));
-    expect(rows).toEqual(["1", "2", "whole"]);
+    expect(rows).toEqual(["2", "1", "whole"]);
     const cell = host.querySelector('tr[data-pr="2"] [data-status="fail"]');
     expect(cell?.textContent).toBe("1 fails");
     expect(cell?.getAttribute("title")).toContain("Fails: Backend CI / Unit tests");

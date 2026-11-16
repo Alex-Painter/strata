@@ -149,7 +149,11 @@ function MatrixTable({
           </tr>
         </thead>
         <tbody>
-          {matrix.rows.map((row) => (
+          {/* Tip first, base last, the same order as the Pull requests tree; the whole stack under them. */}
+          {[
+            ...matrix.rows.filter((row) => row.pr !== null).reverse(),
+            ...matrix.rows.filter((row) => row.pr === null),
+          ].map((row) => (
             <tr
               key={row.pr ?? "whole"}
               data-pr={row.pr ?? "whole"}
