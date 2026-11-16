@@ -10,6 +10,7 @@ import type {
   StacksResponse,
 } from "@strata/core/model";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { Icon } from "../components/Icon";
@@ -17,6 +18,7 @@ import { Info } from "../components/Info";
 import { api, isPending, pollStacks } from "../lib/api";
 import { ago, countPrs, yoursLabel } from "../lib/format";
 import { prUrl } from "../lib/github";
+import { matchesSearch } from "../lib/search";
 import { type ReviewStatus, type ReviewStatusKind, reviewStatus } from "../lib/status";
 import { useStored } from "../lib/stored";
 import { ReadAt } from "./StacksPage";
@@ -30,6 +32,7 @@ import { ReadAt } from "./StacksPage";
  */
 export function ChangesPage({ me }: { me: MeResponse }) {
   const queryClient = useQueryClient();
+  const [query, setQuery] = useState("");
   const assigned = useQuery({
     queryKey: ["assigned"],
     queryFn: api.assigned,
@@ -92,54 +95,57 @@ export function ChangesPage({ me }: { me: MeResponse }) {
     >
       <main className="page">
         <div className="page-in wide">
-          <WaitingOnYou
-            changes={all?.filter((c) => c.waiting)}
-            error={error}
-            status={assigned.data ?? null}
-            searching={search.isPending || Boolean(assigned.data?.running)}
-            onSearch={() => search.mutate()}
-            searchError={search.error?.message ?? assigned.error?.message ?? null}
-            teams={{ show: showTeams, hidden, onChange: setShowTeams }}
-          />
-          <section className="grid gap-3" aria-labelledby="assigned-h">
-            <h2 id="assigned-h" className="h2">
-              Assigned to you, not waiting
-              <Info text="Stacks that you reviewed before, or that you were on before." />
-            </h2>
-            <ChangeList
-              changes={all?.filter(
-                (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
-              )}
+          <SearchBox query={query} onChange={setQuery} />
+          <SearchContext.Provider value={query}>
+            <WaitingOnYou
+              changes={all?.filter((c) => c.waiting)}
               error={error}
-              empty="There are no stacks here at this time."
+              status={assigned.data ?? null}
+              searching={search.isPending || Boolean(assigned.data?.running)}
+              onSearch={() => search.mutate()}
+              searchError={search.error?.message ?? assigned.error?.message ?? null}
+              teams={{ show: showTeams, hidden, onChange: setShowTeams }}
             />
-          </section>
-          {repos.length > 0 && (
-            <YourPrs
-              repos={yours}
-              errors={authored.flatMap((q, i) =>
-                q.error ? [`${repos[i]}: ${q.error.message}`] : [],
-              )}
-            />
-          )}
-          {added.length > 0 && (
-            <section className="grid gap-3" aria-labelledby="added-h">
-              <h2 id="added-h" className="h2">
-                Added by you
-                <Info text="Stacks that you selected for analysis. Nobody asked you to review them." />
+            <section className="grid gap-3" aria-labelledby="assigned-h">
+              <h2 id="assigned-h" className="h2">
+                Assigned to you, not waiting
+                <Info text="Stacks that you reviewed before, or that you were on before." />
               </h2>
-              <ChangeList changes={added} error={null} empty="" />
-            </section>
-          )}
-          {all &&
-            repos.map((repo) => (
-              <OtherStacks
-                key={repo}
-                repo={repo}
-                changes={all.filter((c) => c.repo === repo)}
-                hide={shownStacks}
+              <ChangeList
+                changes={all?.filter(
+                  (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
+                )}
+                error={error}
+                empty="There are no stacks here at this time."
               />
-            ))}
+            </section>
+            {repos.length > 0 && (
+              <YourPrs
+                repos={yours}
+                errors={authored.flatMap((q, i) =>
+                  q.error ? [`${repos[i]}: ${q.error.message}`] : [],
+                )}
+              />
+            )}
+            {added.length > 0 && (
+              <section className="grid gap-3" aria-labelledby="added-h">
+                <h2 id="added-h" className="h2">
+                  Added by you
+                  <Info text="Stacks that you selected for analysis. Nobody asked you to review them." />
+                </h2>
+                <ChangeList changes={added} error={null} empty="" />
+              </section>
+            )}
+            {all &&
+              repos.map((repo) => (
+                <OtherStacks
+                  key={repo}
+                  repo={repo}
+                  changes={all.filter((c) => c.repo === repo)}
+                  hide={shownStacks}
+                />
+              ))}
+          </SearchContext.Provider>
         </div>
       </main>
     </AppShell>
@@ -543,9 +549,93 @@ function PrLink({ repo, number }: { repo: string; number: number }) {
   );
 }
 
+/** The text in the search box: every table on the page shows only the rows that match it. */
+const SearchContext = createContext("");
+
+/** Filters the page's lists by PR number ("123", "#123") or by text. "/" puts the cursor in it. */
+function SearchBox({ query, onChange }: { query: string; onChange: (query: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      input.current?.focus();
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, []);
+  return (
+    <div className="relative -mb-4 max-w-md">
+      <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-faint">
+        <Icon name="search" />
+      </span>
+      <input
+        ref={input}
+        type="search"
+        aria-label="Search the Changes and stacks"
+        placeholder="Search by PR number or text"
+        className="field w-full pr-16 pl-8"
+        value={query}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          if (query) onChange("");
+          else event.currentTarget.blur();
+        }}
+      />
+      <span className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center">
+        {query ? (
+          <button
+            type="button"
+            aria-label="Clear the search"
+            title="Clear the search"
+            className="inline-flex size-6 cursor-pointer items-center justify-center rounded-md text-faint hover:bg-active hover:text-text"
+            onClick={() => {
+              onChange("");
+              input.current?.focus();
+            }}
+          >
+            <Icon name="x" />
+          </button>
+        ) : (
+          <kbd title="Type / to go to the search">/</kbd>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function rowMatches(row: Row, query: string): boolean {
+  return matchesSearch(
+    {
+      title: row.title,
+      repo: row.repo,
+      note: row.note,
+      numbers: [
+        row.rootPr,
+        ...(row.tipPr === null ? [] : [row.tipPr]),
+        ...row.prs.map((pr) => pr.number),
+      ],
+      text: [
+        ...row.prs.flatMap((pr) => [pr.title, pr.author, pr.headRef, pr.baseRef]),
+        row.status?.label,
+        row.strata,
+      ],
+    },
+    query,
+  );
+}
+
 /** Changes or stacks as a table: what, who, when opened, review status, Strata's run, GitHub. */
-function ChangeTable({ rows }: { rows: Row[] }) {
+function ChangeTable({ rows: all }: { rows: Row[] }) {
   const [, navigate] = useLocation();
+  const query = useContext(SearchContext);
+  const rows = all.filter((row) => rowMatches(row, query));
+  if (rows.length === 0 && all.length > 0) {
+    return <div className="empty">No row in this list matches the search.</div>;
+  }
   return (
     <div className="list overflow-x-auto">
       <table className="w-full min-w-[840px] table-fixed border-collapse text-left">

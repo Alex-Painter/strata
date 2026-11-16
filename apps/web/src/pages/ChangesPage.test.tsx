@@ -243,3 +243,60 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(posts).toContain('/api/changes {"input":"acme/app#60"}');
   act(() => root.unmount());
 });
+
+it("filters every list by PR number or by text", async () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ChangesPage me={{ login: "alex", name: null, avatarUrl: null }} />
+      </QueryClientProvider>,
+    ),
+  );
+  await flush();
+  await flush();
+
+  const box = container.querySelector('input[type="search"]') as HTMLInputElement;
+  const type = (value: string) =>
+    act(() => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      set?.call(box, value);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  const shown = () =>
+    [...container.querySelectorAll("tbody tr a:first-child")]
+      .map((a) => a.getAttribute("href"))
+      .filter((href) => href?.startsWith("/"));
+  const section = (heading: string) =>
+    container.querySelector(`section[aria-labelledby="${heading}"]`) as HTMLElement;
+
+  // "/" puts the cursor in the box.
+  act(() => {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "/", bubbles: true }));
+  });
+  expect(document.activeElement).toBe(box);
+
+  // A number matches any PR in the row, with or without "#".
+  type("#4");
+  expect(shown()).toEqual(["/changes/8"]);
+  expect(section("waiting-h").textContent).toContain("No row in this list matches the search.");
+  type("31");
+  expect(shown()).toEqual(["/repos/acme/app#stack-30"]);
+
+  // Text matches titles and authors, without regard to case.
+  type("KIM");
+  expect(shown()).toEqual(["/repos/acme/app#stack-30"]);
+  type("change 20");
+  expect(shown()).toEqual(["/changes/20"]);
+
+  // Escape clears the search, and every row comes back.
+  act(() => {
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+  expect(box.value).toBe("");
+  expect(shown()).toContain("/changes/3");
+  expect(shown()).toContain("/repos/acme/app#stack-30");
+  act(() => root.unmount());
+});
