@@ -153,7 +153,7 @@ export function HomeNav({
   page = "changes",
 }: {
   current: string | null;
-  page?: "changes" | "usage" | "settings";
+  page?: "changes" | "reviewed" | "usage" | "settings";
 }) {
   const changes = useQuery({ queryKey: ["changes"], queryFn: api.changes });
   const repos = [
@@ -168,6 +168,14 @@ export function HomeNav({
       >
         <Icon name="review" />
         <span className="nl">Changes</span>
+      </Link>
+      <Link
+        href="/reviewed"
+        className="nrow"
+        aria-current={page === "reviewed" ? "page" : undefined}
+      >
+        <Icon name="check" />
+        <span className="nl">Reviewed</span>
       </Link>
       <Link href="/usage" className="nrow" aria-current={page === "usage" ? "page" : undefined}>
         <Icon name="chart" />

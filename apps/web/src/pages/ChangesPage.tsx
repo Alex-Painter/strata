@@ -25,10 +25,9 @@ import { ReadAt } from "./StacksPage";
 
 /**
  * The home page, by how much each Change asks of you: waiting on you (from
- * your GitHub assignments), assigned or reviewed but not waiting, your own
- * open PRs and their stacks, ones you added yourself, and the rest of each
- * searched repo's open stacks. Strata analyses the first two by itself; a
- * stack or PR only once you choose it.
+ * your GitHub assignments), your own open PRs and their stacks, ones you added yourself, and the rest of each
+ * searched repo's open stacks. Strata analyses the first by itself; a stack
+ * or PR only once you choose it. Ones you reviewed before are on /reviewed.
  */
 export function ChangesPage({ me }: { me: MeResponse }) {
   const queryClient = useQueryClient();
@@ -106,19 +105,6 @@ export function ChangesPage({ me }: { me: MeResponse }) {
               searchError={search.error?.message ?? assigned.error?.message ?? null}
               teams={{ show: showTeams, hidden, onChange: setShowTeams }}
             />
-            <section className="grid gap-3" aria-labelledby="assigned-h">
-              <h2 id="assigned-h" className="h2">
-                Assigned to you, not waiting
-                <Info text="Stacks that you reviewed before, or that you were on before." />
-              </h2>
-              <ChangeList
-                changes={all?.filter(
-                  (c) => !c.waiting && (c.yours.length > 0 || c.origin === "assigned"),
-                )}
-                error={error}
-                empty="There are no stacks here at this time."
-              />
-            </section>
             {repos.length > 0 && (
               <YourPrs
                 repos={yours}
@@ -451,7 +437,7 @@ const STATUS: Record<RunStatus, string> = {
   failed: "Failed",
 };
 
-function ChangeList({
+export function ChangeList({
   changes,
   error,
   empty,
@@ -550,10 +536,16 @@ function PrLink({ repo, number }: { repo: string; number: number }) {
 }
 
 /** The text in the search box: every table on the page shows only the rows that match it. */
-const SearchContext = createContext("");
+export const SearchContext = createContext("");
 
 /** Filters the page's lists by PR number ("123", "#123") or by text. "/" puts the cursor in it. */
-function SearchBox({ query, onChange }: { query: string; onChange: (query: string) => void }) {
+export function SearchBox({
+  query,
+  onChange,
+}: {
+  query: string;
+  onChange: (query: string) => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {

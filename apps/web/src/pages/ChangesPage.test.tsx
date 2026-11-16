@@ -170,17 +170,17 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   );
   expect(waiting.textContent).toContain("acme/app#9: no luck");
 
-  expect(rows("assigned-h").map(([href]) => href)).toEqual(["/changes/6", "/changes/8"]);
-  expect(section("assigned-h").textContent).toContain("#6 reviewed by you");
-  expect(section("assigned-h").textContent).toContain("acme/app#2 → #4");
+  // Changes you reviewed before are on the Reviewed page, not here.
+  expect(section("assigned-h")).toBeNull();
+  expect(container.textContent).not.toContain("#6 reviewed by you");
   // Each PR number opens that PR on GitHub in a new tab, and does not open the Change.
-  const numbers = [...section("assigned-h").querySelectorAll('a[title^="Open #"]')].filter((a) =>
+  const numbers = [...waiting.querySelectorAll('a[title^="Open #"]')].filter((a) =>
     a.textContent?.startsWith("#"),
   );
   expect(numbers.map((a) => a.getAttribute("href"))).toEqual(
     expect.arrayContaining([
       "https://github.com/acme/app/pull/2",
-      "https://github.com/acme/app/pull/4",
+      "https://github.com/acme/app/pull/3",
     ]),
   );
   expect(numbers.every((a) => a.getAttribute("target") === "_blank")).toBe(true);
@@ -279,8 +279,8 @@ it("filters every list by PR number or by text", async () => {
   expect(document.activeElement).toBe(box);
 
   // A number matches any PR in the row, with or without "#".
-  type("#4");
-  expect(shown()).toEqual(["/changes/8"]);
+  type("#21");
+  expect(shown()).toEqual(["/changes/20"]);
   expect(section("waiting-h").textContent).toContain("No row in this list matches the search.");
   type("31");
   expect(shown()).toEqual(["/repos/acme/app#stack-30"]);
