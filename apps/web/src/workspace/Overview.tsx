@@ -206,6 +206,7 @@ function WholeSummary({
           </h2>
           <ClaimList
             claims={report.summary}
+            numbered
             source={{ kind: "summary" }}
             hunks={diff.byId}
             selected={selected}
@@ -441,6 +442,7 @@ function PartSummary({ stack, part, ...props }: OverviewProps & { stack: Stack; 
           </h2>
           <ClaimList
             claims={part.summary}
+            numbered
             source={{ kind: "summary", pr: n }}
             hunks={props.diff.byId}
             selected={props.selected}

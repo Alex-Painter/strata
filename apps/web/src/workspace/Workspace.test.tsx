@@ -168,7 +168,7 @@ describe("Workspace", () => {
     );
     expect(page.querySelector("#summary-heading")?.textContent).toBe("Summary");
     // The summary's sentences are a surface that a person can highlight and ask about.
-    const summary = page.querySelector('ul[data-anchor-source=\'{"kind":"summary"}\']');
+    const summary = page.querySelector('ol[data-anchor-source=\'{"kind":"summary"}\']');
     expect(summary?.querySelectorAll("[data-anchor-text]").length).toBeGreaterThan(0);
     expect(page.querySelector("#guide-heading .info")?.getAttribute("aria-label")).toContain(
       "Strata's groups of the range",

@@ -1487,6 +1487,14 @@ code,
   .claims li {
     line-height: 1.55;
   }
+  .claims.numbered {
+    list-style: decimal;
+    padding-left: 1.6em;
+  }
+  .claims.numbered li::marker {
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
   /* A selected sentence's hunks, under it. */
   .claim-ev {
     display: grid;

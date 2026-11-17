@@ -32,8 +32,11 @@ export function ClaimList({
   selected,
   onSelect,
   source,
+  numbered = false,
 }: {
   claims: Claim[];
+  /** Numbers the sentences, as for a summary. */
+  numbered?: boolean;
   /** Makes the sentences a surface that a person can highlight and ask about. */
   source?: SourceRef;
   /** The diff's hunks by id: the whole stack's, or one PR's. */
@@ -46,8 +49,12 @@ export function ClaimList({
     .map((claim) => ({ claim, cited: citedHunks(claim, hunks) }))
     .filter(({ cited }) => cited.length > 0);
   if (shown.length === 0) return null;
+  const List = numbered ? "ol" : "ul";
   return (
-    <ul className="claims" data-anchor-source={source ? JSON.stringify(source) : undefined}>
+    <List
+      className={numbered ? "claims numbered" : "claims"}
+      data-anchor-source={source ? JSON.stringify(source) : undefined}
+    >
       {shown.map(({ claim, cited }, index) => {
         const count = cited.length === 1 ? "1 hunk" : `${cited.length} hunks`;
         const where = claim.evidence.map((item) => item.label).join(", ");
@@ -85,7 +92,7 @@ export function ClaimList({
           </li>
         );
       })}
-    </ul>
+    </List>
   );
 }
 
