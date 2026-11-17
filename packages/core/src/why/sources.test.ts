@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildDiff } from "../change/build.js";
-import { cleanCommitMessage, cleanDescription, codeReasons, quoteIn } from "./sources.js";
+import {
+  cleanCommitMessage,
+  cleanDescription,
+  codeReasons,
+  plainDescription,
+  quoteIn,
+} from "./sources.js";
 
 describe("cleanDescription", () => {
   it("keeps the author's words and drops templates, proof, pictures and footers", () => {
@@ -118,5 +124,14 @@ describe("quoteIn", () => {
     expect(quoteIn("sales leads   LOSE deals", "Sales leads\nlose deals when")).toBe(true);
     expect(quoteIn("leads win deals", "Sales leads lose deals")).toBe(false);
     expect(quoteIn("  ", "anything")).toBe(false);
+  });
+});
+
+describe("plainDescription", () => {
+  it("keeps the author's whole text, proof sections too, without tool lines", () => {
+    const body =
+      "Why: runs were slow.\r\n\r\n<!-- fill this in -->\n\n\n\n## Testing\n- [x] Ran it\n\nCo-Authored-By: A <a@b>\n🤖 Generated with Tool\nfooter text";
+    expect(plainDescription(body)).toBe("Why: runs were slow.\n\n## Testing\n- [x] Ran it");
+    expect(plainDescription(null)).toBe("");
   });
 });

@@ -81,6 +81,29 @@ export function cleanDescription(body: string | null | undefined): string {
   return out.join("\n").trim();
 }
 
+/**
+ * A PR or issue body for the chat: the whole text the author wrote, with tool
+ * footers, HTML comments and tool lines taken off. Unlike `cleanDescription`,
+ * it keeps the proof sections and checklists, since a person can ask about
+ * them.
+ */
+export function plainDescription(body: string | null | undefined): string {
+  if (!body) return "";
+  let text = body.replace(/\r\n/g, "\n");
+  for (const footer of FOOTERS) {
+    const at = text.indexOf(footer);
+    if (at >= 0) text = text.slice(0, at);
+  }
+  return text
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .split("\n")
+    .filter((line) => !BOILERPLATE_LINE.test(line))
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Subjects that say nothing about why. */
 const TRIVIAL_SUBJECT =
   /^(merge\b|fixup!|squash!|amend!|wip\b|revert "?wip|lint\b|format\b|typo\b|fix (lint|tests?|types?|ci|build)\b|address (review|comments|feedback)\b|pr feedback\b|review feedback\b|update\s*$)/i;

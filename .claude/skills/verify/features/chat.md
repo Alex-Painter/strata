@@ -1,6 +1,6 @@
 # Chat
 
-The reviewer asks Claude about a Change in the chat panel at the right of the workspace. Nothing else opens in that panel: code shows on the canvas, and details in the Change pane. Selecting text in a diff shows an `Ask` button next to it; choosing it adds the selection as a highlight to the next question. Claude answers in a stream. It can read hunks, read any file at the base or head, and search the head, and it cites hunks by id. Strata drops citations of hunks the report does not hold, so each citation button opens a real hunk. Threads are saved on the Change. Chat runs only for repos whose settings let Strata send their code to Claude, and only when Strata has an Anthropic API key.
+The reviewer asks Claude about a Change in the chat panel at the right of the workspace. Nothing else opens in that panel: code shows on the canvas, and details in the Change pane. Selecting text in a diff shows an `Ask` button next to it; choosing it adds the selection as a highlight to the next question. Claude answers in a stream. It can read hunks, read any file at the base or head, search the head, and read the PRs' descriptions and the issues they close (live from GitHub; the descriptions are also in its prompt), and it cites hunks by id and PR text by its GitHub link. Strata drops citations of hunks the report does not hold, so each citation button opens a real hunk. Threads are saved on the Change. Chat runs only for repos whose settings let Strata send their code to Claude, and only when Strata has an Anthropic API key.
 
 ## Sub-features
 

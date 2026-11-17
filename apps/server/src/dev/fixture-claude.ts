@@ -150,8 +150,9 @@ type Block =
 
 /** One chat turn: a tool call first, then the answer once a tool result came back. */
 export function fixtureChat(body: ChatBody): { model: string; content: Block[]; stop: string } {
-  // The digest is the last system block; the first holds an example id.
-  const digest = body.system.at(-1)?.text ?? "";
+  // The first system block holds an example id; the digest has its own block, before the PR descriptions.
+  const digest =
+    body.system.find((b) => b.text.startsWith("The Change, as Strata analysed it"))?.text ?? "";
   const hunk = /hunk_[0-9a-f]{16}/.exec(digest)?.[0] ?? "hunk_0000000000000000";
   const last = body.messages.at(-1)?.content;
   const answered = Array.isArray(last) && last.some((b) => b?.type === "tool_result");

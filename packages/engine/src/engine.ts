@@ -11,6 +11,7 @@ import { findAuthored } from "./github/authored.js";
 import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js";
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { readPrStatus } from "./github/pr-status.js";
+import { readPrTexts } from "./github/pr-text.js";
 import { approvePr, readLivePr } from "./github/reviews.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
 import { type AskJson, cachedAsk, createLlm, type LlmSettings, tagUsage } from "./llm.js";
@@ -145,6 +146,14 @@ export const createEngine: CreateEngine = (config) => {
           anchors: await resolveAnchors(report, message.anchors, readFile),
         })),
       );
+      const path = report.stack?.selectedPath ?? report.parts.map((part) => part.pr);
+      const readPr = async (pr: number) =>
+        (await readPrTexts(githubPort(config), repo, [pr]))[0] ?? null;
+      // Live, so an edited description reaches the next question. A failure costs only the descriptions.
+      const descriptions = await readPrTexts(githubPort(config), repo, path).catch((error) => {
+        config.log?.(`Cannot read the PR descriptions of ${repo}: ${String(error)}`);
+        return null;
+      });
       yield* runChat({
         client: runLlm.client,
         model: runLlm.models.chat,
@@ -154,6 +163,7 @@ export const createEngine: CreateEngine = (config) => {
         }).recordUsage,
         report,
         history,
+        descriptions,
         text: request.text,
         anchors: await resolveAnchors(report, request.anchors, readFile),
         tools: {
@@ -166,6 +176,7 @@ export const createEngine: CreateEngine = (config) => {
             const at = pr === undefined ? head : partRevision(report, pr, "head");
             return at ? grep(gitDir, at, text) : "";
           },
+          readPr,
         },
         ...(request.signal ? { signal: request.signal } : {}),
       });
