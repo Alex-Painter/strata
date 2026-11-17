@@ -261,6 +261,8 @@ function OtherStacks({
             // No PR here asks for you: show only the path length.
             place: {
               label: `–/${stack.defaultPath.length}`,
+              positions: [],
+              total: stack.defaultPath.length,
               detail: `No PR in this stack asks for you. The path from #${stack.root} has ${stack.defaultPath.length} PRs.`,
             },
           }))}
@@ -490,7 +492,7 @@ interface Row {
   /** The PR the GitHub button opens. */
   githubPr: number;
   /** Where the row's PRs sit in the path, as "2/4" or "2, 3/4"; "–/4" when none of them is yours. */
-  place: { label: string; detail: string } | null;
+  place: { label: string; detail: string; positions: number[]; total: number } | null;
   status: ReviewStatus | null;
   strata: string | null;
 }
@@ -501,11 +503,49 @@ function placeOf(prs: number[], path: number[]): Row["place"] {
   if (at.length === 0) return null;
   const positions = at.map((n) => path.indexOf(n) + 1);
   return {
-    label: `${positions.join(", ")}/${path.length}`,
+    label: `${ranges(positions)}/${path.length}`,
+    positions,
+    total: path.length,
     detail: at
       .map((n, i) => `#${n} is PR ${positions[i]} of ${path.length} in the stack.`)
       .join(" "),
   };
+}
+
+/** Positions as runs: [2, 3, 4, 6] is "2–4, 6". */
+export function ranges(positions: number[]): string {
+  const sorted = [...new Set(positions)].sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const start = sorted[i] as number;
+    let end = start;
+    while (sorted[i + 1] === end + 1) end = sorted[++i] as number;
+    runs.push(end === start ? `${start}` : `${start}–${end}`);
+  }
+  return runs.join(", ");
+}
+
+/** The tallest the drawing gets, in px; a long stack gets thinner bars. */
+const GLYPH_HEIGHT = 28;
+
+/** The stack as a small column of bars, tip on top, your PRs filled. */
+function StackGlyph({ positions, total }: { positions: number[]; total: number }) {
+  if (total < 2) return null;
+  const gap = total > 12 ? 0.5 : 1;
+  const bar = Math.max(1, Math.min(5, (GLYPH_HEIGHT - gap * (total - 1)) / total));
+  return (
+    <span aria-hidden="true" className="flex w-3 shrink-0 flex-col-reverse" style={{ gap }}>
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: one bar per position, which never moves.
+          key={i}
+          data-mine={positions.includes(i + 1) || undefined}
+          className={`block rounded-[1px] ${positions.includes(i + 1) ? "bg-accent" : "bg-line-2"}`}
+          style={{ height: bar }}
+        />
+      ))}
+    </span>
+  );
 }
 
 const TONE: Record<ReviewStatusKind, string> = {
@@ -634,7 +674,7 @@ function ChangeTable({ rows: all }: { rows: Row[] }) {
         <colgroup>
           <col />
           <col className="w-32" />
-          <col className="w-20" />
+          <col className="w-24" />
           <col className="w-24" />
           <col className="w-40" />
           <col className="w-28" />
@@ -708,7 +748,12 @@ function ChangeTable({ rows: all }: { rows: Row[] }) {
                   className="px-3 py-1.5 font-mono text-[13px] text-muted"
                   title={row.place?.detail}
                 >
-                  {row.place?.label}
+                  {row.place && (
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <StackGlyph positions={row.place.positions} total={row.place.total} />
+                      {row.place.label}
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-1.5 text-[13px] text-muted" title={opened}>
                   {opened ? ago(opened) : ""}

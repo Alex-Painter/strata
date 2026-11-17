@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ChangesPage } from "./ChangesPage";
+import { ChangesPage, ranges } from "./ChangesPage";
 
 const change = (id: string, fields: Partial<ChangeSummary>): ChangeSummary => ({
   id,
@@ -197,7 +197,11 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   const yours = rows("yours-h");
   expect(yours).toHaveLength(2);
   expect(yours[0]?.[0]).toBe("/repos/acme/app#stack-50");
-  expect(yours[0]?.[1]).toContain("1, 2/2");
+  expect(yours[0]?.[1]).toContain("1–2/2");
+  // The stack as bars, tip on top: both of #50's stack are yours.
+  const glyph = section("yours-h").querySelector("tbody tr td:nth-child(3) [aria-hidden]");
+  expect(glyph?.children).toHaveLength(2);
+  expect(glyph?.querySelectorAll("[data-mine]")).toHaveLength(2);
   expect(yours[0]?.[1]).toContain("Not analysed");
   expect(yours[1]?.[1]).toContain("My PR 60");
   expect(yours[1]?.[1]).toContain("Draft");
@@ -299,4 +303,10 @@ it("filters every list by PR number or by text", async () => {
   expect(shown()).toContain("/changes/3");
   expect(shown()).toContain("/repos/acme/app#stack-30");
   act(() => root.unmount());
+});
+
+it("writes positions in the stack as runs", () => {
+  expect(ranges([2, 3, 4, 5, 6, 7, 8, 9])).toBe("2–9");
+  expect(ranges([1, 3, 4, 6])).toBe("1, 3–4, 6");
+  expect(ranges([5])).toBe("5");
 });
