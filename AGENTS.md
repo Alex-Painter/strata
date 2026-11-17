@@ -15,7 +15,7 @@ Read `SPEC.md` before doing anything. It is the source of truth for what we're b
 - Treat PR boundaries as hints only. Output must not depend on how code is split (see the shape-invariance benchmark).
 - Keep secrets out of the repo. Redact transcripts before storing them.
 - Write tests for layer classification and shape invariance from the start.
-- Make Claude write in ASD-STE100 Simplified Technical English; write UI copy in plain, natural language (see below).
+- Make Claude write generated text in ASD-STE100 Simplified Technical English, except Ask answers; write UI copy and Ask answers in plain, natural language (see below).
 
 ## Preferences
 
@@ -51,7 +51,9 @@ Text that Strata itself shows (UI copy in `apps/web`, status and progress lines,
 
 ### Generated text: ASD-STE100
 
-Text that an LLM writes for a person (summaries, the Guide, layer reasons, chat answers) is in ASD-STE100 Simplified Technical English (STE). Every prompt whose answer a person reads must include `STE_RULE` from `packages/engine/src/llm.ts`. When you change a prompt, increase its `PROMPT_VERSION`. `STE_RULE` holds the rules that Claude follows.
+Text that an LLM writes for a person (summaries, the why paragraph, the Guide, layer reasons) is in ASD-STE100 Simplified Technical English (STE). Every such prompt must include `STE_RULE` from `packages/engine/src/llm.ts`.
+
+Ask (chat) answers are the exception: they are plain, natural English and do not include `STE_RULE`. When you change a prompt, increase its `PROMPT_VERSION`. `STE_RULE` holds the rules that Claude follows.
 
 ### Tests
 

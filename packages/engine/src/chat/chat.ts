@@ -18,11 +18,11 @@ import {
 } from "@strata/core";
 import type { ChatChunk, ResolvedAnchor } from "../api.js";
 import type { PrText } from "../github/verification.js";
-import { ClaudeError, STE_RULE, type UsageEntry, usageEntry } from "../llm.js";
+import { ClaudeError, type UsageEntry, usageEntry } from "../llm.js";
 import { digest, findHunk, hunkIds, hunkText, type ReadFile } from "./context.js";
 
 /** Increase when the prompt or the tools change. */
-export const CHAT_PROMPT_VERSION = 3;
+export const CHAT_PROMPT_VERSION = 4;
 /** Tool calls for one question. Past it, Claude is told to answer with what it has. */
 const MAX_TOOL_CALLS = 8;
 /** Lines of a file returned by one read. */
@@ -80,9 +80,7 @@ Cite the evidence for each claim: write the hunk id in square brackets after the
 
 The thread shows only the text of your earlier answers. The tool reads that you did for them are not shown again. Do not say that an earlier answer did not come from a tool read.
 
-Keep answers short: a few sentences or a short list. Use Markdown. Put code symbols and paths in backticks.
-
-${STE_RULE}`;
+Write in plain, natural English. Keep answers short: a few sentences or a short list. Use Markdown. Put code symbols and paths in backticks.`;
 
 const TOOLS: Anthropic.Tool[] = [
   {

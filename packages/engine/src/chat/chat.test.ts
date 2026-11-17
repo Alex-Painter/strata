@@ -176,7 +176,7 @@ describe("chat", () => {
       .map((b) => b.text)
       .join("\n");
     expect(system).toContain(hunk.id);
-    expect(system).toContain("ASD-STE100");
+    expect(system).not.toContain("ASD-STE100");
     expect(first?.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
     const [asked] = first?.messages[2]?.content as Anthropic.TextBlockParam[];
     const question = asked?.text ?? "";

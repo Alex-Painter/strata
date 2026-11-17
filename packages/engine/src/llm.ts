@@ -135,9 +135,10 @@ function usageFile(dataDir: string, log?: (message: string) => void): (entry: Us
 }
 
 /**
- * Strata writes all user-facing text in ASD-STE100 Simplified Technical
- * English (see AGENTS.md). Every prompt whose answer a person reads ends with
- * this, so Claude's text follows the same rules as the rest of the UI.
+ * Strata writes the text Claude generates for a person (summaries, the why,
+ * the Guide, layer reasons) in ASD-STE100 Simplified Technical English (see
+ * AGENTS.md). Those prompts end with this. Ask answers are the exception: they
+ * are plain, natural English.
  */
 export const STE_RULE = [
   "Write all text that a person reads in ASD-STE100 Simplified Technical English:",
