@@ -20,7 +20,8 @@ import {
 import type { GitHubPort } from "./port.js";
 
 const FIELDS = `
-  number url body createdAt lastEditedAt headRefOid
+  number title url body createdAt lastEditedAt headRefOid
+  closingIssuesReferences(first: 5) { nodes { number title body url } }
   commits(last: 1) { nodes { commit {
     oid committedDate
     statusCheckRollup { contexts(first: 100) { nodes {
@@ -96,8 +97,13 @@ export interface DeploymentNode {
 
 export interface VerificationNode {
   number: number;
+  title: string;
   url: string;
   body: string | null;
+  /** The issues the PR closes when it merges, as GitHub links them. */
+  closingIssuesReferences: {
+    nodes: ({ number: number; title: string; body: string | null; url: string } | null)[];
+  } | null;
   createdAt: string;
   lastEditedAt: string | null;
   headRefOid: string;
@@ -145,12 +151,25 @@ export interface VerificationPage {
   repository: Record<string, VerificationNode | null> | null;
 }
 
-/** Reads the verification of each PR, bottom first. Files decide the UI flag. */
+/** A PR's own words, read in the same query: for the why (summaries/why.ts). */
+export interface PrText {
+  number: number;
+  title: string;
+  url: string;
+  body: string | null;
+  issues: { number: number; title: string; body: string | null; url: string }[];
+}
+
+/**
+ * Reads the verification of each PR, bottom first. Files decide the UI flag.
+ * The PRs' titles, bodies and linked issues come back too, as `texts`, which
+ * are not part of the verification.
+ */
 export async function readVerification(
   port: GitHubPort,
   repo: string,
   prs: { number: number; files: FileChange[] | null }[],
-): Promise<Verification> {
+): Promise<Verification & { texts: PrText[] }> {
   const [owner, name] = repo.split("/");
   const nodes = new Map<number, VerificationNode>();
   const notes: string[] = [];
@@ -171,6 +190,14 @@ export async function readVerification(
       return [{ ...base, flags: verificationFlags(base, files) }];
     }),
     notes,
+    texts: prs.flatMap(({ number }) => {
+      const node = nodes.get(number);
+      if (!node) return [];
+      const issues = (node.closingIssuesReferences?.nodes ?? []).flatMap((issue) =>
+        issue ? [issue] : [],
+      );
+      return [{ number, title: node.title ?? "", url: node.url, body: node.body, issues }];
+    }),
   };
 }
 

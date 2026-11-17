@@ -15,3 +15,4 @@ export * from "./layers/index.js";
 export * from "./model/index.js";
 export * from "./stack/index.js";
 export * from "./verification/index.js";
+export * from "./why/sources.js";

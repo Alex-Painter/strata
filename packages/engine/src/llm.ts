@@ -11,9 +11,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_MODELS, type EngineConfig } from "./api.js";
 
 /** What Strata asks Claude for. Each task is logged apart, so its cost shows. */
-export type LlmTask = "layers" | "pr-summary" | "whole-summary" | "chat";
+export type LlmTask = "layers" | "pr-summary" | "whole-summary" | "change-why" | "chat";
 
-export const LLM_TASKS: readonly LlmTask[] = ["layers", "pr-summary", "whole-summary", "chat"];
+export const LLM_TASKS: readonly LlmTask[] = [
+  "layers",
+  "pr-summary",
+  "whole-summary",
+  "change-why",
+  "chat",
+];
 
 export interface LlmSettings {
   client: Anthropic;

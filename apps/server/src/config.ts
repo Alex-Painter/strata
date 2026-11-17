@@ -33,6 +33,7 @@ const Env = z.object({
   STRATA_MODEL_LAYERS: z.string().min(1).optional(),
   STRATA_MODEL_PR_SUMMARY: z.string().min(1).optional(),
   STRATA_MODEL_WHOLE_SUMMARY: z.string().min(1).optional(),
+  STRATA_MODEL_CHANGE_WHY: z.string().min(1).optional(),
   STRATA_MODEL_CHAT: z.string().min(1).optional(),
   WEB_DIST: z.string().min(1).optional(),
   DEV_AUTH_BYPASS: z.string().optional(),

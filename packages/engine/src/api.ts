@@ -27,12 +27,14 @@ import type { LlmTask, UsageEntry } from "./llm.js";
  * The model for each task. Sorting files into layers and summing up one PR
  * are small, closed jobs, so Haiku does them. The whole-stack summary (its
  * name, summary and Guide order) and chat need more judgement, so Sonnet does
- * them. Config can move any task to another model.
+ * them. The why only restates reasons that its sources state, so Haiku does
+ * it. Config can move any task to another model.
  */
 export const DEFAULT_MODELS: Readonly<Record<LlmTask, string>> = {
   layers: "claude-haiku-5-5",
   "pr-summary": "claude-haiku-5-5",
   "whole-summary": "claude-sonnet-5-5",
+  "change-why": "claude-haiku-5-5",
   chat: "claude-sonnet-5-5",
 };
 

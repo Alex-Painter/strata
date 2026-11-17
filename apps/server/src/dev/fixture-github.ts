@@ -218,6 +218,10 @@ const verdictReview = (oid: string) => ({
 demo.github.verification = {
   9: {
     body: [
+      "## Why",
+      "",
+      "Big accounts wait 4 seconds for the forecast page. A cache per account makes it fast.",
+      "",
       "## Verification",
       "",
       "- `uv run pytest tests/` passed.",

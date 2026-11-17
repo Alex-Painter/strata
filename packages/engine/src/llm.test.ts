@@ -8,6 +8,7 @@ describe("the model for each task", () => {
       layers: "claude-haiku-5-5",
       "pr-summary": "claude-haiku-5-5",
       "whole-summary": "claude-sonnet-5-5",
+      "change-why": "claude-haiku-5-5",
       chat: "claude-sonnet-5-5",
     });
     expect(modelsOf({})).toEqual(DEFAULT_MODELS);
@@ -18,6 +19,7 @@ describe("the model for each task", () => {
       layers: "claude-opus-5-5",
       "pr-summary": "claude-opus-5-5",
       "whole-summary": "claude-opus-5-5",
+      "change-why": "claude-opus-5-5",
       chat: "claude-haiku-5-5",
     });
   });

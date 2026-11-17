@@ -33,7 +33,9 @@ const verdict = (head: string, blocking: boolean) =>
 // Shaped like GlyphicAI/maverick-backend#9336 and #9660 on 2026-11-02.
 const node: VerificationNode = {
   number: 9336,
+  title: "Show the live view",
   url: "https://github.com/acme/app/pull/9336",
+  closingIssuesReferences: null,
   body: "## Testing\n\n- `pytest` passed locally.\n\nNot run: the live view on a phone.\n",
   createdAt: "2026-10-22T17:40:05Z",
   lastEditedAt: "2026-10-26T20:00:00Z",
@@ -213,6 +215,19 @@ describe("readVerification", () => {
     expect(result.prs.map((pr) => pr.pr)).toEqual(prs.map((pr) => pr.number));
     expect(result.notes).toEqual(["Strata cannot read the verification of #99 from GitHub."]);
     expect(result.prs[1]?.flags.map((flag) => flag.kind)).toEqual(["no-checks", "claimed-only"]);
+    // The PRs' own words come back too, for the why.
+    expect(result.texts.map((text) => text.number)).toEqual(prs.map((pr) => pr.number));
+    expect(result.texts[1]?.body).toContain("pytest");
+  });
+
+  it("returns the issues that each PR closes", async () => {
+    const prs = [prNode(5, "5".padStart(40, "0"))];
+    const github = fakeGitHub("acme/app", prs);
+    const issue = { number: 77, title: "Slow forecasts", body: "Pages time out.", url: "u" };
+    github.verification[5] = { closingIssuesReferences: { nodes: [issue, null] } };
+    const result = await readVerification(github, "acme/app", [{ number: 5, files: null }]);
+    expect(result.texts[0]?.issues).toEqual([issue]);
+    expect(verificationQuery([5])).toContain("closingIssuesReferences(first: 5)");
   });
 
   it("names each PR once in the query", () => {

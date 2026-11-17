@@ -224,3 +224,39 @@ export async function gitVersion(): Promise<[number, number]> {
   const match = /(\d+)\.(\d+)/.exec(out);
   return match ? [Number(match[1]), Number(match[2])] : [0, 0];
 }
+
+/** A commit's id and full message. */
+export interface CommitMessage {
+  oid: string;
+  message: string;
+}
+
+/**
+ * The messages of the commits in `to` but not in `from`, oldest first, with
+ * no merges. At most `limit` of them, the newest kept. Empty when git does
+ * not have one of the two.
+ */
+export async function commitMessages(
+  gitDir: string,
+  from: string,
+  to: string,
+  limit = 30,
+): Promise<CommitMessage[]> {
+  const result = await git(gitDir, [
+    "log",
+    "--no-merges",
+    `--max-count=${limit}`,
+    "--format=%H%x1f%B%x1e",
+    to,
+    `^${from}`,
+    "--",
+  ]);
+  if (result.code !== 0) return [];
+  return result.stdout
+    .split("\x1e")
+    .flatMap((record) => {
+      const [oid, message] = record.replace(/^\n+/, "").split("\x1f");
+      return oid && message !== undefined ? [{ oid: oid.trim(), message: message.trim() }] : [];
+    })
+    .reverse();
+}

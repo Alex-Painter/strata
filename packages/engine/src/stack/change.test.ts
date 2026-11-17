@@ -198,9 +198,26 @@ describe("engine.analyzeChange summaries", () => {
         create: async (body: { system: string }) => {
           bodies.push(body);
           const sentence = [{ text: "Adds a note.", hunks: ["h1"] }];
-          const answer = body.system.includes("one pull request")
-            ? { summary: sentence }
-            : { summary: sentence, sections: [{ title: "Notes", groups: ["g1"], about: [] }] };
+          const answer = body.system.includes("why a code change exists")
+            ? {
+                why: [
+                  {
+                    text: "Support needs notes on each account.",
+                    sources: [{ label: "d2", quote: "support asked for notes" }],
+                  },
+                  {
+                    text: "Quotes words that are not there.",
+                    sources: [{ label: "d2", quote: "nope" }],
+                  },
+                  {
+                    text: "Cites a label that is not there.",
+                    sources: [{ label: "d9", quote: "x" }],
+                  },
+                ],
+              }
+            : body.system.includes("one pull request")
+              ? { summary: sentence }
+              : { summary: sentence, sections: [{ title: "Notes", groups: ["g1"], about: [] }] };
           return {
             stop_reason: "end_turn",
             content: [{ type: "text", text: JSON.stringify(answer), citations: null }],
@@ -248,10 +265,12 @@ describe("engine.analyzeChange summaries", () => {
       "Cloning acme/app into the cache (first time only)",
       "Fetching branches and 3 PR heads from acme/app",
       "Building the diffs",
-      "Writing summaries",
       "Reading checks, reviews and verification for each PR",
+      "Writing summaries",
     ]);
+    // No PR says why, so Claude is not asked why.
     expect(bodies).toHaveLength(4);
+    expect(report.why).toBeUndefined();
     expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);
     expect(report.summary[0]?.evidence[0]?.anchor.source).toEqual({
       kind: "hunk",
@@ -274,6 +293,42 @@ describe("engine.analyzeChange summaries", () => {
     );
     expect(bodies).toHaveLength(4);
     expect(again.summary).toEqual(report.summary);
+  });
+
+  it("writes the why from a PR description, and keeps only quotes that are in it", async () => {
+    await allowClaude();
+    demo.github.verification[2] = {
+      body: "## Why\n\nSupport asked for notes on each account.\n\n## Testing\n\n- pytest passed\n",
+    };
+    const { client, bodies } = fakeClaude();
+    const report = await engine({ anthropicClient: client }).analyzeChange(
+      parseChangeInput("acme/app#3"),
+    );
+    const asked = bodies.find((body) =>
+      body.system.includes("why a code change exists"),
+    ) as unknown as {
+      messages: Array<{ content: string }>;
+    };
+    const prompt = asked.messages[0]?.content ?? "";
+    expect(prompt).toContain("d2 PR description: Add the forecast service");
+    expect(prompt).toContain("Support asked for notes on each account.");
+    // The proof section is for Verification, not the why.
+    expect(prompt).not.toContain("pytest");
+    expect(report.why?.map((claim) => claim.text)).toEqual([
+      "Support needs notes on each account.",
+    ]);
+    const evidence = report.why?.[0]?.evidence[0];
+    expect(evidence?.label).toBe("#2 description");
+    expect(evidence?.anchor.quote?.exact).toBe("support asked for notes");
+    const source = report.sources.find(
+      (item) =>
+        evidence?.anchor.source.kind === "context" && item.id === evidence.anchor.source.sourceId,
+    );
+    expect(source).toMatchObject({
+      kind: "pr-description",
+      title: "#2 Add the forecast service",
+      fromPrs: true,
+    });
   });
 
   it("leaves the summaries for later when asked, and says so", async () => {

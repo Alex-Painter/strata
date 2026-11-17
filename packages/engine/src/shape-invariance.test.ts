@@ -70,7 +70,9 @@ function fakeClaude() {
   return { client, bodies };
 }
 
-const isWhole = (body: Analysed["bodies"][number]) => !body.system.includes("one pull request");
+/** The whole-stack summary's requests: not a PR's, and not the why, which reads the authors' text. */
+const isWhole = (body: Analysed["bodies"][number]) =>
+  !body.system.includes("one pull request") && !body.system.includes("why a code change exists");
 
 const analysed = new Map<FeatureShape, Analysed>();
 /** The stack shape's code given as a plain range, with no PRs at all. */
@@ -314,7 +316,9 @@ describe("shape invariance", () => {
       stableStringify(canonicalReport(stack.report)),
     );
     expect(range.asked).toEqual(stack.asked);
-    expect(JSON.stringify(range.bodies)).toBe(JSON.stringify(stack.bodies.filter(isWhole)));
+    expect(JSON.stringify(range.bodies.filter(isWhole))).toBe(
+      JSON.stringify(stack.bodies.filter(isWhole)),
+    );
   });
 
   it("gives a fork two paths, and the Change for one of them", () => {

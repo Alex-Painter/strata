@@ -21,9 +21,10 @@ import {
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "../api.js";
 import type { RepoCache } from "../git/cache.js";
+import { type CommitMessage, commitMessages } from "../git/diff.js";
 import type { GitHubPort } from "../github/port.js";
-import { readVerification } from "../github/verification.js";
-import { type ClaudeSteps, summarise, wholeNotes } from "../whole.js";
+import { type PrText, readVerification } from "../github/verification.js";
+import { type ClaudeSteps, explainWhy, summarise, wholeNotes } from "../whole.js";
 import { buildStackDiffs, type StackDiffs } from "./parts.js";
 import { resolveStack } from "./resolve.js";
 
@@ -141,17 +142,38 @@ export async function stackReport(
     ...(options.signal ? { signal: options.signal } : {}),
   });
   const whole = diffs.whole;
-  const summaries = await summarise(whole?.model ?? null, diffs.parts, meta, options);
+  const path = resolved.stack.selectedPath;
+  // Read first: the why reads the PRs' titles, bodies and issues from the same query.
+  const read = meta.github
+    ? await verificationOf(meta.github, resolved, path, diffs, options)
+    : undefined;
+  const { texts = [], ...verification } = read ?? {};
+  const [summaries, why] = await Promise.all([
+    summarise(whole?.model ?? null, diffs.parts, meta, options),
+    meta.ask
+      ? explainWhy(
+          {
+            repo: resolved.stack.repo,
+            prs: texts,
+            commits: await pathCommits(resolved, path),
+            whole: whole?.model ?? null,
+          },
+          meta,
+          options,
+        )
+      : { why: [], sources: [], notes: [] },
+  ]);
   // Notes that depend on how the work was split go on the stack, out of the whole-stack view.
   const stack: Stack = {
     ...resolved.stack,
     issues: [...resolved.stack.issues, ...diffs.issues],
-    notes: [...resolved.stack.notes, ...diffNotes(resolved.stack, diffs), ...summaries.partNotes],
+    notes: [
+      ...resolved.stack.notes,
+      ...diffNotes(resolved.stack, diffs),
+      ...summaries.partNotes,
+      ...why.notes,
+    ],
   };
-  const path = stack.selectedPath;
-  const verification = meta.github
-    ? await verificationOf(meta.github, resolved, path, diffs, options)
-    : undefined;
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -172,8 +194,9 @@ export async function stackReport(
     },
     stack,
     parts: diffs.parts.map((part) => ({ ...part, summary: summaries.parts.get(part.pr) ?? [] })),
-    sources: options.sources ?? [],
-    ...(verification ? { verification } : {}),
+    sources: [...(options.sources ?? []), ...why.sources],
+    ...(read ? { verification: verification as Verification } : {}),
+    ...(why.why.length > 0 ? { why: why.why } : {}),
     summary: summaries.summary,
     guide: summaries.guide,
     layerSummaries: [],
@@ -194,6 +217,31 @@ export async function stackReport(
   };
 }
 
+/**
+ * The commits of each PR on the path, from its base as GitHub recorded it to
+ * its head, oldest first and each once. A PR whose commits git does not have
+ * gives none.
+ */
+async function pathCommits(
+  resolved: ResolvedChange & { stack: Stack },
+  path: number[],
+): Promise<CommitMessage[]> {
+  const nodes = new Map(resolved.stack.nodes.map((node) => [node.pr.number, node]));
+  const seen = new Set<string>();
+  const out: CommitMessage[] = [];
+  for (const number of path) {
+    const node = nodes.get(number);
+    const from = node?.pr.baseOid ?? node?.anchor ?? resolved.stack.base;
+    if (!node || !from) continue;
+    for (const commit of await commitMessages(resolved.gitDir, from, node.pr.headOid)) {
+      if (seen.has(commit.oid)) continue;
+      seen.add(commit.oid);
+      out.push(commit);
+    }
+  }
+  return out;
+}
+
 /** A failure to read GitHub costs the report its verification, not the whole run. */
 async function verificationOf(
   github: GitHubPort,
@@ -201,7 +249,7 @@ async function verificationOf(
   path: number[],
   diffs: StackDiffs,
   options: AnalyzeOptions,
-): Promise<Verification> {
+): Promise<Verification & { texts?: PrText[] }> {
   options.onProgress?.("Reading checks, reviews and verification for each PR");
   const files = new Map(diffs.parts.map((part) => [part.pr, part.files]));
   try {

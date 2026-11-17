@@ -18,8 +18,8 @@ import {
 } from "@strata/core";
 import type { AnalyzeOptions, ResolvedChange } from "./api.js";
 import type { RepoCache } from "./git/cache.js";
-import { mergeBase, resolveCommit } from "./git/diff.js";
-import { buildWholeDiff, type ClaudeSteps, summarise, wholeNotes } from "./whole.js";
+import { commitMessages, mergeBase, resolveCommit } from "./git/diff.js";
+import { buildWholeDiff, type ClaudeSteps, explainWhy, summarise, wholeNotes } from "./whole.js";
 
 export type RangeInput = Extract<ChangeInput, { kind: "range" }>;
 
@@ -70,7 +70,21 @@ export async function rangeReport(
     ...(options.signal ? { signal: options.signal } : {}),
   });
   const model = whole?.model ?? null;
-  const summaries = await summarise(model, [], meta, options);
+  const [summaries, why] = await Promise.all([
+    summarise(model, [], meta, options),
+    meta.ask
+      ? explainWhy(
+          {
+            repo: describeRepo(resolved.repo),
+            prs: [],
+            commits: await commitMessages(resolved.gitDir, base, head),
+            whole: model,
+          },
+          meta,
+          options,
+        )
+      : { why: [], sources: [], notes: [] },
+  ]);
   return {
     schemaVersion: REPORT_SCHEMA_VERSION,
     change: {
@@ -85,12 +99,18 @@ export async function rangeReport(
     },
     stack: null,
     parts: [],
-    sources: options.sources ?? [],
+    sources: [...(options.sources ?? []), ...why.sources],
+    ...(why.why.length > 0 ? { why: why.why } : {}),
     summary: summaries.summary,
     guide: summaries.guide,
     layerSummaries: [],
     diagrams: [],
-    notes: [...layerNotes, ...wholeNotes(resolved.repo, model, meta), ...summaries.notes],
+    notes: [
+      ...layerNotes,
+      ...wholeNotes(resolved.repo, model, meta),
+      ...summaries.notes,
+      ...why.notes,
+    ],
     raw: { diff: whole?.diff ?? "" },
     analysis: {
       engineVersion: meta.engineVersion,

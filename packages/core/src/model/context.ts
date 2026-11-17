@@ -5,7 +5,14 @@
  * text so they can be shown side by side with the code, highlighted, quoted
  * into chat and cited as evidence through the same anchor model.
  */
-export type ContextKind = "spec" | "ticket" | "pr-description" | "transcript" | "design" | "note";
+export type ContextKind =
+  | "spec"
+  | "ticket"
+  | "pr-description"
+  | "commit"
+  | "transcript"
+  | "design"
+  | "note";
 
 export interface ContextSource {
   /** Content-derived, so re-importing the same text keeps anchors valid. */
@@ -16,4 +23,9 @@ export interface ContextSource {
   url?: string;
   /** Plain text or Markdown, with secrets redacted before storage. */
   content: string;
+  /**
+   * True when Strata read it from the PRs: a description, a linked issue or a
+   * commit message. Such text depends on how the work was split.
+   */
+  fromPrs?: boolean;
 }

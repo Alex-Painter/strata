@@ -24,6 +24,7 @@ import { judgeLayers, type LayerJudge } from "./layers/judge.js";
 import type { AskJson } from "./llm.js";
 import type { RepoSettings } from "./settings.js";
 import { type Summaries, writeSummaries } from "./summaries/summaries.js";
+import { type WhyInput, type WhyResult, writeWhy } from "./summaries/why.js";
 
 export interface WholeDiff {
   from: string;
@@ -105,6 +106,16 @@ export async function summarise(
     notes: [],
     partNotes: [],
   };
+}
+
+/** Claude's why when the repo allows the summaries; otherwise none. */
+export async function explainWhy(
+  input: WhyInput,
+  steps: ClaudeSteps,
+  options: { signal?: AbortSignal },
+): Promise<WhyResult> {
+  if (!steps.ask) return { why: [], sources: [], notes: [] };
+  return writeWhy(input, steps.ask, options.signal);
 }
 
 /** Says what Strata guessed or skipped about the whole diff, and how to change that. */

@@ -16,6 +16,7 @@ export function canonicalReport(report: ChangeReport): unknown {
     stack: _stack,
     parts: _parts,
     verification: _verification,
+    why: _why,
     change,
     sources,
     ...rest
@@ -24,8 +25,9 @@ export function canonicalReport(report: ChangeReport): unknown {
   return {
     ...rest,
     change: whole,
-    // A stack has one description per PR, so they depend on the split.
-    sources: sources.filter((source) => source.kind !== "pr-description"),
+    // A stack has one description per PR, so they depend on the split, and so does
+    // the text read from them and from their commits, and the why written from it.
+    sources: sources.filter((source) => source.kind !== "pr-description" && !source.fromPrs),
   };
 }
 

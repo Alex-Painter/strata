@@ -375,8 +375,10 @@ export const forcePushed = (before: string, after: string, minute: number): Time
 function verificationNode(pr: PrNode, given: Partial<VerificationNode>): VerificationNode {
   return {
     number: pr.number,
+    title: pr.title,
     url: pr.url,
     body: null,
+    closingIssuesReferences: null,
     createdAt: pr.createdAt,
     lastEditedAt: null,
     headRefOid: pr.headRefOid,

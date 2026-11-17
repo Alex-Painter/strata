@@ -10,6 +10,9 @@
  *   groups first, then the data model; the other groups are left for Strata
  *   to place.
  * - One PR: a sentence per file, three at most.
+ * - Why: one sentence that quotes the first line of the first PR description,
+ *   issue or commit that has text, plus one with a quote that is not in its
+ *   source, which Strata must drop.
  * - Chat (a streamed request with tools): first it reads the first hunk the
  *   system prompt lists, then it answers in one sentence that cites that hunk
  *   and a hunk that does not exist, which Strata must drop.
@@ -32,9 +35,11 @@ export function fixtureClaude(body: MessageBody): unknown {
   const prompt = body.messages[0]?.content ?? "";
   const answer = body.system.includes("sort the files of a code change")
     ? { files: sorted(prompt) }
-    : body.system.includes("one pull request")
-      ? { summary: partSummary(prompt) }
-      : wholeStack(prompt);
+    : body.system.includes("why a code change exists")
+      ? { why: why(prompt) }
+      : body.system.includes("one pull request")
+        ? { summary: partSummary(prompt) }
+        : wholeStack(prompt);
   return {
     id: "msg_fixture",
     type: "message",
@@ -45,6 +50,28 @@ export function fixtureClaude(body: MessageBody): unknown {
     stop_sequence: null,
     usage: { input_tokens: 0, output_tokens: 0 },
   };
+}
+
+function why(prompt: string) {
+  let label: string | null = null;
+  let words = "";
+  for (const line of prompt.slice(prompt.indexOf("The sources:")).split("\n")) {
+    const head = /^([dich]\d+) /.exec(line);
+    if (head) {
+      label = head[1] as string;
+      continue;
+    }
+    const text = line.trim();
+    if (!label || !/^[dic]/.test(label) || !text || text.startsWith("#") || text.startsWith("("))
+      continue;
+    words = text.split(/\s+/).slice(0, 8).join(" ");
+    break;
+  }
+  if (!label || !words) return [];
+  return [
+    { text: `The authors say: ${words}.`, sources: [{ label, quote: words }] },
+    { text: "This sentence quotes words that are not there.", sources: [{ label, quote: "zzz" }] },
+  ];
 }
 
 function sorted(prompt: string) {

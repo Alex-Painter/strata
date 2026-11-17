@@ -20,7 +20,7 @@ import type { Verification } from "./verification.js";
  * 5: where each PR's lines went (PrPart.provenance).
  * 6: the Guide, and a summary for the whole stack and for each PR.
  * 7: notes about the split moved to the stack, and each PR's baseOid.
- * 8: the inspect rules each file matched. Later, optional: `verification`.
+ * 8: the inspect rules each file matched. Later, optional: `verification`, `why`.
  */
 export const REPORT_SCHEMA_VERSION = 8;
 
@@ -98,6 +98,15 @@ export interface ChangeReport {
   verification?: Verification;
   /** Absent until the steps that decide it exist. */
   verdict?: Verdict;
+  /**
+   * One to four sentences on why the Change exists, each citing the text it
+   * rests on: a PR description, a linked issue or a commit message in
+   * `sources`, or a comment or test name in a hunk. It reads the authors' own
+   * words, which depend on how the work was split, so it stays out of
+   * shape-invariance comparisons. Absent when nothing says why, or in reports
+   * from before Strata wrote it.
+   */
+  why?: Claim[];
   /** Three to six sentences about the whole stack, from its diff alone. */
   summary: Claim[];
   guide: Guide;
