@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { guideIn } from "../workspace/model";
 import { ClaimList } from "./Claims";
 import { GuideView } from "./Guide";
+import { WhyText } from "./Why";
 
 const adding = (path: string, ...lines: string[]) =>
   `diff --git a/${path} b/${path}\nnew file mode 100644\n--- /dev/null\n+++ b/${path}\n@@ -0,0 +1,${lines.length} @@\n${lines.map((l) => `+${l}`).join("\n")}\n`;
@@ -211,5 +212,64 @@ describe("GuideView", () => {
     expect(item.querySelector('ul[aria-label="Files in Forecasts"]')?.textContent).toBe(
       "app/models/account.py",
     );
+  });
+});
+
+describe("WhyText", () => {
+  const source = {
+    id: "ctx_1",
+    kind: "pr-description" as const,
+    title: "#9 Cache forecasts",
+    url: "https://github.com/acme/app/pull/9",
+    content: "Cache forecasts\n\nBig accounts time out.",
+    fromPrs: true,
+  };
+  const why = (text: string, sourceId: string, ...cited: Hunk[]): Claim => ({
+    text,
+    confidence: "medium",
+    evidence: [
+      {
+        anchor: {
+          source: { kind: "context", sourceId },
+          quote: { exact: "Big accounts time out", prefix: "", suffix: "" },
+        },
+        label: "#9 description",
+      },
+      ...claim("", ...cited).evidence,
+    ],
+  });
+
+  it("shows one paragraph with a chip per source, and selects the sentence", () => {
+    const onSelect = vi.fn();
+    const claims = [why("Big accounts time out.", "ctx_1", model)];
+    const page = mount(
+      <WhyText
+        claims={claims}
+        sources={[source]}
+        hunks={hunks}
+        selected={null}
+        onSelect={onSelect}
+      />,
+    );
+    const paragraph = page.querySelector("p[data-why]");
+    expect(paragraph?.textContent).toBe("Big accounts time out. #9 description1 hunk ");
+    const [quoted, hunk] = paragraph?.querySelectorAll("button") ?? [];
+    expect(quoted?.getAttribute("title")).toBe("“Big accounts time out”");
+    expect(hunk?.getAttribute("aria-label")).toBe("1 hunk: app/models/account.py:1");
+    act(() => (quoted as HTMLButtonElement).click());
+    expect(onSelect).toHaveBeenCalledWith(claims[0]);
+  });
+
+  it("shows no sentence that quotes nothing", () => {
+    const page = mount(
+      <WhyText
+        claims={[claim("Only code.", model)]}
+        sources={[source]}
+        hunks={hunks}
+        selected={null}
+        onSelect={() => {}}
+      />,
+    );
+    expect(page.querySelector("p[data-why]")).toBeNull();
   });
 });

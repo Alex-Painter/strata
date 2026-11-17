@@ -23,6 +23,7 @@ import { LayerMatrixView } from "../components/LayerMatrix";
 import { StateBadge } from "../components/PrStatus";
 import { Spinner } from "../components/Spinner";
 import { PrVerificationView, StackVerification } from "../components/Verification";
+import { WhyText } from "../components/Why";
 import {
   ago,
   CHECKS_LABEL,
@@ -194,16 +195,28 @@ function WholeSummary({
   onLayer,
   of,
 }: OverviewProps & { of: "stack" | "range" }) {
+  const why = report.why ?? [];
   return (
     <>
-      {report.summary.length > 0 && (
+      {(report.summary.length > 0 || why.length > 0) && (
         <section aria-labelledby="summary-heading" className="grid gap-2">
           <h2 id="summary-heading" className="h2">
             Summary
             <Info
-              text={`This summary uses only the ${of === "stack" ? "whole-stack diff" : "range's diff"}. Each sentence names the hunks that it rests on.`}
+              text={
+                why.length > 0
+                  ? `The first paragraph says why, from the PR descriptions, linked issues, commits, comments and tests. The list uses only the ${of === "stack" ? "whole-stack diff" : "range's diff"}. Each sentence names what it rests on.`
+                  : `This summary uses only the ${of === "stack" ? "whole-stack diff" : "range's diff"}. Each sentence names the hunks that it rests on.`
+              }
             />
           </h2>
+          <WhyText
+            claims={why}
+            sources={report.sources}
+            hunks={diff.byId}
+            selected={selected}
+            onSelect={onClaim}
+          />
           <ClaimList
             claims={report.summary}
             numbered

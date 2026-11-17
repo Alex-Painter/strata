@@ -13,6 +13,7 @@ import { Counts, layerFact, meaningful } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { Info } from "../components/Info";
 import { Spinner } from "../components/Spinner";
+import { quotedSources } from "../components/Why";
 import { ago, countPrs, FILE_STATUS, stateLabel } from "../lib/format";
 import { type ReviewStatusKind, reviewStatus } from "../lib/status";
 import { citedIds, claimsIn, hunksOf, plural, type ScopedDiff, type Selection } from "./model";
@@ -124,6 +125,7 @@ export function Details({
     }
   } else if (diff && selection?.kind === "claim") {
     const cited = citedHunks(selection.claim, diff.byId);
+    const quoted = report ? quotedSources(selection.claim, report.sources) : [];
     body = (
       <>
         <div className="grid gap-1">
@@ -132,28 +134,48 @@ export function Details({
             From {selection.by} · {selection.claim.confidence} confidence
           </p>
         </div>
-        <Section title="Evidence" count={cited.length}>
-          <div className="grid">
-            {cited.map((hunk) => (
-              <button
-                key={hunk.id}
-                type="button"
-                className="evrow"
-                onClick={() => onReveal({ kind: "hunk", id: hunk.id })}
-              >
-                <span className="f">
-                  {hunk.path}:{hunk.newStart}
-                </span>
-              </button>
-            ))}
-          </div>
-          {cited.length < citedIds(selection.claim).length && (
-            <p className="sub">
-              {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} are not in
-              this diff.
-            </p>
-          )}
-        </Section>
+        {quoted.length > 0 && (
+          <Section title="Sources" count={quoted.length}>
+            <div className="grid gap-2">
+              {quoted.map(({ evidence, source, quote }) => (
+                <div key={`${evidence.label}:${quote}`} className="grid gap-0.5">
+                  {source?.url ? (
+                    <a className="f lnk" href={source.url} target="_blank" rel="noreferrer">
+                      {source.title}
+                    </a>
+                  ) : (
+                    <span className="f">{source?.title ?? evidence.label}</span>
+                  )}
+                  <blockquote className="quote">“{quote}”</blockquote>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+        {(cited.length > 0 || quoted.length === 0) && (
+          <Section title="Evidence" count={cited.length}>
+            <div className="grid">
+              {cited.map((hunk) => (
+                <button
+                  key={hunk.id}
+                  type="button"
+                  className="evrow"
+                  onClick={() => onReveal({ kind: "hunk", id: hunk.id })}
+                >
+                  <span className="f">
+                    {hunk.path}:{hunk.newStart}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {cited.length < citedIds(selection.claim).length && (
+              <p className="sub">
+                {plural(citedIds(selection.claim).length - cited.length, "cited hunk")} are not in
+                this diff.
+              </p>
+            )}
+          </Section>
+        )}
       </>
     );
   }

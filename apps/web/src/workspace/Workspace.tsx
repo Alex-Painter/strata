@@ -701,6 +701,7 @@ export function Workspace({
 
 /** Where a whole-diff sentence was written from: the summary, or a Guide section. */
 function claimSource(report: ChangeReport, claim: Claim): string {
+  if (report.why?.includes(claim)) return "the PR descriptions, issues and commits";
   const section = report.guide.sections.find((s) => s.about.includes(claim));
   if (section) return `the Guide's “${section.title}”`;
   return report.stack ? "the whole-stack diff" : "the range's diff";

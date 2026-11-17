@@ -26,6 +26,11 @@ export const FEATURES: Record<string, { label: string; color: string; info: stri
     color: "var(--chg)",
     info: "Claude writes the summary of the whole stack and the Guide.",
   },
+  "change-why": {
+    label: "Why",
+    color: "var(--accent)",
+    info: "Claude says why the Change exists, from the PR descriptions, commits, comments and tests.",
+  },
   chat: {
     label: "Ask",
     color: "var(--hl-number)",

@@ -1,6 +1,6 @@
 # Usage
 
-The Usage page shows what Strata sent to Claude in the last 7, 30 or 90 days, and its estimated cost. It groups the cost by day, by feature (Layers, PR summaries, Whole-stack summary and Guide, Ask) and by Change. With an Admin API key on the server, it also shows the amount that Anthropic bills. The numbers come from `llm-usage.jsonl` in the data folder, the same file that `strata usage` reads. The page makes no Claude request.
+The Usage page shows what Strata sent to Claude in the last 7, 30 or 90 days, and its estimated cost. It groups the cost by day, by feature (Layers, PR summaries, Whole-stack summary and Guide, Why, Ask) and by Change. With an Admin API key on the server, it also shows the amount that Anthropic bills. The numbers come from `llm-usage.jsonl` in the data folder, the same file that `strata usage` reads. The page makes no Claude request.
 
 ## Sub-features
 
