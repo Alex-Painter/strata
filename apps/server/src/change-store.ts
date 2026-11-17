@@ -61,15 +61,20 @@ export function backfillPathPrs(db: Db) {
 }
 
 /**
- * Gives each Change the title of its latest report: the stack's name, when
- * Claude wrote one. An older search set titles back to the bottom PR's title.
+ * Gives each Change the title of its latest report with Claude's summary:
+ * the name Claude gave the stack. An older search set titles back to the
+ * bottom PR's title. A run without a summary (such as the assignment
+ * search's, which leaves it for later) has only that title, thus it does not
+ * count, and a Change with no such report keeps its title.
  */
 export function backfillTitles(db: Db) {
   for (const row of db.select().from(changes).all()) {
     const report = db
       .select({ title: sql<string | null>`json_extract(${reports.body}, '$.change.title')` })
       .from(reports)
-      .where(eq(reports.changeId, row.id))
+      .where(
+        and(eq(reports.changeId, row.id), sql`json_array_length(${reports.body}, '$.summary') > 0`),
+      )
       .orderBy(desc(reports.createdAt))
       .get();
     if (report?.title && report.title !== row.title) {

@@ -16,7 +16,11 @@ import { AssignedSearch } from "./assigned.js";
 import { backfillTitles } from "./change-store.js";
 import { loadConfig } from "./config.js";
 import { openDatabase } from "./db/client.js";
-import { changes as changesTable, runs as runsTable } from "./db/schema.js";
+import {
+  changes as changesTable,
+  reports as reportsTable,
+  runs as runsTable,
+} from "./db/schema.js";
 import { engineFactory } from "./engines.js";
 import { Jobs } from "./jobs.js";
 import { RunQueue } from "./runs.js";
@@ -261,15 +265,29 @@ describe("the assignment search", () => {
     expect((await list()).map((change) => change.title)).toEqual(["A name for the stack"]);
   });
 
-  it("gives a Change its latest report's title again at start", async () => {
+  it("gives a Change the name from its latest report with summaries again at start", async () => {
     demo.github.requests = { 4: { assignees: ["alex"] } };
     const { db, runs, assigned, list } = setup();
     await assigned.search(USER);
     await runs.idle();
-    const [reported] = (await list()).map((change) => change.title);
+    const titles = async () => (await list()).map((change) => change.title);
+    // The search's run has no summaries, thus only the bottom PR's title: it keeps Claude's name.
+    db.update(changesTable).set({ title: "A name for the stack" }).run();
+    backfillTitles(db);
+    expect(await titles()).toEqual(["A name for the stack"]);
+
+    // A run with summaries carries Claude's name, which comes back over an old search's title.
+    const [report] = db.select().from(reportsTable).all();
+    if (!report) throw new Error("The run saved no report.");
+    const body = JSON.parse(report.body);
+    body.change.title = "Claude's name";
+    body.summary = [{ text: "It adds a cache.", confidence: "high", evidence: [] }];
+    db.update(reportsTable)
+      .set({ body: JSON.stringify(body) })
+      .run();
     db.update(changesTable).set({ title: "A title that an old search wrote" }).run();
     backfillTitles(db);
-    expect((await list()).map((change) => change.title)).toEqual([reported]);
+    expect(await titles()).toEqual(["Claude's name"]);
   });
 
   it("keeps a Change once GitHub stops listing its PR, no longer waiting", async () => {
