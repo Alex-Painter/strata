@@ -137,11 +137,11 @@ describe("engine.analyzeChange for stacks", () => {
     ]);
     expect(report.analysis.model).toBeUndefined();
     expect(steps).toEqual([
-      "Strata finds the stack",
-      "Strata clones acme/app into its cache (only one time)",
-      "Strata fetches the branches of acme/app and 3 PR heads",
-      "Strata makes the diffs",
-      "Strata reads the checks, reviews and verification of each PR",
+      "Finding the stack",
+      "Cloning acme/app into the cache (first time only)",
+      "Fetching branches and 3 PR heads from acme/app",
+      "Building the diffs",
+      "Reading checks, reviews and verification for each PR",
     ]);
   });
 
@@ -223,7 +223,7 @@ describe("engine.analyzeChange summaries", () => {
       "There is no summary, and the Guide shows Strata's own groups. This repo lets Claude " +
         "write them, but Strata does not have an Anthropic API key.",
     ]);
-    expect(steps).not.toContain("Claude writes the summaries");
+    expect(steps).not.toContain("Writing summaries");
   });
 
   it("never asks Claude about a repo that doesn't allow it, even with a key", async () => {
@@ -244,12 +244,12 @@ describe("engine.analyzeChange summaries", () => {
       { onProgress: (step) => steps.push(step) },
     );
     expect(steps).toEqual([
-      "Strata finds the stack",
-      "Strata clones acme/app into its cache (only one time)",
-      "Strata fetches the branches of acme/app and 3 PR heads",
-      "Strata makes the diffs",
-      "Claude writes the summaries",
-      "Strata reads the checks, reviews and verification of each PR",
+      "Finding the stack",
+      "Cloning acme/app into the cache (first time only)",
+      "Fetching branches and 3 PR heads from acme/app",
+      "Building the diffs",
+      "Writing summaries",
+      "Reading checks, reviews and verification for each PR",
     ]);
     expect(bodies).toHaveLength(4);
     expect(report.summary.map((claim) => claim.text)).toEqual(["Adds a note."]);
@@ -285,7 +285,7 @@ describe("engine.analyzeChange summaries", () => {
       { deferSummaries: true, onProgress: (step) => steps.push(step) },
     );
     expect(bodies).toEqual([]);
-    expect(steps).not.toContain("Claude writes the summaries");
+    expect(steps).not.toContain("Writing summaries");
     expect(report.summary).toEqual([]);
     expect(report.guide.by).not.toBe("llm");
     expect(report.notes).toEqual([

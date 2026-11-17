@@ -413,7 +413,7 @@ export function Workspace({
           <Breadcrumb items={[...(me ? [{ label: "Changes", href: "/" }] : []), { label: name }]} />
           <span
             className="pill status ml-1.5 gap-1.5"
-            title={report?.verdict?.headline ?? "Strata does not give a verdict at this time."}
+            title={report?.verdict?.headline ?? "No verdict yet."}
           >
             {working(run) && <Spinner />}
             {statusWord(report, run)}

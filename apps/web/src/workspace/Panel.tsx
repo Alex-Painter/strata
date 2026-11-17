@@ -237,9 +237,7 @@ function Overview({
   fresh: PathPr[];
 }) {
   if (!report) {
-    return (
-      <p className="text-muted">{run?.loading ? "Loading…" : "There is no report at this time."}</p>
-    );
+    return <p className="text-muted">{run?.loading ? "Loading…" : "No report yet."}</p>;
   }
   const stack = report.stack;
   const path = stack?.selectedPath ?? [];
@@ -288,7 +286,7 @@ function Overview({
             <Prop term="Status">
               <span
                 className="inline-flex items-center gap-2"
-                title={report.verdict?.headline ?? "Strata does not give a verdict at this time."}
+                title={report.verdict?.headline ?? "No verdict yet."}
               >
                 {working(run) && <Spinner />}
                 {statusWord(report, run)}

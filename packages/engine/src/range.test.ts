@@ -46,10 +46,10 @@ describe("ranges", () => {
       onProgress: (step) => steps.push(step),
     });
     expect(steps).toEqual([
-      "Strata finds the range",
-      "Strata clones acme/app into its cache (only one time)",
-      "Strata fetches the branches of acme/app",
-      "Strata makes the diff",
+      "Finding the range",
+      "Cloning acme/app into the cache (first time only)",
+      "Fetching branches from acme/app",
+      "Building the diff",
     ]);
     expect(range.stack).toBeNull();
     expect(range.parts).toEqual([]);

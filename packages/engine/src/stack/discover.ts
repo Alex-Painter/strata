@@ -29,9 +29,7 @@ export async function discoverStacks(
   const covered = new Set<number>();
   const groups = groupsToFind(index, options.open);
   for (const [i, group] of groups.entries()) {
-    options.onProgress?.(
-      `Strata finds the stacks: ${i} of ${groups.length} groups of linked PRs are complete`,
-    );
+    options.onProgress?.(`Finding stacks: ${i} of ${groups.length} PR groups done`);
     for (const number of group) {
       if (covered.has(number)) continue;
       let stack = await resolveStack(index, { pr: number }, gitDir, options);

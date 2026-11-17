@@ -25,7 +25,7 @@ export function SettingsPage({ me }: { me: MeResponse }) {
           </section>
           {assigned.error && <p className="alert">{assigned.error.message}</p>}
           {assigned.data && repos.length === 0 && (
-            <div className="empty">Strata does not search a repo at this time.</div>
+            <div className="empty">No repos to search yet.</div>
           )}
           {repos.map((repo) => (
             <section key={repo} className="grid gap-3" aria-label={repo}>

@@ -101,19 +101,19 @@ export const createEngine: CreateEngine = (config) => {
           ...(llm ? { model: llm.models["whole-summary"] } : {}),
         };
         if (gh.kind === "range") {
-          options.onProgress?.("Strata finds the range");
+          options.onProgress?.("Finding the range");
           const resolved = await resolveRangeChange(
             gh,
             await openCache(config, repo, options.onProgress),
           );
           options.signal?.throwIfAborted();
-          options.onProgress?.("Strata makes the diff");
+          options.onProgress?.("Building the diff");
           return rangeReport(resolved, options, meta);
         }
-        options.onProgress?.("Strata finds the stack");
+        options.onProgress?.("Finding the stack");
         const resolved = await resolveStackInput(config, gh, options.onProgress);
         options.signal?.throwIfAborted();
-        options.onProgress?.("Strata makes the diffs");
+        options.onProgress?.("Building the diffs");
         return stackReport(resolved, options, { ...meta, github: githubPort(config) });
       });
     },

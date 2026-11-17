@@ -71,7 +71,7 @@ export class RepoCache {
     ];
     const pulls = new Set(refs.pulls).size;
     this.options.log?.(
-      `Strata fetches the branches of ${this.repo}${pulls > 0 ? ` and ${pulls} PR heads` : ""}`,
+      `Fetching branches${pulls > 0 ? ` and ${pulls} PR heads` : ""} from ${this.repo}`,
     );
     await gitOk(
       this.gitDir,
@@ -97,8 +97,8 @@ export class RepoCache {
     const { checkout } = this.options;
     this.options.log?.(
       checkout
-        ? `Strata clones ${this.repo} into its cache and uses the objects in ${checkout}`
-        : `Strata clones ${this.repo} into its cache (only one time)`,
+        ? `Cloning ${this.repo} into the cache, reusing objects from ${checkout}`
+        : `Cloning ${this.repo} into the cache (first time only)`,
     );
     await mkdir(dirname(this.gitDir), { recursive: true });
     await gitOk(

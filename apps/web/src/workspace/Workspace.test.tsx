@@ -202,8 +202,8 @@ describe("Workspace", () => {
       act(() => root?.unmount());
       return text;
     };
-    expect(status("Strata reads PRs from GitHub: 350 at this time")).toBe(
-      "Strata refreshes the report. Strata reads PRs from GitHub: 350 at this time…",
+    expect(status("Reading PRs from GitHub: 350 so far")).toBe(
+      "Refreshing report… Reading PRs from GitHub: 350 so far…",
     );
   });
 

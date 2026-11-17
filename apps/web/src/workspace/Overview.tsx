@@ -61,15 +61,15 @@ export interface OverviewProps {
 /** Says what a run is doing, or why there's no report, above whatever's on the canvas. */
 export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean }) {
   const { info } = run;
-  if (run.loading) return <p className="text-muted">Strata loads the Change…</p>;
+  if (run.loading) return <p className="text-muted">Loading Change…</p>;
   if (!info) return null;
   if (info.status === "queued" || info.status === "running") {
     const step =
       info.status === "queued"
-        ? "Another run must finish first"
-        : (info.progress ?? "Strata analyses the Change");
+        ? "Waiting for another run to finish"
+        : (info.progress ?? "Analysing Change");
     // With a report on screen, a run is a refresh of it.
-    const text = hasReport ? `Strata refreshes the report. ${step}` : step;
+    const text = hasReport ? `Refreshing report… ${step}` : step;
     return (
       <p className="flex items-center gap-2 text-muted" role="status">
         <Spinner />
@@ -80,7 +80,7 @@ export function RunBanner({ run, hasReport }: { run: RunView; hasReport: boolean
   if (info.status === "done" && !hasReport) {
     return (
       <div role="status" className="note grid justify-items-start gap-2 text-text">
-        <p>An older version of Strata analysed this Change. Run it again to see it.</p>
+        <p>This analysis is from an older version of Strata. Run it again to see it.</p>
         <RunAgain run={run} />
       </div>
     );

@@ -219,13 +219,13 @@ function userTurn(text: string, anchors: ResolvedAnchor[]): string {
 }
 
 function statusOf(name: string, input: Record<string, unknown>): string {
-  if (name === "read_hunk") return `Claude reads ${String(input.id)}`;
+  if (name === "read_hunk") return `Reading ${String(input.id)}`;
   if (name === "read_file") {
     const of = typeof input.pr === "number" ? ` of #${input.pr}` : "";
-    return `Claude reads ${String(input.path)} at the ${input.side === "base" ? "base" : "head"}${of}`;
+    return `Reading ${String(input.path)} at ${input.side === "base" ? "base" : "head"}${of}`;
   }
-  if (name === "search") return `Claude searches the code for "${String(input.text)}"`;
-  return `Claude uses ${name}`;
+  if (name === "search") return `Searching the code for "${String(input.text)}"`;
+  return `Using ${name}`;
 }
 
 async function runTool(

@@ -217,7 +217,7 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   const github = section("others-acme-app").querySelector('a[aria-label="Open #30 on GitHub"]');
   expect(github?.getAttribute("href")).toBe("https://github.com/acme/app/pull/30");
   expect(github?.getAttribute("target")).toBe("_blank");
-  expect(section("others-acme-app").textContent).toContain("Strata looks for changes");
+  expect(section("others-acme-app").textContent).toContain("Checking for updates");
 
   // #3 asks only acme/backend, one of your teams: the toggle hides it.
   const teams = [...waiting.querySelectorAll("label")]
@@ -285,7 +285,7 @@ it("filters every list by PR number or by text", async () => {
   // A number matches any PR in the row, with or without "#".
   type("#21");
   expect(shown()).toEqual(["/changes/20"]);
-  expect(section("waiting-h").textContent).toContain("No row in this list matches the search.");
+  expect(section("waiting-h").textContent).toContain("Nothing matches your search.");
   type("31");
   expect(shown()).toEqual(["/repos/acme/app#stack-30"]);
 

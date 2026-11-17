@@ -202,7 +202,7 @@ async function verificationOf(
   diffs: StackDiffs,
   options: AnalyzeOptions,
 ): Promise<Verification> {
-  options.onProgress?.("Strata reads the checks, reviews and verification of each PR");
+  options.onProgress?.("Reading checks, reviews and verification for each PR");
   const files = new Map(diffs.parts.map((part) => [part.pr, part.files]));
   try {
     return await readVerification(

@@ -5,7 +5,7 @@ The reviewer asks Claude about a Change in the chat panel at the right of the wo
 ## Sub-features
 
 - `highlight`: selecting text in a hunk's lines shows `button "Ask about the selection"`. Choosing it opens the chat panel with the highlight as a chip in `list "Highlights"`. A selection in a PR's own diff points at that PR's hunk.
-- `ask`: `textbox "Question"`, Enter to send (Shift+Enter adds a line). The answer streams in, with status lines such as `Claude reads <hunk id>`, and a `Stop` button while it runs.
+- `ask`: `textbox "Question"`, Enter to send (Shift+Enter adds a line). The answer streams in, with status lines such as `Reading <hunk id>`, and a `Stop` button while it runs.
 - `citations`: each `[hunk_…]` in an answer is a button named after the file. Choosing it opens the hunk in its layer, in the whole stack or in its PR.
 - `threads`: `combobox "Thread"` lists the Change's threads, newest first, titled by their first question. `New thread` starts another. Threads stay after a reload.
 - `older-analysis`: an answer about an earlier run of the Change says `This answer is about an earlier analysis of the Change.`
@@ -28,7 +28,7 @@ Preconditions:
 - **Ask.** Fill `textbox "Question"` with `Why six hours?` and press Enter. One `POST /api/changes/<id>/threads` and one `POST /api/threads/<thread>/messages` go out. The question shows with its highlight (`app/forecast_cache.py` and `timedelta(hours=6)`), then the answer `The fixture Claude read one hunk. It cites it 0042_forecast_cache.sql. It also cites a hunk that does not exist.`: the made-up citation is gone, and the real one is a button.
 - **Citation.** Choose `button "0042_forecast_cache.sql"`. The URL gets `?layer=data-model`, and that hunk is selected (`data-selected="true"`).
 - **Threads.** Reload. `combobox "Thread"` shows `Why six hours?` with the same question and answer.
-- **API.** `strata-verify http $C chat/messages GET /api/threads/<thread>/messages` returns the two messages; the user message carries its anchor (`source.kind` `hunk`) and `analysedAt`. `strata-verify http $C chat/ask POST /api/threads/<thread>/messages -H 'Content-Type: application/json' -d '{"text":"And the tests?","anchors":[]}'` returns `200`, `content-type: text/event-stream`, and the events `status` (`Claude reads hunk_…`), `delta`, `delta`, `done`.
+- **API.** `strata-verify http $C chat/messages GET /api/threads/<thread>/messages` returns the two messages; the user message carries its anchor (`source.kind` `hunk`) and `analysedAt`. `strata-verify http $C chat/ask POST /api/threads/<thread>/messages -H 'Content-Type: application/json' -d '{"text":"And the tests?","anchors":[]}'` returns `200`, `content-type: text/event-stream`, and the events `status` (`Reading hunk_…`), `delta`, `delta`, `done`.
 - **Gated.** Write `{"sendCodeToAnthropic":false}` to `<run dir>/instance/data/settings/acme/app.json`. The same POST returns `403` with `Turn on "Send the code in acme/app to Claude" in Settings to ask Claude.`, and the chat panel shows the Settings link.
 
 Save each `read_page` tree with `strata-verify note $C chat/<step>.aria.txt`, with the URL you were on.

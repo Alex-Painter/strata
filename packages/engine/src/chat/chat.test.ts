@@ -159,9 +159,9 @@ describe("chat", () => {
     );
 
     expect(chunks.filter((c) => c.type === "status").map((c) => c.text)).toEqual([
-      `Claude reads ${hunk.id}`,
-      `Claude reads ${file} at the head`,
-      'Claude searches the code for "nothing matches this"',
+      `Reading ${hunk.id}`,
+      `Reading ${file} at head`,
+      'Searching the code for "nothing matches this"',
     ]);
     const answer = chunks
       .filter((c) => c.type === "text")
@@ -240,9 +240,9 @@ describe("chat", () => {
     );
 
     expect(chunks.filter((c) => c.type === "status").map((c) => c.text)).toEqual([
-      `Claude reads ${file.path} at the head of #3`,
-      'Claude searches the code for "nothing matches this"',
-      `Claude reads ${file.path} at the head of #99`,
+      `Reading ${file.path} at head of #3`,
+      'Searching the code for "nothing matches this"',
+      `Reading ${file.path} at head of #99`,
     ]);
     const [first, second] = requests;
     const system = ((first?.system ?? []) as Anthropic.TextBlockParam[])

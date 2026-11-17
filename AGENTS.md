@@ -15,7 +15,7 @@ Read `SPEC.md` before doing anything. It is the source of truth for what we're b
 - Treat PR boundaries as hints only. Output must not depend on how code is split (see the shape-invariance benchmark).
 - Keep secrets out of the repo. Redact transcripts before storing them.
 - Write tests for layer classification and shape invariance from the start.
-- Write all user-facing text in ASD-STE100 Simplified Technical English (see below).
+- Make Claude write in ASD-STE100 Simplified Technical English; write UI copy in plain, natural language (see below).
 
 ## Preferences
 
@@ -37,34 +37,21 @@ Defaults: no Claude call on a run that nobody opens; one request per Change, not
 
 - Everything clickable (buttons, links, rows that open something, checkboxes, toggles) shows `cursor: pointer`, whatever a UI library or Tailwind's preflight sets by default. A disabled control shows `not-allowed`. The base rule is in `apps/web/src/styles.css`; a new clickable element that it does not match gets `cursor-pointer`.
 
-## Write all user-facing text in ASD-STE100
+## Copy and generated text
 
-Strata writes all text that a person reads in ASD-STE100 Simplified Technical English (STE). This applies to:
+### UI copy: plain and natural
 
-- UI copy in `apps/web`: labels, headings, help text, tooltips, empty states, errors and status lines.
-- Messages from the server and the CLI that a person sees: API errors, progress steps, issues, notes and the CLI help.
-- Text that the core and the engine put in a report: layer reasons, stack issues, notes and the reasons that GitHub's diff is different.
-- Text that an LLM writes for a person. Every prompt whose answer a person reads must include `STE_RULE` from `packages/engine/src/llm.ts`. When you change a prompt, increase its `PROMPT_VERSION`.
+Text that Strata itself shows (UI copy in `apps/web`, status and progress lines, loading and empty states, errors, server and CLI messages, notes in a report) is written in plain, concise UI language. It is not held to ASD-STE100.
 
-### The rules to apply
-
-- Write short sentences. Use 20 words or fewer for an instruction, and 25 words or fewer for a description.
-- Put one topic in each sentence, and one instruction in each sentence.
-- Use the active voice. Name who or what does the action: "Strata cannot find the commit", not "The commit could not be found".
-- Use only the simple tenses: present, simple past and future.
-- Use the imperative for instructions: "Try again", "Select a path outside the checkout".
-- Use the approved STE words, with their approved meanings. Use one word for one meaning. For example, use "select" (not "choose" or "pick"), "cannot find" (not "can't tell"), and "thus" or a new sentence (not ", so").
-- Do not use contractions: "is not", "cannot", "does not".
-- Do not use phrasal verbs: "start", not "set up"; "go back", not "back out".
-- Do not use -ing forms, except in technical names. For a progress step, write a sentence: "Strata reads the PRs in acme/app", not "Reading acme/app's PRs".
-- Use "a", "an" and "the" where English permits them.
-- You can use technical names as they are: paths, code symbols, product names, git and GitHub terms (PR, branch, commit, hunk, diff, rebase, restack, force-push, trunk), and Strata's own terms (Change, stack, layer, Guide, whole-stack diff, mechanical).
-
-### Permitted exceptions
-
-- A status or control label of one word can show a state or progress: "Running", "Analysing", "Opening…", "Searching…".
+- Status and progress lines are short -ing phrases: "Refreshing report…", "Fetching branches and 9 PR heads from acme/app", "Loading Change…". Do not write them as sentences about Strata ("Strata fetches the branches…").
+- Progress steps from the engine and the server have no trailing "…" or full stop; the UI adds the ellipsis.
+- Empty states are short: "No report yet.", "Nothing matches your search."
+- Do not name Claude as the actor in the UI ("Writing summaries", not "Claude writes the summaries").
 - Strata uses British spelling ("analyse", "summarise"). Do not change it.
-- Prompts to an LLM, code comments and test names are not user-facing. STE is not necessary there, but keep them clear.
+
+### Generated text: ASD-STE100
+
+Text that an LLM writes for a person (summaries, the Guide, layer reasons, chat answers) is in ASD-STE100 Simplified Technical English (STE). Every prompt whose answer a person reads must include `STE_RULE` from `packages/engine/src/llm.ts`. When you change a prompt, increase its `PROMPT_VERSION`. `STE_RULE` holds the rules that Claude follows.
 
 ### Tests
 

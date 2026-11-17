@@ -48,13 +48,13 @@ describe("engine.discoverStacks", () => {
     });
 
     expect(steps).toEqual([
-      "Strata clones acme/app into its cache (only one time)",
-      "Strata fetches the branches of acme/app and 6 PR heads",
-      "Strata finds the stacks: 0 of 2 groups of linked PRs are complete",
-      "Strata finds the stacks: 1 of 2 groups of linked PRs are complete",
+      "Cloning acme/app into the cache (first time only)",
+      "Fetching branches and 6 PR heads from acme/app",
+      "Finding stacks: 0 of 2 PR groups done",
+      "Finding stacks: 1 of 2 PR groups done",
     ]);
     // A server's log keeps the clone and fetch, though a caller follows them too.
-    expect(logged).toContain("Strata fetches the branches of acme/app and 6 PR heads");
+    expect(logged).toContain("Fetching branches and 6 PR heads from acme/app");
     expect(stacks.map(shape)).toEqual([
       {
         root: 1,
@@ -111,7 +111,7 @@ describe("engine.discoverStacks", () => {
       log: (message) => logged.push(message),
     });
 
-    const fetching = "Strata fetches the branches of acme/app and 6 PR heads";
+    const fetching = "Fetching branches and 6 PR heads from acme/app";
     // The CLI prints progress and logs to the same place.
     const steps: string[] = [];
     await engine.discoverStacks("acme/app", { onProgress: (step) => steps.push(step) });
@@ -141,8 +141,8 @@ describe("engine.discoverStacks", () => {
       onProgress: (step) => steps.push(step),
     });
     expect(open.map((stack) => stack.root)).toEqual([5]);
-    expect(steps).toContain("Strata fetches the branches of acme/app and 3 PR heads");
-    expect(steps).toContain("Strata finds the stacks: 0 of 1 groups of linked PRs are complete");
+    expect(steps).toContain("Fetching branches and 3 PR heads from acme/app");
+    expect(steps).toContain("Finding stacks: 0 of 1 PR groups done");
 
     const all = await engine.discoverStacks("acme/app");
     expect(all.map((stack) => stack.root)).toEqual([1, 5]);

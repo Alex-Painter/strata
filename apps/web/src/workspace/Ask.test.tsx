@@ -66,7 +66,7 @@ beforeEach(() => {
           { ...base, id: "m2", role: "assistant", text: answer, anchors: [] },
         ];
         return sse([
-          { type: "status", text: "Claude reads app/forecast_cache.py at the head" },
+          { type: "status", text: "Reading app/forecast_cache.py at head" },
           { type: "delta", text: "The cache keeps" },
           { type: "delta", text: ` forecasts for six hours [${HUNK}].` },
           { type: "done", message: saved[1] as ChatMessage },

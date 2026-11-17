@@ -98,7 +98,7 @@ function UsageBody({ data }: { data: UsageResponse }) {
     return (
       <>
         <Totals data={data} />
-        <div className="empty">Strata did not send a request to Claude in this period.</div>
+        <div className="empty">No Claude requests in this period.</div>
       </>
     );
   }

@@ -93,7 +93,7 @@ export async function summarise(
   options: { onProgress?: (step: string) => void; signal?: AbortSignal },
 ): Promise<Summaries> {
   if (steps.ask) {
-    options.onProgress?.("Claude writes the summaries");
+    options.onProgress?.("Writing summaries");
     return writeSummaries(whole, parts, steps.ask, options.signal);
   }
   const groups = whole ? guideGroups(whole) : [];

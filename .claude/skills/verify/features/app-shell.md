@@ -24,7 +24,7 @@ Preconditions:
 
 - One instance from `strata-verify up` (bypass mode), passing `doctor`. `$B` stands for its RUN_ID and `URL` for its URL.
 
-- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"` with the text `Nobody assigned a stack to you at this time.` (the assignment search is off without `--assigned`, so there's no Refresh). Also `link "Strata"`, `link "Reviewed"` (it opens `/reviewed`, whose `heading "Reviewed"` shows `You were not on a stack in the last 14 days.`), the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
+- **Home page.** `navigate` to `URL/`, then `read_page`. Expect `heading "Waiting on you"` with the text `Nothing is waiting on you.` (the assignment search is off without `--assigned`, so there's no Refresh). Also `link "Strata"`, `link "Reviewed"` (it opens `/reviewed`, whose `heading "Reviewed"` shows `You were not on a stack in the last 14 days.`), the text `verify-bot`, `button "Switch theme"` and `button "Sign out"`. Save it with `strata-verify note $B app-shell/changes.aria.txt`.
 - **Missing Change.** `navigate` to `URL/changes/abc`. The page shows `Not found.` under a breadcrumb `Changes › Change`.
 - **Home link.** From that page, `find` "Strata" (the link) and click it. The URL becomes `URL/` and `heading "Waiting on you"` appears, with no full page reload needed.
 - **Sidebar collapse.** Choose `button "Collapse the sidebar"`. `navigation "Strata"` goes, the card fills the window, and `button "Expand the sidebar"` shows before the breadcrumb. Reload: it stays collapsed. Choose `Expand the sidebar` to bring it back.

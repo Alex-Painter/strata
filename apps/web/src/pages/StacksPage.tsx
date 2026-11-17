@@ -50,8 +50,8 @@ export function StacksPage({ me }: { me: MeResponse }) {
           </header>
           {!stacks.error && (stacks.isPending || isPending(stacks.data)) && (
             <p role="status" className="text-muted">
-              Strata reads the PRs in {repo} and fetches their branches…
-              {progress && <span className="block">{progress}.</span>}
+              Reading PRs in {repo} and fetching their branches…
+              {progress && <span className="block">{progress}…</span>}
             </p>
           )}
           {stacks.error && (
@@ -175,7 +175,7 @@ export function ReadAt({ readAt, refreshing }: { readAt: string; refreshing: boo
   return (
     <span className="block text-[13px] text-faint">
       Read {ago(readAt)}
-      {refreshing && ". Strata looks for changes…"}
+      {refreshing && " · Checking for updates…"}
     </span>
   );
 }

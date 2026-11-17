@@ -162,7 +162,7 @@ function WaitingOnYou({
     ? (status?.progress ?? "Searching…")
     : status?.lastFinishedAt
       ? `Searched ${repos} ${ago(status.lastFinishedAt)}`
-      : `Strata searches ${repos} for PRs that are assigned to you or that ask for your review`;
+      : `Not searched ${repos} yet`;
   const problems = [...(searchError ? [searchError] : []), ...(status?.errors ?? [])];
   return (
     <section className="grid gap-3" aria-labelledby="waiting-h">
@@ -195,11 +195,7 @@ function WaitingOnYou({
           {problem}
         </p>
       ))}
-      <ChangeList
-        changes={changes}
-        error={error}
-        empty="Nobody assigned a stack to you at this time."
-      />
+      <ChangeList changes={changes} error={error} empty="Nothing is waiting on you." />
     </section>
   );
 }
@@ -250,7 +246,7 @@ function OtherStacks({
         <p className="alert">{stacks.error.message}</p>
       ) : !found ? (
         <p role="status" className="text-[13px] text-muted">
-          Strata reads the stacks in {repo}…{progress ? ` ${progress}.` : ""}
+          Loading stacks in {repo}…{progress ? ` ${progress}…` : ""}
         </p>
       ) : others.length === 0 ? (
         <div className="empty">There are no other open stacks.</div>
@@ -410,11 +406,11 @@ function YourPrs({ repos, errors }: { repos: YourRepo[]; errors: string[] }) {
       {rows.length > 0 && <ChangeTable rows={rows} />}
       {waitingFor.length > 0 && errors.length === 0 ? (
         <p role="status" className="text-[13px] text-muted">
-          Strata reads your PRs in {waitingFor.join(", ")}…
+          Loading your PRs in {waitingFor.join(", ")}…
         </p>
       ) : (
         rows.length === 0 &&
-        errors.length === 0 && <div className="empty">You have no open PRs at this time.</div>
+        errors.length === 0 && <div className="empty">You have no open PRs.</div>
       )}
     </section>
   );
@@ -666,7 +662,7 @@ function ChangeTable({ rows: all }: { rows: Row[] }) {
   const query = useContext(SearchContext);
   const rows = all.filter((row) => rowMatches(row, query));
   if (rows.length === 0 && all.length > 0) {
-    return <div className="empty">No row in this list matches the search.</div>;
+    return <div className="empty">Nothing matches your search.</div>;
   }
   return (
     <div className="list overflow-x-auto">

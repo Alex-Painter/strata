@@ -76,7 +76,7 @@ export async function loadPrIndex(repo: string, options: PrIndexOptions): Promis
       fetched.push(toStackPr(node, await allEvents(options.port, owner, name, node)));
     }
     if (reachedOld || !pageInfo.hasNextPage) break;
-    options.onProgress?.(`Strata reads PRs from GitHub: ${fetched.length} at this time`);
+    options.onProgress?.(`Reading PRs from GitHub: ${fetched.length} so far`);
     cursor = pageInfo.endCursor;
   }
   if (!defaultBranch) throw new GitHubError(`${repo} has no default branch.`);

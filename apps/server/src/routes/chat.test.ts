@@ -55,7 +55,7 @@ function setup() {
       async *chat(request) {
         asked.push(request);
         const hunk = request.report.change.hunks[0]?.id;
-        yield { type: "status", text: "Claude reads a hunk" };
+        yield { type: "status", text: "Reading a hunk" };
         yield { type: "text", text: `It adds a file [${hunk}].` };
         yield { type: "text", text: " See also [hunk_0000000000000000]." };
       },
