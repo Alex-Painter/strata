@@ -135,8 +135,8 @@ function ServerWorkspace({ me }: { me: MeResponse }) {
 
 /**
  * Approvals for the Change's PRs. Strata reads them from GitHub when the
- * page opens and after each run, and sends an approval only from a confirmed
- * click.
+ * page opens and after each run, and sends an approval only when the reviewer
+ * clicks Approve.
  */
 function useApprovals(id: string, analysedAt: string | null): ApprovalsView {
   const queryClient = useQueryClient();

@@ -141,7 +141,7 @@ export const api = {
   /** What the Approve action can do for each PR on the Change's path, read from GitHub now. */
   approvals: (id: string) =>
     request<ApprovalsResponse>(`/api/changes/${encodeURIComponent(id)}/approvals`),
-  /** Sends approving reviews to GitHub. Only call it from a person's confirmed click. */
+  /** Sends approving reviews to GitHub. Only call it from a person's click. */
   approve: (id: string, body: ApproveRequest) =>
     request<ApproveResponse>(`/api/changes/${encodeURIComponent(id)}/approve`, post(body)),
   runAgain: (id: string) =>

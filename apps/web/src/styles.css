@@ -190,6 +190,10 @@
   input:disabled {
     cursor: not-allowed;
   }
+  /* A button whose request is in flight (an approval, say) is busy, not off-limits. */
+  button[aria-busy="true"] {
+    cursor: progress;
+  }
 }
 
 html,

@@ -43,34 +43,21 @@ const click = (element: Element | undefined) => {
   act(() => (element as HTMLElement).click());
 };
 
-it("sends nothing on the first click, and one approval on Approve on GitHub", () => {
+it("approves on the first click, with no confirm step", () => {
   const sent: [PrApproval[], "stack" | number][] = [];
   mount(<PrApprove approvals={view([pr(4, { kind: "can-approve" })], sent)} pr={4} />);
   click(button("Approve"));
-  expect(sent).toEqual([]);
-  const dialog = document.querySelector("[role=dialog]");
-  expect(dialog?.getAttribute("aria-label")).toBe("Approve #4 on GitHub?");
-  expect(dialog?.textContent).toContain("Strata sends an approval as alex.");
-  expect(dialog?.textContent).toContain("#4 at 4444444");
-  // Cancel has the focus, so Enter does not approve.
-  expect(document.activeElement?.textContent).toBe("Cancel");
-  click(button("Approve on GitHub"));
   expect(sent.map(([prs, from]) => [prs.map((p) => p.number), from])).toEqual([[[4], 4]]);
   expect(document.querySelector("[role=dialog]")).toBeNull();
 });
 
-it("sends nothing on Cancel or Escape", () => {
-  const sent: [PrApproval[], "stack" | number][] = [];
-  mount(<PrApprove approvals={view([pr(4, { kind: "can-approve" })], sent)} pr={4} />);
-  click(button("Approve"));
-  click(button("Cancel"));
-  expect(document.querySelector("[role=dialog]")).toBeNull();
-  click(button("Approve"));
-  act(() => {
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-  });
-  expect(document.querySelector("[role=dialog]")).toBeNull();
-  expect(sent).toEqual([]);
+it("shows a spinner on a PR's Approve while it is sending", () => {
+  const sending = { ...view([pr(4, { kind: "can-approve" })]), sending: [4] };
+  const container = mount(<PrApprove approvals={sending} pr={4} />);
+  const approving = button("Approving…");
+  expect(approving?.disabled).toBe(true);
+  expect(approving?.getAttribute("aria-busy")).toBe("true");
+  expect(container.querySelector(".spin")).not.toBeNull();
 });
 
 it("shows each state of a PR in its pane", () => {
@@ -97,7 +84,7 @@ it("shows each state of a PR in its pane", () => {
   expect(button("Approve again")?.disabled).toBe(false);
 });
 
-it("approves the stack in one confirm step, and lists the PRs it skips", () => {
+it("approves the stack in one click, and names the PRs it skips in the title", () => {
   const sent: [PrApproval[], "stack" | number][] = [];
   const prs = [
     pr(1, { kind: "closed", state: "merged" }),
@@ -106,17 +93,32 @@ it("approves the stack in one confirm step, and lists the PRs it skips", () => {
     pr(4, { kind: "own" }),
   ];
   mount(<ApproveStack approvals={view(prs, sent)} />);
-  click(button("Approve stack"));
-  const dialog = document.querySelector("[role=dialog]");
-  expect(dialog?.getAttribute("aria-label")).toBe("Approve 2 PRs on GitHub?");
-  expect(dialog?.textContent).toContain("Strata does not approve these PRs:");
-  expect(dialog?.textContent).toContain("#1 It is not open.");
-  expect(dialog?.textContent).toContain("#4 It is your PR.");
-  expect(sent).toEqual([]);
-  click(button("Approve on GitHub"));
+  const stack = button("Approve stack");
+  expect(stack?.title).toBe(
+    "Approve #2, #3 on GitHub\nSkips #1: It is not open.\nSkips #4: It is your PR.",
+  );
+  click(stack);
+  expect(document.querySelector("[role=dialog]")).toBeNull();
   expect(sent.map(([list, from]) => [list.map((p) => p.number), from])).toEqual([
     [[2, 3], "stack"],
   ]);
+});
+
+it("shows a spinner on Approve stack and on each row it is sending", () => {
+  const prs = [pr(2, { kind: "can-approve" }), pr(3, { kind: "can-approve" })];
+  const sending = { ...view(prs), sending: [2, 3] };
+  const container = mount(
+    <>
+      <ApproveStack approvals={sending} />
+      <RowApprove approvals={sending} pr={2} title="PR 2" />
+    </>,
+  );
+  expect(button("Approving…")?.getAttribute("aria-busy")).toBe("true");
+  const row = container.querySelector<HTMLButtonElement>("button[aria-label='Approve #2 PR 2']");
+  expect(row?.disabled).toBe(true);
+  expect(row?.getAttribute("aria-busy")).toBe("true");
+  expect(row?.dataset.open).toBe("true");
+  expect(container.querySelectorAll(".spin")).toHaveLength(2);
 });
 
 it("blocks Approve stack while a PR on the path has new commits", () => {
@@ -156,34 +158,12 @@ it("marks an approved row and offers Approve on an open one", () => {
   expect([...rowButtons].map((b) => b.getAttribute("aria-label"))).toEqual(["Approve #3 PR 3"]);
 });
 
-it("opens a row's confirm step outside the row, and focuses Cancel without a scroll", () => {
-  // The row's actions sit in a translated box, which makes `position: fixed`
-  // relative to the row. A confirm step inside it widened the Change pane, and
-  // the focus on Cancel scrolled the pane's content out of view.
-  const focus = HTMLElement.prototype.focus;
-  const calls: (FocusOptions | undefined)[] = [];
-  HTMLElement.prototype.focus = function (options?: FocusOptions) {
-    calls.push(options);
-    focus.call(this, options);
-  };
-  try {
-    const container = mount(
-      <ul>
-        <li>
-          <span className="row-acts">
-            <RowApprove approvals={view([pr(3, { kind: "can-approve" })])} pr={3} title="PR 3" />
-          </span>
-        </li>
-      </ul>,
-    );
-    click(container.querySelector("button[aria-label='Approve #3 PR 3']") ?? undefined);
-    const dialog = document.querySelector("[role=dialog]");
-    expect(dialog?.getAttribute("aria-label")).toBe("Approve #3 on GitHub?");
-    expect(container.contains(dialog)).toBe(false);
-    expect(dialog?.parentElement).toBe(document.body);
-    expect(document.activeElement?.textContent).toBe("Cancel");
-    expect(calls).toEqual([{ preventScroll: true }]);
-  } finally {
-    HTMLElement.prototype.focus = focus;
-  }
+it("approves a row on the first click", () => {
+  const sent: [PrApproval[], "stack" | number][] = [];
+  const container = mount(
+    <RowApprove approvals={view([pr(3, { kind: "can-approve" })], sent)} pr={3} title="PR 3" />,
+  );
+  click(container.querySelector("button[aria-label='Approve #3 PR 3']") ?? undefined);
+  expect(document.querySelector("[role=dialog]")).toBeNull();
+  expect(sent.map(([list, from]) => [list.map((p) => p.number), from])).toEqual([[[3], 3]]);
 });

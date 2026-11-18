@@ -6,14 +6,13 @@ import {
   type PrApproval,
   stackApproval,
 } from "@strata/core/model";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Icon } from "../components/Icon";
+import { Spinner } from "../components/Spinner";
 
 /**
- * Approving PRs on GitHub from Strata. Every approval goes through a confirm
- * step, and only its second button sends it. Approvals go out as the signed-in
- * user and name the head commit Strata analysed.
+ * Approving PRs on GitHub from Strata. A click sends the approval straight
+ * away, and the button shows a spinner until GitHub answers. Approvals go out
+ * as the signed-in user and name the head commit Strata analysed.
  */
 export interface ApprovalsView {
   data: ApprovalsResponse | null;
@@ -33,7 +32,6 @@ const short = (oid: string | null) => (oid ? oid.slice(0, 7) : "unknown");
 /** The Approve action in a PR's pane, beside its status words. */
 export function PrApprove({ approvals, pr: number }: { approvals: ApprovalsView; pr: number }) {
   const pr = approvals.data?.prs.find((p) => p.number === number);
-  const [confirm, setConfirm] = useState<DOMRect | null>(null);
   if (!pr || !approvals.data) return null;
   const { state } = pr;
   const sending = approvals.sending.includes(number);
@@ -62,11 +60,10 @@ export function PrApprove({ approvals, pr: number }: { approvals: ApprovalsView;
         className="btn sm"
         disabled={!canApprove(state) || sending}
         title={block ?? `Approve #${number} on GitHub`}
-        aria-haspopup="dialog"
-        aria-expanded={confirm !== null}
-        onClick={(event) => setConfirm(event.currentTarget.getBoundingClientRect())}
+        aria-busy={sending || undefined}
+        onClick={() => approvals.approve([pr], number)}
       >
-        <Icon name="check" />
+        {sending ? <Spinner /> : <Icon name="check" />}
         {sending ? "Approving…" : state.kind === "approved-earlier" ? "Approve again" : "Approve"}
       </button>
       {state.kind === "head-moved" && <span className="text-muted">New commits since the run</span>}
@@ -74,19 +71,6 @@ export function PrApprove({ approvals, pr: number }: { approvals: ApprovalsView;
         <span role="alert" className="text-del">
           {note}
         </span>
-      )}
-      {confirm && (
-        <ConfirmApprove
-          anchor={confirm}
-          viewer={approvals.data.viewer}
-          prs={[pr]}
-          skip={[]}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() => {
-            setConfirm(null);
-            approvals.approve([pr], number);
-          }}
-        />
       )}
     </span>
   );
@@ -103,7 +87,6 @@ export function RowApprove({
   title: string;
 }) {
   const pr = approvals.data?.prs.find((p) => p.number === number);
-  const [confirm, setConfirm] = useState<DOMRect | null>(null);
   if (!pr || !approvals.data) return null;
   if (pr.state.kind === "approved") {
     return (
@@ -116,40 +99,23 @@ export function RowApprove({
   if (!canApprove(pr.state)) return null;
   const sending = approvals.sending.includes(number);
   return (
-    <>
-      <button
-        type="button"
-        className="row-act ib"
-        aria-label={`Approve #${number} ${title}`}
-        title={`Approve #${number} on GitHub`}
-        aria-haspopup="dialog"
-        aria-expanded={confirm !== null}
-        data-open={confirm !== null || sending ? "true" : undefined}
-        disabled={sending}
-        onClick={(event) => setConfirm(event.currentTarget.getBoundingClientRect())}
-      >
-        {sending ? <span className="text-[12px]">…</span> : <Icon name="check" />}
-      </button>
-      {confirm && (
-        <ConfirmApprove
-          anchor={confirm}
-          viewer={approvals.data.viewer}
-          prs={[pr]}
-          skip={[]}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() => {
-            setConfirm(null);
-            approvals.approve([pr], number);
-          }}
-        />
-      )}
-    </>
+    <button
+      type="button"
+      className="row-act ib"
+      aria-label={`Approve #${number} ${title}`}
+      title={sending ? `Approving #${number}…` : `Approve #${number} on GitHub`}
+      aria-busy={sending || undefined}
+      data-open={sending ? "true" : undefined}
+      disabled={sending}
+      onClick={() => approvals.approve([pr], number)}
+    >
+      {sending ? <Spinner /> : <Icon name="check" />}
+    </button>
   );
 }
 
-/** Approve stack: every PR on the path that you can approve, in one confirm step. */
+/** Approve stack: every PR on the path that you can approve, in one click. */
 export function ApproveStack({ approvals }: { approvals: ApprovalsView }) {
-  const [confirm, setConfirm] = useState<DOMRect | null>(null);
   if (!approvals.data) {
     return approvals.error ? (
       <p className="px-2 text-[13px] text-faint">{approvals.error}</p>
@@ -163,7 +129,10 @@ export function ApproveStack({ approvals }: { approvals: ApprovalsView }) {
       ? `${blocked.map((n) => `#${n}`).join(", ")} has new commits. Run Strata again before you approve the stack.`
       : prs.length === 0
         ? "No PR on this path needs your approval."
-        : `Approve ${prs.length === 1 ? "1 PR" : `${prs.length} PRs`} on GitHub`;
+        : [
+            `Approve ${prs.map((pr) => `#${pr.number}`).join(", ")} on GitHub`,
+            ...skip.map((s) => `Skips #${s.number}: ${s.reason}`),
+          ].join("\n");
   const failures = approvals.results.filter((r) => !r.ok);
   const refused = approvals.sendError?.from === "stack" ? approvals.sendError.message : null;
   return (
@@ -174,11 +143,10 @@ export function ApproveStack({ approvals }: { approvals: ApprovalsView }) {
           className="btn sm"
           disabled={blocked.length > 0 || prs.length === 0 || sending}
           title={title}
-          aria-haspopup="dialog"
-          aria-expanded={confirm !== null}
-          onClick={(event) => setConfirm(event.currentTarget.getBoundingClientRect())}
+          aria-busy={sending || undefined}
+          onClick={() => approvals.approve(prs, "stack")}
         >
-          <Icon name="check" />
+          {sending ? <Spinner /> : <Icon name="check" />}
           {sending ? "Approving…" : "Approve stack"}
         </button>
         {blocked.length > 0 && <span className="text-[13px] text-muted">New commits</span>}
@@ -197,117 +165,6 @@ export function ApproveStack({ approvals }: { approvals: ApprovalsView }) {
               </p>
             ),
         )}
-      {confirm && (
-        <ConfirmApprove
-          anchor={confirm}
-          viewer={approvals.data.viewer}
-          prs={prs}
-          skip={skip}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() => {
-            setConfirm(null);
-            approvals.approve(prs, "stack");
-          }}
-        />
-      )}
     </div>
-  );
-}
-
-/**
- * The confirm step. It names each PR and the commit its approval names, and
- * the PRs it skips. Cancel has the focus, so Enter does not approve by itself.
- *
- * It renders into document.body. A row's actions sit in a translated box, and
- * a transform makes `position: fixed` relative to that box: the popover then
- * hangs off the row, the Change pane grows, and focusing Cancel scrolls the
- * pane's content out of view until the popover closes.
- */
-export function ConfirmApprove({
-  anchor,
-  viewer,
-  prs,
-  skip,
-  onConfirm,
-  onCancel,
-}: {
-  anchor: DOMRect;
-  viewer: string;
-  prs: PrApproval[];
-  skip: { number: number; reason: string }[];
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.querySelector<HTMLElement>("[data-cancel]")?.focus({ preventScroll: true });
-    const away = (event: PointerEvent) => {
-      if (!ref.current?.contains(event.target as Node)) onCancel();
-    };
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
-    };
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [onCancel]);
-  const width = 320;
-  const left = Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8));
-  // Under the button, or above it when it does not fit below.
-  const [top, setTop] = useState(anchor.bottom + 6);
-  useLayoutEffect(() => {
-    const height = ref.current?.offsetHeight ?? 0;
-    const below = anchor.bottom + 6;
-    setTop(below + height > window.innerHeight - 8 ? Math.max(8, anchor.top - 6 - height) : below);
-  }, [anchor]);
-  const heading =
-    prs.length === 1
-      ? `Approve #${prs[0]?.number} on GitHub?`
-      : `Approve ${prs.length} PRs on GitHub?`;
-  return createPortal(
-    <div
-      ref={ref}
-      role="dialog"
-      aria-label={heading}
-      className="pop fixed grid gap-2 p-3 text-[13px]"
-      style={{ top, left, width }}
-    >
-      <p className="font-medium text-text">{heading}</p>
-      <p className="text-muted">
-        Strata sends an approval as <span className="font-mono">{viewer}</span>. The author and the
-        team see it on GitHub.
-      </p>
-      <ul className="grid gap-0.5">
-        {prs.map((pr) => (
-          <li key={pr.number} className="font-mono">
-            #{pr.number} <span className="text-faint">at {short(pr.analysedHead)}</span>
-          </li>
-        ))}
-      </ul>
-      {skip.length > 0 && (
-        <div className="grid gap-0.5 text-muted">
-          <p>Strata does not approve these PRs:</p>
-          <ul className="grid gap-0.5">
-            {skip.map((s) => (
-              <li key={s.number}>
-                <span className="font-mono">#{s.number}</span> {s.reason}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div className="flex justify-end gap-2 pt-1">
-        <button type="button" className="btn sm ghost" data-cancel onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="button" className="btn sm primary" onClick={onConfirm}>
-          Approve on GitHub
-        </button>
-      </div>
-    </div>,
-    document.body,
   );
 }
