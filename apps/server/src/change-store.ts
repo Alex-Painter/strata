@@ -4,7 +4,13 @@
  * same Change for the same path.
  */
 import type { AssignedReason, ChangeSummary, PathPr, Stack, YourPr } from "@strata/core/model";
-import { type ChangeInput, describeInput, describeRepo, waitsOnYou } from "@strata/core/model";
+import {
+  allApproved,
+  type ChangeInput,
+  describeInput,
+  describeRepo,
+  waitsOnYou,
+} from "@strata/core/model";
 import type { ResolvedChange } from "@strata/engine";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { newId } from "./auth/crypto.js";
@@ -34,8 +40,22 @@ export function pathPrsOf(stack: Stack | null | undefined): string | null {
     if (!pr) return [];
     const { number, author, createdAt, state, draft, review, checks } = pr;
     const { title, url, baseRef, headRef } = pr;
+    const latestReview = pr.latestReview ?? null;
     return [
-      { number, author, createdAt, state, draft, review, checks, title, url, baseRef, headRef },
+      {
+        number,
+        author,
+        createdAt,
+        state,
+        draft,
+        review,
+        latestReview,
+        checks,
+        title,
+        url,
+        baseRef,
+        headRef,
+      },
     ];
   });
   return JSON.stringify(prs);
@@ -156,6 +176,7 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
       seenAt: a.lastSeenAt.toISOString(),
     }))
     .sort((a, b) => Number(b.active) - Number(a.active) || a.number - b.number);
+  const prs = row.pathPrs ? (JSON.parse(row.pathPrs) as PathPr[]) : [];
   return {
     id: row.id,
     title: row.title,
@@ -164,10 +185,11 @@ export function summarize(db: Db, row: ChangeRow): ChangeSummary {
     status: latestRun(db, row.id)?.status ?? null,
     origin: row.origin,
     yours,
-    waiting: yours.some((pr) => pr.active && waitsOnYou(pr.reasons)),
+    // Once every open PR is approved, by anyone, nothing is left for you to do.
+    waiting: yours.some((pr) => pr.active && waitsOnYou(pr.reasons)) && !allApproved(prs),
     rootPr: row.rootPr,
     tipPr: row.tipPr,
-    prs: row.pathPrs ? (JSON.parse(row.pathPrs) as PathPr[]) : [],
+    prs,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -95,6 +95,7 @@ export class PrStatusRefresher {
           merged.state === pr.state &&
           merged.draft === pr.draft &&
           merged.review === pr.review &&
+          merged.latestReview === pr.latestReview &&
           merged.checks === pr.checks &&
           merged.title === pr.title
         )

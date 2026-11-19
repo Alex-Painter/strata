@@ -52,6 +52,7 @@ export interface StackPrSummary {
   /** The commits and PRs the link rests on. */
   linkEvidence: Evidence[];
   review: StackPr["review"];
+  latestReview?: StackPr["latestReview"];
   checks: StackPr["checks"];
 }
 
@@ -64,6 +65,7 @@ export type PathPr = Pick<
   StackPrSummary,
   "number" | "author" | "createdAt" | "state" | "draft" | "review" | "checks"
 > &
+  Partial<Pick<StackPrSummary, "latestReview">> &
   Partial<Pick<StackPrSummary, "title" | "url" | "baseRef" | "headRef">>;
 
 export interface StackSummary {

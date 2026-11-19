@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import page from "./fixtures/pr-page.json" with { type: "json" };
-import { type PrNode, type PrPage, toStackPr } from "./graphql.js";
+import { latestReviewOf, type PrNode, type PrPage, toStackPr } from "./graphql.js";
 
 /** A page in the exact shape GitHub returns, nulls included. */
 const nodes = ((page as PrPage).repository?.pullRequests.nodes ?? []).filter(
@@ -40,6 +40,7 @@ describe("toStackPr", () => {
         },
       ],
       review: "review-required",
+      latestReview: null,
       checks: "pending",
     });
   });
@@ -72,5 +73,16 @@ describe("toStackPr", () => {
   it("maps a PR with no commits or checks", () => {
     const node = { ...(nodes[0] as PrNode), commits: { nodes: [] }, reviewDecision: null };
     expect(toStackPr(node, [])).toMatchObject({ checks: null, review: null });
+  });
+});
+
+describe("latestReviewOf", () => {
+  it("says what reviewers say now, with a request for changes over any approval", () => {
+    expect(latestReviewOf(undefined)).toBeNull();
+    expect(latestReviewOf({ nodes: [] })).toBeNull();
+    expect(latestReviewOf({ nodes: [{ state: "APPROVED" }, null] })).toBe("approved");
+    expect(latestReviewOf({ nodes: [{ state: "APPROVED" }, { state: "CHANGES_REQUESTED" }] })).toBe(
+      "changes-requested",
+    );
   });
 });

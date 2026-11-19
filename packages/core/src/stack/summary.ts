@@ -25,6 +25,7 @@ export function summarizeStack(stack: Stack): StackSummary {
     link: edges.get(pr.number)?.link ?? null,
     linkEvidence: edges.get(pr.number)?.evidence ?? [],
     review: pr.review,
+    latestReview: pr.latestReview ?? null,
     checks: pr.checks,
   }));
   return {

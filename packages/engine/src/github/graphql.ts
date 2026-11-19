@@ -15,6 +15,13 @@ const TIMELINE_FIELDS = `
 
 const TIMELINE_ITEMS = "itemTypes: [BASE_REF_CHANGED_EVENT, HEAD_REF_FORCE_PUSHED_EVENT]";
 
+/**
+ * Each reviewer's latest approval or request for changes, bots included.
+ * GitHub's reviewDecision leaves out reviews that do not count towards its
+ * rules (a bot's, or any review on a repo with no required reviews).
+ */
+export const LATEST_REVIEWS = "latestOpinionatedReviews(first: 20) { nodes { state } }";
+
 /** Newest-updated first, so a refresh can stop once it reaches what it has. */
 export const PR_PAGE_QUERY = `
 query StrataPrPage($owner: String!, $name: String!, $cursor: String) {
@@ -29,6 +36,7 @@ query StrataPrPage($owner: String!, $name: String!, $cursor: String) {
         baseRefName baseRefOid headRefName headRefOid isCrossRepository
         mergeCommit { oid }
         reviewDecision
+        ${LATEST_REVIEWS}
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
         timelineItems(first: 50, ${TIMELINE_ITEMS}) {${TIMELINE_FIELDS}
         }
@@ -90,6 +98,7 @@ export interface PrNode {
   isCrossRepository: boolean;
   mergeCommit: { oid: string } | null;
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+  latestOpinionatedReviews?: LatestReviews | null;
   commits: {
     nodes: ({ commit: { statusCheckRollup: { state: string } | null } } | null)[];
   };
@@ -114,6 +123,18 @@ export const REVIEWS = {
   CHANGES_REQUESTED: "changes-requested",
   REVIEW_REQUIRED: "review-required",
 } as const;
+
+export interface LatestReviews {
+  nodes: ({ state: string } | null)[] | null;
+}
+
+/** What reviewers say now, whoever they are: one request for changes outweighs any approval. */
+export function latestReviewOf(reviews: LatestReviews | null | undefined): StackPr["latestReview"] {
+  const states = (reviews?.nodes ?? []).map((node) => node?.state);
+  if (states.includes("CHANGES_REQUESTED")) return "changes-requested";
+  if (states.includes("APPROVED")) return "approved";
+  return null;
+}
 
 export const CHECKS: Record<string, StackPr["checks"]> = {
   SUCCESS: "success",
@@ -166,6 +187,7 @@ export function toStackPr(node: PrNode, events: (TimelineNode | null)[]): StackP
     baseChanges,
     forcePushes,
     review: node.reviewDecision ? REVIEWS[node.reviewDecision] : null,
+    latestReview: latestReviewOf(node.latestOpinionatedReviews),
     checks: rollup ? (CHECKS[rollup] ?? null) : null,
   };
 }

@@ -290,6 +290,48 @@ describe("the assignment search", () => {
     expect(await titles()).toEqual(["Claude's name"]);
   });
 
+  it("stops waiting on you once every open PR on the path is approved, by a bot too", async () => {
+    // #2 asks for your review; its path is #1-#2-#3.
+    demo.github.requests = { 2: { reviewers: ["alex"] } };
+    const { assigned, list } = setup();
+    await assigned.search(USER);
+
+    const pr = (n: number) => {
+      const found = demo.github.prs.find((p) => p.number === n);
+      if (!found) throw new Error(`The demo repo has no #${n}.`);
+      return found;
+    };
+    // #1 is merged. GitHub approves #2. Only a bot approved #3, which GitHub does not count.
+    pr(2).reviewDecision = "APPROVED";
+    pr(3).reviewDecision = "REVIEW_REQUIRED";
+    pr(3).latestOpinionatedReviews = { nodes: [{ state: "APPROVED" }] };
+    // The list reads the PRs' status from GitHub again; your review request stays.
+    const [change] = await list();
+    expect(change?.waiting).toBe(false);
+    expect(change?.yours.map((y) => y.active)).toEqual([true]);
+    expect(change?.prs.map((p) => [p.number, p.state, p.review, p.latestReview])).toEqual([
+      [1, "merged", null, null],
+      [2, "open", "approved", null],
+      [3, "open", "review-required", "approved"],
+    ]);
+  });
+
+  it("keeps waiting on you while one open PR is not approved", async () => {
+    demo.github.requests = { 2: { reviewers: ["alex"] } };
+    for (const p of demo.github.prs) {
+      if (p.number <= 3) p.reviewDecision = "APPROVED";
+    }
+    const third = demo.github.prs.find((p) => p.number === 3);
+    if (!third) throw new Error("The demo repo has no #3.");
+    // Someone asks for changes on #3 after GitHub approved it.
+    third.latestOpinionatedReviews = {
+      nodes: [{ state: "APPROVED" }, { state: "CHANGES_REQUESTED" }],
+    };
+    const { assigned, list } = setup();
+    await assigned.search(USER);
+    expect((await list()).map((c) => c.waiting)).toEqual([true]);
+  });
+
   it("keeps a Change once GitHub stops listing its PR, no longer waiting", async () => {
     demo.github.requests = { 4: { assignees: ["alex"] } };
     const { assigned, list } = setup();

@@ -4,7 +4,7 @@
  * the Changes list stays fresh for about one request per repo.
  */
 import type { PathPr } from "@strata/core";
-import { CHECKS, REVIEWS } from "./graphql.js";
+import { CHECKS, LATEST_REVIEWS, type LatestReviews, latestReviewOf, REVIEWS } from "./graphql.js";
 import type { GitHubPort } from "./port.js";
 import { splitRepo } from "./pr-index.js";
 
@@ -12,7 +12,10 @@ import { splitRepo } from "./pr-index.js";
 export const STATUS_BATCH = 100;
 
 /** The fields of a PR that do not come from inference, as the Changes list keeps them. */
-export type PrStatus = Pick<PathPr, "number" | "state" | "draft" | "review" | "checks" | "title">;
+export type PrStatus = Pick<
+  PathPr,
+  "number" | "state" | "draft" | "review" | "latestReview" | "checks" | "title"
+>;
 
 export interface StatusNode {
   number: number;
@@ -20,6 +23,7 @@ export interface StatusNode {
   state: "OPEN" | "MERGED" | "CLOSED";
   isDraft: boolean;
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+  latestOpinionatedReviews?: LatestReviews | null;
   commits: { nodes: ({ commit: { statusCheckRollup: { state: string } | null } } | null)[] };
 }
 
@@ -34,7 +38,7 @@ export function prStatusQuery(count: number): string {
     { length: count },
     (_, i) => `
     p${i}: pullRequest(number: $n${i}) {
-      number title state isDraft reviewDecision
+      number title state isDraft reviewDecision ${LATEST_REVIEWS}
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
     }`,
   ).join("");
@@ -77,6 +81,7 @@ function toStatus(node: StatusNode): PrStatus {
     state: STATES[node.state],
     draft: node.isDraft,
     review: node.reviewDecision ? REVIEWS[node.reviewDecision] : null,
+    latestReview: latestReviewOf(node.latestOpinionatedReviews),
     checks: rollup ? (CHECKS[rollup] ?? null) : null,
   };
 }

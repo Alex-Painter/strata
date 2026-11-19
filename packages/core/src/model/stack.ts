@@ -49,6 +49,11 @@ export interface StackPr {
   /** Every force-push of the head branch, oldest first. */
   forcePushes: ForcePush[];
   review: "approved" | "changes-requested" | "review-required" | null;
+  /**
+   * What its reviewers say now, bots included, whether or not GitHub counts
+   * them towards `review`. Missing on PRs read before Strata kept it.
+   */
+  latestReview?: "approved" | "changes-requested" | null;
   checks: "success" | "failure" | "pending" | null;
 }
 
