@@ -1,4 +1,10 @@
-import type { Anchor, ChangeReport, ChatMessage, ChatStreamEvent } from "@strata/core/model";
+import type {
+  Anchor,
+  ChangeReport,
+  ChatMessage,
+  ChatStreamEvent,
+  ReviewComment,
+} from "@strata/core/model";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -21,6 +27,21 @@ const anchor: Anchor = {
 };
 
 let saved: ChatMessage[];
+let comments: ReviewComment[];
+const draft: ReviewComment = {
+  id: "cmt_1",
+  changeId: "chg_1",
+  pr: 2,
+  path: "app/forecast_cache.py",
+  line: 12,
+  side: "RIGHT",
+  body: "Why six hours and not one?",
+  messageId: "m2",
+  commitOid: "a".repeat(40),
+  state: "pending",
+  url: null,
+  createdAt: "",
+};
 let sent: unknown[];
 let send: boolean;
 
@@ -32,6 +53,7 @@ const sse = (events: ChatStreamEvent[]) =>
 
 beforeEach(() => {
   saved = [];
+  comments = [];
   sent = [];
   send = true;
   vi.stubGlobal(
@@ -59,20 +81,35 @@ beforeEach(() => {
       }
       if (url === "/api/threads/thr_1/messages" && init?.method === "POST") {
         sent.push(JSON.parse(String(init.body)));
-        const base = { threadId: "thr_1", analysedAt: "2026-10-29T10:00:00Z", createdAt: "" };
+        const base = {
+          threadId: "thr_1",
+          analysedAt: "2026-10-29T10:00:00Z",
+          createdAt: "",
+          reads: [],
+        };
         const answer = `The cache keeps forecasts for six hours [${HUNK}].`;
         saved = [
           { ...base, id: "m1", role: "user", text: "Why six hours?", anchors: [anchor] },
-          { ...base, id: "m2", role: "assistant", text: answer, anchors: [] },
+          {
+            ...base,
+            id: "m2",
+            role: "assistant",
+            text: answer,
+            anchors: [],
+            reads: [{ tool: "read_hunk", target: HUNK, path: "app/forecast_cache.py" }],
+          },
         ];
+        comments = [draft];
         return sse([
           { type: "status", text: "Reading app/forecast_cache.py at head" },
+          { type: "draft", comment: draft },
           { type: "delta", text: "The cache keeps" },
           { type: "delta", text: ` forecasts for six hours [${HUNK}].` },
           { type: "done", message: saved[1] as ChatMessage },
         ]);
       }
       if (url === "/api/threads/thr_1/messages") return Response.json(saved);
+      if (url === "/api/changes/chg_1/comments") return Response.json(comments);
       return Response.json({ error: "Not found." }, { status: 404 });
     }),
   );
@@ -147,6 +184,12 @@ it("sends a question with its highlight, streams the answer, and links its citat
   expect(citation.textContent).toBe("forecast_cache.py");
   act(() => citation.click());
   expect(cited).toEqual([HUNK]);
+  // The drafted comment shows under the answer, waiting in #2's review, with what the answer read.
+  expect(log.querySelector(".ask-draft")?.textContent).toContain("Comment on #2");
+  expect(log.querySelector(".ask-draft")?.textContent).toContain("forecast_cache.py:12");
+  expect(log.querySelector(".ask-draft")?.textContent).toContain("Why six hours and not one?");
+  expect(log.querySelectorAll(".ask-draft")).toHaveLength(1);
+  expect(log.textContent).toContain("Read 1 hunk");
   expect(container.querySelector('select[aria-label="Thread"]')?.textContent).toContain(
     "Why six hours?",
   );
@@ -176,7 +219,7 @@ it("focuses the question box after Ask on a selection", async () => {
 });
 
 it("starts a new thread and focuses the question box when N asks for one", async () => {
-  const base = { threadId: "thr_1", analysedAt: "2026-10-29T10:00:00Z", createdAt: "" };
+  const base = { threadId: "thr_1", analysedAt: "2026-10-29T10:00:00Z", createdAt: "", reads: [] };
   saved = [
     { ...base, id: "m1", role: "user", text: "Why six hours?", anchors: [] },
     { ...base, id: "m2", role: "assistant", text: "Because.", anchors: [] },
@@ -198,7 +241,7 @@ it("starts a new thread and focuses the question box when N asks for one", async
 });
 
 it("lets the reviewer open a different thread while an answer streams in", async () => {
-  const base = { analysedAt: "2026-10-29T10:00:00Z", createdAt: "" };
+  const base = { analysedAt: "2026-10-29T10:00:00Z", createdAt: "", reads: [] };
   const threads = [
     { id: "thr_1", changeId: "chg_1", title: "Why six hours?", createdAt: "" },
     { id: "thr_2", changeId: "chg_1", title: "Who reads the cache?", createdAt: "" },

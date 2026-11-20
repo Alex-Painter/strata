@@ -15,7 +15,10 @@
  *   source, which Strata must drop.
  * - Chat (a streamed request with tools): first it reads the first hunk the
  *   system prompt lists, then it answers in one sentence that cites that hunk
- *   and a hunk that does not exist, which Strata must drop.
+ *   and a hunk that does not exist, which Strata must drop. When the question
+ *   asks for a comment on a PR ("comment on #10"), it reads the hunk in that
+ *   PR's own diff too, then drafts a comment on its first added line and one
+ *   on the PR as a whole.
  */
 
 interface MessageBody {
@@ -161,6 +164,62 @@ export function fixtureChat(body: ChatBody): { model: string; content: Block[]; 
       model: body.model,
       stop: "tool_use",
       content: [{ type: "tool_use", id: "toolu_fixture", name: "read_hunk", input: { id: hunk } }],
+    };
+  }
+  // The question is the last user turn that is text, not tool results.
+  const question = [...body.messages]
+    .reverse()
+    .find((m) => m.role === "user" && typeof m.content === "string")?.content as string | undefined;
+  const asked = /comment on #(\d+)/i.exec(question ?? "");
+  const rounds = body.messages.filter(
+    (m) => Array.isArray(m.content) && m.content.some((b) => b?.type === "tool_result"),
+  ).length;
+  if (asked && rounds === 1) {
+    return {
+      model: body.model,
+      stop: "tool_use",
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_fixture_pr",
+          name: "read_hunk",
+          input: { id: hunk, pr: Number(asked[1]) },
+        },
+      ],
+    };
+  }
+  if (asked && rounds === 2) {
+    const pr = Number(asked[1]);
+    const result = Array.isArray(last)
+      ? String(last.find((b) => b?.type === "tool_result")?.content ?? "")
+      : "";
+    const path = /^(\S+) @@/.exec(result)?.[1];
+    const line = /^\s*\d*\s+(\d+) \+/m.exec(result)?.[1];
+    const drafts: Block[] = [
+      {
+        type: "tool_use",
+        id: "toolu_fixture_general",
+        name: "draft_comment",
+        input: { pr, body: "The fixture Claude asks for a rollout note in the description." },
+      },
+    ];
+    if (path && line) {
+      drafts.unshift({
+        type: "tool_use",
+        id: "toolu_fixture_line",
+        name: "draft_comment",
+        input: { pr, path, line: Number(line), body: "The fixture Claude asks why this line." },
+      });
+    }
+    return { model: body.model, stop: "tool_use", content: drafts };
+  }
+  if (asked) {
+    return {
+      model: body.model,
+      stop: "end_turn",
+      content: [
+        { type: "text", text: `The fixture Claude put comments in the review of #${asked[1]}.` },
+      ],
     };
   }
   return {

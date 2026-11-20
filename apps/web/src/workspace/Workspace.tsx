@@ -623,6 +623,7 @@ export function Workspace({
                         node={node}
                         part={part ?? undefined}
                         approvals={approvals}
+                        changeId={changeId ?? undefined}
                       />
                     ) : stack && summary ? (
                       <StackOverview
@@ -660,6 +661,7 @@ export function Workspace({
               focus={askFocus}
               startNew={askNew}
               onStartNew={() => setAskNew(false)}
+              onOpenReview={scope}
             />
           </Panel>
         )}

@@ -4,6 +4,7 @@
  * sentence it is about.
  */
 import type { Anchor } from "./anchors.js";
+import type { ReviewComment } from "./review.js";
 
 export type ChatRole = "user" | "assistant";
 
@@ -27,6 +28,21 @@ export interface ChatMessage {
    */
   analysedAt: string | null;
   createdAt: string;
+  /** What the assistant read for this answer. Empty for user messages. */
+  reads: ChatRead[];
+}
+
+/** One tool read behind an answer. */
+export interface ChatRead {
+  tool: "read_hunk" | "read_file" | "read_pr" | "search";
+  /** The hunk id, the path, the PR number or the search text. */
+  target: string;
+  /** The PR whose own diff it was read in. */
+  pr?: number;
+  /** For read_file: the side of the diff. */
+  side?: "base" | "head";
+  /** The path of a read hunk. */
+  path?: string;
 }
 
 export interface PostChatMessageRequest {
@@ -39,6 +55,8 @@ export type ChatStreamEvent =
   | { type: "delta"; text: string }
   /** What the agent is doing between text, e.g. "Reading src/models/user.py". */
   | { type: "status"; text: string }
+  /** A comment Ask drafted, now in the PR's pending review. */
+  | { type: "draft"; comment: ReviewComment }
   | { type: "done"; message: ChatMessage }
   | { type: "error"; message: string };
 

@@ -36,8 +36,9 @@ import {
 } from "../lib/format";
 import { commitUrl, shortOid } from "../lib/github";
 import { revisedBy } from "../lib/provenance";
-import { type ApprovalsView, PrApprove } from "./Approve";
+import type { ApprovalsView } from "./Approve";
 import { changeLayers, filesIn, plural, type ScopedDiff } from "./model";
+import { ReviewBox } from "./Review";
 
 export interface RunView {
   info: RunInfo | null;
@@ -295,6 +296,7 @@ export function PrOverview({
   node,
   part,
   approvals,
+  changeId,
   ...props
 }: OverviewProps & {
   stack: Stack;
@@ -302,6 +304,8 @@ export function PrOverview({
   part: PrPart | undefined;
   /** Approvals on GitHub; absent on the CLI's page. */
   approvals?: ApprovalsView | undefined;
+  /** The server's Change, for the review box; absent on the CLI's page. */
+  changeId?: string | undefined;
 }) {
   const { pr } = node;
   const edge = stack.edges.find((e) => e.child === pr.number);
@@ -338,9 +342,17 @@ export function PrOverview({
           {pr.checks && <span>{CHECKS_LABEL[pr.checks]}</span>}
           {pr.author && <span>by {pr.author}</span>}
           <span>updated {ago(pr.updatedAt)}</span>
-          {approvals && <PrApprove approvals={approvals} pr={pr.number} />}
         </p>
       </header>
+
+      {approvals && changeId && (
+        <ReviewBox
+          changeId={changeId}
+          pr={pr.number}
+          approvals={approvals}
+          onReviewed={approvals.update}
+        />
+      )}
 
       <dl className="props">
         <Fact term="Branch">

@@ -24,6 +24,7 @@ import {
   APPROVE_MUTATION,
   type ApprovePage,
   PR_REVIEW_QUERY,
+  REVIEW_MUTATION,
   type ReviewNode,
   type ReviewPage,
 } from "../github/reviews.js";
@@ -38,6 +39,7 @@ export interface FakeGitHub extends GitHubPort {
       | "verification"
       | "review"
       | "approve"
+      | "submit-review"
       | "status"
       | "text";
     variables: Record<string, unknown>;
@@ -60,6 +62,10 @@ export interface FakeReview {
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED";
   commit: string;
   submittedAt: string;
+  /** The summary of a review sent through the fake. */
+  body?: string;
+  /** Its line comments. */
+  threads?: { path: string; line: number; side: string; body: string }[];
 }
 
 export interface FakeRequests {
@@ -108,6 +114,10 @@ export function fakeGitHub(
       if (query === APPROVE_MUTATION) {
         fake.calls.push({ query: "approve", variables });
         return approve(fake, repo, String(variables.id), String(variables.commit)) as T;
+      }
+      if (query === REVIEW_MUTATION) {
+        fake.calls.push({ query: "submit-review", variables });
+        return review(fake, repo, variables) as T;
       }
       if (query === PR_REVIEW_QUERY) {
         fake.calls.push({ query: "review", variables });
@@ -253,6 +263,53 @@ function approve(fake: FakeGitHub, repo: string, id: string, commit: string): Ap
       pullRequestReview: {
         url: `https://github.com/${repo}/pull/${pr.number}#pullrequestreview-${count}`,
         state: "APPROVED",
+        commit: { oid: commit },
+      },
+    },
+  };
+}
+
+const REVIEW_STATE = {
+  APPROVE: "APPROVED",
+  REQUEST_CHANGES: "CHANGES_REQUESTED",
+  COMMENT: "COMMENTED",
+} as const;
+
+/** Acts as GitHub does for a review with a summary and line comments. */
+function review(fake: FakeGitHub, repo: string, variables: Record<string, unknown>): ApprovePage {
+  const id = String(variables.id);
+  const pr = fake.prs.find((node) => `PR_${node.number}` === id);
+  if (!pr) throw new Error(`Could not resolve to a node with the global id of '${id}'`);
+  const event = String(variables.event) as keyof typeof REVIEW_STATE;
+  const state = REVIEW_STATE[event];
+  const refusal = fake.refuseApproval[pr.number];
+  if (refusal) throw new GitHubError(refusal);
+  const own = pr.author?.login.toLowerCase() === fake.viewer.toLowerCase();
+  if (own && event === "APPROVE") {
+    throw new GitHubError("Review Can not approve your own pull request");
+  }
+  if (own && event === "REQUEST_CHANGES") {
+    throw new GitHubError("Review Can not request changes on your own pull request");
+  }
+  const threads = (variables.threads ?? []) as FakeReview["threads"] & object;
+  const body = typeof variables.body === "string" ? variables.body : "";
+  if (event !== "APPROVE" && body === "" && threads.length === 0) {
+    throw new GitHubError("Review body can't be blank");
+  }
+  const commit = String(variables.commit);
+  const submittedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const reviews = fake.reviews[pr.number] ?? [];
+  fake.reviews[pr.number] = reviews;
+  reviews.push({ by: fake.viewer, state, commit, submittedAt, body, threads });
+  if (event === "APPROVE") pr.reviewDecision = "APPROVED";
+  if (event === "REQUEST_CHANGES") pr.reviewDecision = "CHANGES_REQUESTED";
+  pr.updatedAt = submittedAt;
+  const count = reviews.filter((r) => r.by === fake.viewer).length;
+  return {
+    addPullRequestReview: {
+      pullRequestReview: {
+        url: `https://github.com/${repo}/pull/${pr.number}#pullrequestreview-${count}`,
+        state,
         commit: { oid: commit },
       },
     },

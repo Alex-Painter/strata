@@ -12,7 +12,7 @@ import { createGitHubPort, GitHubError, type GitHubPort } from "./github/port.js
 import { loadPrIndex, splitRepo } from "./github/pr-index.js";
 import { readPrStatus } from "./github/pr-status.js";
 import { readPrTexts } from "./github/pr-text.js";
-import { approvePr, readLivePr } from "./github/reviews.js";
+import { approvePr, readLivePr, submitReview } from "./github/reviews.js";
 import { createLlmLayerJudge, type LayerJudge } from "./layers/judge.js";
 import { type AskJson, cachedAsk, createLlm, type LlmSettings, tagUsage } from "./llm.js";
 import { serialize } from "./lock.js";
@@ -68,6 +68,9 @@ export const createEngine: CreateEngine = (config) => {
     },
     approvePr(read, commitOid) {
       return approvePr(githubPort(config), read.nodeId, commitOid);
+    },
+    submitReview(read, review) {
+      return submitReview(githubPort(config), read.nodeId, review);
     },
     async resolveChange(input, options = {}) {
       const gh = githubInput(input);

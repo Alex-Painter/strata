@@ -116,6 +116,7 @@ const PATHS = {
   external: <path d="M9.5 2.75h3.75V6.5M13.25 2.75L7.5 8.5M11.5 9.5v3.75h-8.75V4.5H6.5" />,
   out: <path d="M9.5 3.25H12.75v9.5H9.5M6.5 5L3.5 8l3 3M3.5 8h7" />,
   check: <path d="M3.25 8.5l3 3 6.5-7" />,
+  comment: <path d="M2.75 3.25h10.5v7.5H8l-3 2.5v-2.5H2.75z" />,
   copy: (
     <>
       <rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.5" />

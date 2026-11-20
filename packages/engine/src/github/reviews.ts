@@ -4,6 +4,7 @@
  * only when a person asks for it.
  */
 import type { LivePr, ViewerReview } from "@strata/core";
+import type { ReviewSubmission } from "../api.js";
 import { GitHubError, type GitHubPort } from "./port.js";
 import { splitRepo } from "./pr-index.js";
 
@@ -22,6 +23,13 @@ query StrataPrReview($owner: String!, $name: String!, $number: Int!) {
 export const APPROVE_MUTATION = `
 mutation StrataApprove($id: ID!, $commit: GitObjectID!) {
   addPullRequestReview(input: { pullRequestId: $id, event: APPROVE, commitOID: $commit }) {
+    pullRequestReview { url state commit { oid } }
+  }
+}`;
+
+export const REVIEW_MUTATION = `
+mutation StrataReview($id: ID!, $commit: GitObjectID!, $event: PullRequestReviewEvent!, $body: String, $threads: [DraftPullRequestReviewThread]) {
+  addPullRequestReview(input: { pullRequestId: $id, event: $event, commitOID: $commit, body: $body, threads: $threads }) {
     pullRequestReview { url state commit { oid } }
   }
 }`;
@@ -118,4 +126,31 @@ export async function approvePr(
   const review = page.addPullRequestReview?.pullRequestReview;
   if (!review) throw new GitHubError("GitHub did not return the review.");
   return { url: review.url, commitOid: review.commit?.oid ?? commitOid };
+}
+
+/**
+ * Submits a review with a summary, an event and line comments, in one
+ * request, so GitHub gets all of it or none. GitHub's refusal comes back as a
+ * GitHubError.
+ */
+export async function submitReview(
+  port: GitHubPort,
+  nodeId: string,
+  review: ReviewSubmission,
+): Promise<{ url: string }> {
+  const page = await port.graphql<ApprovePage>(REVIEW_MUTATION, {
+    id: nodeId,
+    commit: review.commitOid,
+    event: review.event,
+    body: review.body,
+    threads: review.threads.map((t) => ({
+      path: t.path,
+      line: t.line,
+      side: t.side,
+      body: t.body,
+    })),
+  });
+  const done = page.addPullRequestReview?.pullRequestReview;
+  if (!done) throw new GitHubError("GitHub did not return the review.");
+  return { url: done.url };
 }

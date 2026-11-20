@@ -17,7 +17,7 @@ import type { UsageEntry } from "../llm.js";
 import { settingsPath } from "../settings.js";
 import { type DemoRepo, demoRepo } from "../testing/demo-repo.js";
 import { StackRepo } from "../testing/stack-repo.js";
-import { checkCitations } from "./chat.js";
+import { checkCitations, claimsRead, readsNote } from "./chat.js";
 
 let remote: StackRepo;
 let dataDir: string;
@@ -136,6 +136,7 @@ describe("chat", () => {
         anchors: [],
         analysedAt: null,
         createdAt: "2026-10-02T00:00:00Z",
+        reads: [],
       },
       {
         id: "m2",
@@ -145,6 +146,7 @@ describe("chat", () => {
         anchors: [],
         analysedAt: null,
         createdAt: "2026-10-02T00:00:00Z",
+        reads: [],
       },
     ];
 
@@ -178,7 +180,13 @@ describe("chat", () => {
     expect(system).toContain(hunk.id);
     expect(system).not.toContain("ASD-STE100");
     expect(first?.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
-    const [asked] = first?.messages[2]?.content as Anthropic.TextBlockParam[];
+    expect(first?.messages[1]?.content).toEqual("(Tool reads for this answer: none.)\n\nA stack.");
+    expect(chunks.filter((c) => c.type === "read").map((c) => c.read)).toEqual([
+      { tool: "read_hunk", target: hunk.id, path: hunk.path },
+      { tool: "read_file", target: file, side: "head" },
+      { tool: "search", target: "nothing matches this" },
+    ]);
+    const [asked] = (first?.messages[2]?.content ?? []) as Anthropic.TextBlockParam[];
     const question = asked?.text ?? "";
     expect(question).toContain(`<highlight source="${hunk.path}`);
     expect(question).toContain(`Highlighted text:\n${lines[0]}`);
@@ -187,6 +195,7 @@ describe("chat", () => {
     const results = second?.messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
     expect(results.map((r) => r.tool_use_id)).toEqual(["t1", "t2", "t3"]);
     expect(results[0]?.content).toContain(`${hunk.path} @@`);
+    expect(results[0]?.content).toContain("(Columns: base line, head line, diff text.)");
     expect(results[1]?.content).toContain(`${file} at the head, lines 1-`);
     expect(results[2]?.content).toBe("No file at the head has this text.");
     expect(usage.map((entry) => entry.task)).toEqual(["chat", "chat"]);
@@ -427,5 +436,140 @@ describe("chat", () => {
     expect(await engine().readFile(repo, head, path)).not.toBeNull();
     expect(await engine().readFile(repo, head, "../outside")).toBeNull();
     expect(await engine().readFile(repo, head, "no/such/file")).toBeNull();
+  });
+
+  it("reads the code when an answer says it read code but made no tool call", async () => {
+    await allowClaude();
+    const analysed = await report();
+    const hunk = analysed.change.hunks[0];
+    if (!hunk) throw new Error("The demo stack has no hunks.");
+    const { client, requests } = scripted([
+      { stop_reason: "end_turn", content: [text("I will read the migration first. It is safe.")] },
+      { stop_reason: "tool_use", content: [toolUse("t1", "read_hunk", { id: hunk.id })] },
+      { stop_reason: "end_turn", content: [text("I read it now. The claim holds.")] },
+    ]);
+    const usage: UsageEntry[] = [];
+    const chunks = await collect(
+      engine({ anthropicClient: client, recordUsage: (entry) => usage.push(entry) }).chat({
+        report: analysed,
+        history: [],
+        text: "Is it safe?",
+        anchors: [],
+      }),
+    );
+    expect(chunks.filter((c) => c.type === "status").map((c) => c.text)).toEqual([
+      "Checking the code",
+      `Reading ${hunk.id}`,
+    ]);
+    const nudge = requests[1]?.messages.at(-1)?.content as Anthropic.TextBlockParam[];
+    expect(nudge[0]?.text).toContain("you made no tool call for this question");
+    expect(usage.map((entry) => entry.task)).toEqual([
+      "chat",
+      "chat-read-check",
+      "chat-read-check",
+    ]);
+    expect(requests).toHaveLength(3);
+  });
+
+  it("checks an answer for read claims only once, and not when it made tool calls", async () => {
+    await allowClaude();
+    const analysed = await report();
+    const { client, requests } = scripted([
+      { stop_reason: "end_turn", content: [text("I checked the file.")] },
+      { stop_reason: "end_turn", content: [text("I checked it again.")] },
+    ]);
+    await collect(
+      engine({ anthropicClient: client }).chat({
+        report: analysed,
+        history: [],
+        text: "Is it safe?",
+        anchors: [],
+      }),
+    );
+    expect(requests).toHaveLength(2);
+
+    const plain = scripted([{ stop_reason: "end_turn", content: [text("The PR adds a file.")] }]);
+    await collect(
+      engine({ anthropicClient: plain.client }).chat({
+        report: analysed,
+        history: [],
+        text: "What is it?",
+        anchors: [],
+      }),
+    );
+    expect(plain.requests).toHaveLength(1);
+  });
+
+  it("tells read claims from other text", () => {
+    expect(claimsRead("I will read the migration code and the drop script first.")).toBe(true);
+    expect(claimsRead("I read the hunk.")).toBe(true);
+    expect(claimsRead("Let me check the model.")).toBe(true);
+    expect(claimsRead("I have not read the model change.")).toBe(false);
+    expect(claimsRead("The script reads only encrypted credentials.")).toBe(false);
+    expect(
+      readsNote([
+        { tool: "read_hunk", target: "hunk_1", path: "a.py", pr: 3 },
+        { tool: "read_file", target: "b.py", side: "base" },
+        { tool: "read_pr", target: "3" },
+      ]),
+    ).toBe(
+      "(Tool reads for this answer: read_hunk hunk_1 (a.py) of #3; read_file b.py at base; read_pr #3.)",
+    );
+  });
+
+  it("drafts comments only on read code, on a line of the PR's own diff", async () => {
+    await allowClaude();
+    const analysed = await report();
+    const part = analysed.parts.find((p) => p.pr === 2);
+    const hunk = part?.hunks[0];
+    const line = hunk?.lines.find((l) => l.kind === "add")?.newLine;
+    if (!part || !hunk || line === undefined) throw new Error("#2 has no added line.");
+    const { client, requests } = scripted([
+      {
+        stop_reason: "tool_use",
+        content: [
+          toolUse("t1", "draft_comment", { pr: 2, path: hunk.path, line, body: "Too early." }),
+          toolUse("t2", "read_hunk", { id: hunk.id, pr: 2 }),
+          toolUse("t3", "draft_comment", { pr: 2, path: hunk.path, line, body: "Why this?" }),
+          toolUse("t4", "draft_comment", { pr: 2, path: hunk.path, line: 99_999, body: "No." }),
+          toolUse("t5", "draft_comment", { pr: 2, body: "Please add a rollout note." }),
+          toolUse("t6", "draft_comment", { pr: 99, body: "Not here." }),
+        ],
+      },
+      { stop_reason: "end_turn", content: [text("I added two comments to #2.")] },
+    ]);
+    const chunks = await collect(
+      engine({ anthropicClient: client }).chat({
+        report: analysed,
+        history: [],
+        text: "Comment on #2",
+        anchors: [],
+      }),
+    );
+    expect(chunks.filter((c) => c.type === "draft").map((c) => c.draft)).toEqual([
+      { pr: 2, path: hunk.path, line, side: "RIGHT", body: "Why this?", commitOid: demo.heads[2] },
+      {
+        pr: 2,
+        path: null,
+        line: null,
+        side: "RIGHT",
+        body: "Please add a rollout note.",
+        commitOid: null,
+      },
+    ]);
+    const results = requests[1]?.messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(results[0]).toMatchObject({
+      is_error: true,
+      content: `Read ${hunk.path} with read_hunk or read_file before you comment on it.`,
+    });
+    expect(results[2]?.content).toContain("pending review of #2");
+    expect(results[3]?.is_error).toBe(true);
+    expect(String(results[3]?.content)).toContain("is not in #2's diff");
+    expect(results[5]).toMatchObject({ is_error: true, content: "#99 is not on this path." });
+    const system = ((requests[0]?.system ?? []) as Anthropic.TextBlockParam[])
+      .map((b) => b.text)
+      .join("\n");
+    expect(system).toContain("You cannot post a comment.");
+    expect(requests[0]?.tools?.map((t) => ("name" in t ? t.name : ""))).toContain("draft_comment");
   });
 });

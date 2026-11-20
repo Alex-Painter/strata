@@ -1,4 +1,11 @@
-import { type Anchor, anchorId, type ChangeReport, type ChatMessage } from "@strata/core/model";
+import {
+  type Anchor,
+  anchorId,
+  type ChangeReport,
+  type ChatMessage,
+  type ChatRead,
+  type ReviewComment,
+} from "@strata/core/model";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -6,6 +13,7 @@ import { findHunk } from "../components/Diff";
 import { Icon } from "../components/Icon";
 import { api } from "../lib/api";
 import { Markdown } from "../lib/markdown";
+import { useComments, whereOf } from "./Review";
 
 /** A question on its way: what was asked, and the answer so far. */
 interface Pending {
@@ -16,6 +24,8 @@ interface Pending {
   answer: string;
   status: string | null;
   error: string | null;
+  /** Comments the answer drafted so far. */
+  drafts: ReviewComment[];
 }
 
 /**
@@ -33,6 +43,7 @@ export function Ask({
   focus = 0,
   startNew = false,
   onStartNew,
+  onOpenReview,
 }: {
   changeId: string;
   report: ChangeReport | null;
@@ -48,6 +59,8 @@ export function Ask({
   startNew?: boolean;
   /** Tells the parent that the chat used startNew. */
   onStartNew?: () => void;
+  /** Opens a PR's pane, where its review box is. */
+  onOpenReview?: (pr: number) => void;
 }) {
   const queryClient = useQueryClient();
   const repo = report?.change.repo.kind === "github" ? report.change.repo : null;
@@ -69,6 +82,7 @@ export function Ask({
     queryFn: () => api.messages(threadId ?? ""),
     enabled: threadId !== null,
   });
+  const comments = useComments(changeId);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -111,6 +125,7 @@ export function Ask({
       answer: "",
       status: null,
       error: null,
+      drafts: [],
     });
     setText("");
     onClearAnchors();
@@ -133,6 +148,7 @@ export function Ask({
             if (event.type === "delta")
               return { ...now, answer: now.answer + event.text, status: null };
             if (event.type === "status") return { ...now, status: event.text };
+            if (event.type === "draft") return { ...now, drafts: [...now.drafts, event.comment] };
             if (event.type === "error") return { ...now, error: event.message };
             return now;
           }),
@@ -141,6 +157,7 @@ export function Ask({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["messages", id] }),
         queryClient.invalidateQueries({ queryKey: ["threads", changeId] }),
+        queryClient.invalidateQueries({ queryKey: ["comments", changeId] }),
       ]);
       setPending((now) => (now?.error ? now : null));
     } catch (error) {
@@ -231,6 +248,11 @@ export function Ask({
                 <p className="sub">This answer is about an earlier analysis of the Change.</p>
               )}
               <Markdown text={message.text} onCite={onCite} citeLabel={citeLabel} />
+              <Drafts
+                drafts={(comments.data ?? []).filter((c) => c.messageId === message.id)}
+                onOpenReview={onOpenReview}
+              />
+              <Reads reads={message.reads ?? []} />
             </div>
           ),
         )}
@@ -239,6 +261,7 @@ export function Ask({
             <Question text={live.text} anchors={live.anchors} report={report} onCite={onCite} />
             <div className="ask-a">
               {live.answer && <Markdown text={live.answer} onCite={onCite} citeLabel={citeLabel} />}
+              <Drafts drafts={live.drafts} onOpenReview={onOpenReview} />
               {!live.error && (
                 <p className="sub" role="status">
                   {live.status ?? (live.answer ? "Writing…" : "Thinking…")}
@@ -376,4 +399,75 @@ export function anchorLabel(report: ChangeReport, anchor: Anchor): string {
     default:
       return source.kind;
   }
+}
+
+/** The comments an answer drafted: each waits in its PR's review until the reviewer sends it. */
+function Drafts({
+  drafts,
+  onOpenReview,
+}: {
+  drafts: ReviewComment[];
+  onOpenReview: ((pr: number) => void) | undefined;
+}) {
+  if (drafts.length === 0) return null;
+  return (
+    <div className="grid gap-2">
+      {drafts.map((draft) => (
+        <div key={draft.id} className="ask-draft">
+          <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+            <Icon name="comment" className="i" />
+            <span>
+              Comment on <span className="font-mono">#{draft.pr}</span>
+            </span>
+            <span className="font-mono" title={draft.path ?? undefined}>
+              {whereOf(draft)}
+            </span>
+            <span className="flex-1" />
+            {draft.state === "posted" && draft.url ? (
+              <a href={draft.url} target="_blank" rel="noreferrer" className="lnk">
+                Sent to GitHub
+              </a>
+            ) : onOpenReview ? (
+              <button type="button" className="btn ghost sm" onClick={() => onOpenReview(draft.pr)}>
+                In #{draft.pr}'s review
+              </button>
+            ) : (
+              <span>In #{draft.pr}'s review</span>
+            )}
+          </div>
+          <p className="whitespace-pre-wrap">{draft.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const READ_NOUN: Record<ChatRead["tool"], [string, string]> = {
+  read_hunk: ["hunk", "hunks"],
+  read_file: ["file", "files"],
+  read_pr: ["PR description", "PR descriptions"],
+  search: ["search", "searches"],
+};
+
+/** What the answer read, so an answer with nothing behind it shows. */
+export function readsLine(reads: ChatRead[]): string {
+  if (reads.length === 0) return "No code read for this answer";
+  const counts = new Map<ChatRead["tool"], number>();
+  for (const read of reads) counts.set(read.tool, (counts.get(read.tool) ?? 0) + 1);
+  const parts = [...counts].map(([tool, n]) => {
+    const [one, many] = READ_NOUN[tool];
+    return `${n} ${n === 1 ? one : many}`;
+  });
+  return `Read ${parts.join(", ")}`;
+}
+
+function Reads({ reads }: { reads: ChatRead[] }) {
+  const title = reads
+    .map((r) => (r.tool === "read_hunk" && r.path ? `${r.target} (${r.path})` : r.target))
+    .join("\n");
+  return (
+    <p className="sub" title={title || undefined}>
+      {readsLine(reads)}
+    </p>
+  );
 }

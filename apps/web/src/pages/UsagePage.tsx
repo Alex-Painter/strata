@@ -36,6 +36,11 @@ export const FEATURES: Record<string, { label: string; color: string; info: stri
     color: "var(--hl-number)",
     info: "Claude answers the questions in the Ask tab.",
   },
+  "chat-read-check": {
+    label: "Ask read check",
+    color: "var(--del)",
+    info: "An extra Ask round when an answer says it read code but made no tool call.",
+  },
 };
 
 const feature = (task: string) => FEATURES[task] ?? { label: task, color: "var(--fg-3)", info: "" };

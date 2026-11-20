@@ -2,7 +2,13 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ChangeDetail, ChatMessage, ChatStreamEvent, ChatThread } from "@strata/core/model";
+import type {
+  ChangeDetail,
+  ChatMessage,
+  ChatStreamEvent,
+  ChatThread,
+  ReviewComment,
+} from "@strata/core/model";
 import type { ChatRequest, Engine } from "@strata/engine";
 import { settingsPath } from "@strata/engine";
 import { type DemoRepo, demoRepo, StackRepo } from "@strata/engine/testing";
@@ -56,6 +62,11 @@ function setup() {
         asked.push(request);
         const hunk = request.report.change.hunks[0]?.id;
         yield { type: "status", text: "Reading a hunk" };
+        yield { type: "read", read: { tool: "read_hunk", target: hunk ?? "", path: "a.txt" } };
+        yield {
+          type: "draft",
+          draft: { pr: 2, path: null, line: null, side: "RIGHT", body: "Nice.", commitOid: null },
+        };
         yield { type: "text", text: `It adds a file [${hunk}].` };
         yield { type: "text", text: " See also [hunk_0000000000000000]." };
       },
@@ -120,10 +131,19 @@ it("keeps threads on a Change and streams answers with checked citations", async
   expect(res.status).toBe(200);
   expect(res.headers.get("content-type")).toContain("text/event-stream");
   const stream = await events(res);
-  expect(stream.map((e) => e.type)).toEqual(["status", "delta", "delta", "done"]);
+  expect(stream.map((e) => e.type)).toEqual(["status", "draft", "delta", "delta", "done"]);
   const done = stream.at(-1) as Extract<ChatStreamEvent, { type: "done" }>;
   const hunk = asked[0]?.report.change.hunks[0]?.id;
   expect(done.message.text).toBe(`It adds a file [${hunk}]. See also.`);
+  expect(done.message.reads).toEqual([{ tool: "read_hunk", target: hunk, path: "a.txt" }]);
+  // The draft is kept in the PR's pending review, tied to the answer, and not sent to GitHub.
+  const draft = stream[1] as Extract<ChatStreamEvent, { type: "draft" }>;
+  expect(draft.comment).toMatchObject({ pr: 2, body: "Nice.", state: "pending", url: null });
+  const comments = (await (
+    await app.request(`/api/changes/${id}/comments`)
+  ).json()) as ReviewComment[];
+  expect(comments).toEqual([{ ...draft.comment, messageId: done.message.id }]);
+  expect(demo.github.calls.filter((c) => c.query === "submit-review")).toEqual([]);
   expect(asked[0]?.anchors).toEqual([anchor]);
   expect(asked[0]?.history).toEqual([]);
 
@@ -143,6 +163,7 @@ it("keeps threads on a Change and streams answers with checked citations", async
   // The next question carries the thread so far.
   await events(await post(`/api/threads/${thread.id}/messages`, { text: "And #3?", anchors: [] }));
   expect(asked[1]?.history.map((m) => m.role)).toEqual(["user", "assistant"]);
+  expect(asked[1]?.history[1]?.reads).toEqual(done.message.reads);
 });
 
 it("asks nothing when the repo does not allow Claude, or before a report exists", async () => {

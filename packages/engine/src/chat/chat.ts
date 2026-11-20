@@ -10,19 +10,23 @@
  * not hold, so every link in an answer goes to real evidence (AGENTS.md).
  */
 import type Anthropic from "@anthropic-ai/sdk";
+import type { Hunk } from "@strata/core";
 import {
   type ChangeReport,
   type ChatMessage,
+  type ChatRead,
   CITATION_PATTERN,
+  type CommentSide,
+  commentTarget,
   plainDescription,
 } from "@strata/core";
-import type { ChatChunk, ResolvedAnchor } from "../api.js";
+import type { ChatChunk, CommentDraft, ResolvedAnchor } from "../api.js";
 import type { PrText } from "../github/verification.js";
 import { ClaudeError, type UsageEntry, usageEntry } from "../llm.js";
 import { digest, findHunk, hunkIds, hunkText, type ReadFile } from "./context.js";
 
 /** Increase when the prompt or the tools change. */
-export const CHAT_PROMPT_VERSION = 4;
+export const CHAT_PROMPT_VERSION = 5;
 /** Tool calls for one question. Past it, Claude is told to answer with what it has. */
 const MAX_TOOL_CALLS = 8;
 /** Lines of a file returned by one read. */
@@ -36,6 +40,10 @@ const DESCRIPTION_CHARS = 6_000;
 const DESCRIPTIONS_CHARS = 24_000;
 /** Characters of one linked issue in a `read_pr` result. */
 const ISSUE_CHARS = 4_000;
+/** Comments Ask can draft for one question. */
+const MAX_DRAFTS = 10;
+/** Characters of one drafted comment. */
+const DRAFT_CHARS = 4_000;
 
 export interface ChatTools {
   readFile: ReadFile;
@@ -78,7 +86,11 @@ Use the tools to read hunks, files and search results before you make a claim ab
 
 Cite the evidence for each claim: write the hunk id in square brackets after the sentence, for example [hunk_0123456789abcdef]. Cite only hunk ids from the digest, from a highlight or from a tool result. Do not cite files by a made-up id; name them by path. Cite a PR description or an issue with a Markdown link to its URL, for example [#123](https://github.com/acme/app/pull/123).
 
-The thread shows only the text of your earlier answers. The tool reads that you did for them are not shown again. Do not say that an earlier answer did not come from a tool read.
+The thread shows only the text of your earlier answers. A line before each one lists the tool reads it made and the comments it drafted.
+
+Do not write that you read, checked or will read something unless you call the tool for it in this answer, or an earlier answer's list of reads shows it. If you did not read it, say so.
+
+When the person asks for a comment on a PR, write it with \`draft_comment\`, one call per comment. Read the code a comment is about first. A line comment goes on a line of that PR's own diff: \`read_hunk\` with \`pr\` shows the line numbers. You cannot post a comment. It goes into the PR's pending review in Strata, and the person reads it, edits it and sends the review from Strata. Do not repeat the comment text in your answer; say in one line which PR and line each comment is on.
 
 Write in plain, natural English. Keep answers short: a few sentences or a short list. Use Markdown. Put code symbols and paths in backticks.`;
 
@@ -123,6 +135,22 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "draft_comment",
+    description:
+      "Adds a review comment to a PR's pending review in Strata. It does not post to GitHub; the person sends the review. With `path` and `line`, the comment goes on that line of the PR's own diff (`side` RIGHT is the head, LEFT is the base). Without them, it is a comment on the PR as a whole.",
+    input_schema: {
+      type: "object",
+      properties: {
+        pr: { type: "integer", description: "A PR number on this path." },
+        body: { type: "string", description: "The comment, in Markdown." },
+        path: { type: "string", description: "The file, from the repo root." },
+        line: { type: "integer", description: "A line number in the PR's own diff." },
+        side: { type: "string", enum: ["RIGHT", "LEFT"] },
+      },
+      required: ["pr", "body"],
+    },
+  },
+  {
     name: "search",
     description:
       "Searches every file of the repo at the head of the Change for a fixed string. With `pr`, searches at the head of that PR's own diff. Returns path:line:text lines.",
@@ -155,14 +183,24 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
     ...run.history.map(
       ({ message, anchors }): Anthropic.MessageParam => ({
         role: message.role,
-        content: message.role === "user" ? userTurn(message.text, anchors) : message.text,
+        content:
+          message.role === "user"
+            ? userTurn(message.text, anchors)
+            : `${readsNote(message.reads ?? [])}\n\n${message.text}`,
       }),
     ),
     { role: "user", content: userTurn(run.text, run.anchors) },
   ];
+  // What Claude read in this thread, so a comment is drafted only on code it read.
+  const read = new Set(
+    run.history.flatMap(({ message }) => (message.reads ?? []).flatMap(readPaths)),
+  );
 
   let calls = 0;
+  let drafts = 0;
   let wrote = false;
+  let answer = "";
+  let checked = false;
   for (;;) {
     signal?.throwIfAborted();
     const stream = client.messages.stream(
@@ -183,13 +221,24 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
         if (first && wrote) yield { type: "text", text: "\n\n" };
         first = false;
         wrote = true;
+        answer += event.delta.text;
         yield { type: "text", text: event.delta.text };
       }
     }
     const message = await stream.finalMessage();
-    run.recordUsage?.(usageEntry("chat", message.model ?? model, message.usage));
+    run.recordUsage?.(
+      usageEntry(checked ? "chat-read-check" : "chat", message.model ?? model, message.usage),
+    );
     if (message.stop_reason === "refusal") throw new ClaudeError("Claude did not answer.");
-    if (message.stop_reason !== "tool_use") return;
+    if (message.stop_reason !== "tool_use") {
+      // An answer that says it read code, with no read behind it: one more round to read it.
+      if (checked || calls > 0 || !claimsRead(answer)) return;
+      checked = true;
+      yield { type: "status", text: "Checking the code" };
+      messages.push({ role: "assistant", content: message.content });
+      messages.push({ role: "user", content: READ_CHECK });
+      continue;
+    }
 
     messages.push({ role: "assistant", content: message.content });
     const results: Anthropic.ToolResultBlockParam[] = [];
@@ -208,7 +257,26 @@ export async function* runChat(run: ChatRun): AsyncIterable<ChatChunk> {
       const input = (block.input ?? {}) as Record<string, unknown>;
       yield { type: "status", text: statusOf(block.name, input) };
       try {
+        if (block.name === "draft_comment") {
+          drafts += 1;
+          if (drafts > MAX_DRAFTS)
+            throw new Error("The comment limit for this question is reached.");
+          const draft = checkDraft(input, report, read);
+          yield { type: "draft", draft };
+          const where = draft.path ? `${draft.path} line ${draft.line}` : "the PR as a whole";
+          results.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: `The comment is in the pending review of #${draft.pr}, on ${where}. The person decides to send it.`,
+          });
+          continue;
+        }
         const content = await runTool(block.name, input, report, tools);
+        const done = readOf(block.name, input, report);
+        if (done) {
+          for (const path of readPaths(done)) read.add(path);
+          yield { type: "read", read: done };
+        }
         results.push({ type: "tool_result", tool_use_id: block.id, content: clip(content) });
       } catch (error) {
         results.push({
@@ -264,6 +332,7 @@ function statusOf(name: string, input: Record<string, unknown>): string {
   }
   if (name === "read_pr") return `Reading the description of #${String(input.pr)}`;
   if (name === "search") return `Searching the code for "${String(input.text)}"`;
+  if (name === "draft_comment") return `Drafting a comment on #${String(input.pr)}`;
   return `Using ${name}`;
 }
 
@@ -279,7 +348,7 @@ async function runTool(
       const pr = typeof input.pr === "number" ? input.pr : undefined;
       const found = findHunk(report, input.id, pr);
       if (!found) throw new Error(`This Change has no hunk ${input.id}${pr ? ` in #${pr}` : ""}.`);
-      return hunkText(found.hunk);
+      return numberedHunk(found.hunk);
     }
     case "read_file": {
       if (typeof input.path !== "string") throw new Error("Give the file as `path`.");
@@ -317,6 +386,104 @@ async function runTool(
     default:
       throw new Error(`There is no tool ${name}.`);
   }
+}
+
+/** A hunk as diff text with the base and head line numbers of each line. */
+function numberedHunk(hunk: Hunk): string {
+  const lines = hunk.lines.map((line) => {
+    const base = line.oldLine === undefined ? "" : String(line.oldLine);
+    const head = line.newLine === undefined ? "" : String(line.newLine);
+    return `${base.padStart(5)} ${head.padStart(5)} ${MARK[line.kind]}${line.content}`;
+  });
+  return [hunkText(hunk, 0, 0), "(Columns: base line, head line, diff text.)", ...lines].join("\n");
+}
+
+const MARK = { add: "+", del: "-", context: " " } as const;
+
+/** The read a tool call made, for the answer's list of reads. Null for a call that read nothing. */
+function readOf(
+  name: string,
+  input: Record<string, unknown>,
+  report: ChangeReport,
+): ChatRead | null {
+  const pr = typeof input.pr === "number" ? { pr: input.pr } : {};
+  if (name === "read_hunk" && typeof input.id === "string") {
+    const found = findHunk(report, input.id, pr.pr);
+    return { tool: name, target: input.id, ...pr, ...(found ? { path: found.hunk.path } : {}) };
+  }
+  if (name === "read_file" && typeof input.path === "string") {
+    return { tool: name, target: input.path, ...pr, side: input.side === "base" ? "base" : "head" };
+  }
+  if (name === "read_pr" && typeof input.pr === "number") {
+    return { tool: name, target: String(input.pr) };
+  }
+  if (name === "search" && typeof input.text === "string") {
+    return { tool: name, target: input.text, ...pr };
+  }
+  return null;
+}
+
+/** The files a read showed. */
+function readPaths(read: ChatRead): string[] {
+  if (read.tool === "read_file") return [read.target];
+  if (read.tool === "read_hunk" && read.path) return [read.path];
+  return [];
+}
+
+/** The line before an earlier answer: what it read and drafted. */
+export function readsNote(reads: ChatRead[]): string {
+  if (reads.length === 0) return "(Tool reads for this answer: none.)";
+  const list = reads.map((r) => {
+    const of = r.pr === undefined ? "" : ` of #${r.pr}`;
+    if (r.tool === "read_hunk") return `read_hunk ${r.target}${r.path ? ` (${r.path})` : ""}${of}`;
+    if (r.tool === "read_file") return `read_file ${r.target} at ${r.side ?? "head"}${of}`;
+    if (r.tool === "read_pr") return `read_pr #${r.target}`;
+    return `search "${r.target}"${of}`;
+  });
+  return `(Tool reads for this answer: ${list.join("; ")}.)`;
+}
+
+const READ_CHECK =
+  "Strata note: your answer says that you read or will read code, but you made no tool call for this question. Call the tools now to read it. Then correct any claim that the code does not support.";
+
+/** Words that say the answer read code. */
+const READ_CLAIM =
+  /\b(?:I(?:'ve| have)? (?:read|checked|looked at|reviewed|inspected|opened|went through)|I will (?:read|check|look at|open)|I'll (?:read|check|look at|open)|after (?:I )?read(?:ing)?|let me (?:read|check|look at|open))\b/i;
+
+/** True when the text says it read or will read something. */
+export function claimsRead(text: string): boolean {
+  return READ_CLAIM.test(text);
+}
+
+/** A draft_comment call checked against the report and the reads so far. Throws what Claude must fix. */
+function checkDraft(
+  input: Record<string, unknown>,
+  report: ChangeReport,
+  read: Set<string>,
+): CommentDraft {
+  if (typeof input.pr !== "number") throw new Error("Give the PR number as `pr`.");
+  if (!onPath(report, input.pr)) throw new Error(`#${input.pr} is not on this path.`);
+  const body = typeof input.body === "string" ? input.body.trim() : "";
+  if (body === "") throw new Error("Give the comment as `body`.");
+  if (body.length > DRAFT_CHARS) {
+    throw new Error(`Write a comment of ${DRAFT_CHARS} characters or fewer.`);
+  }
+  const path = typeof input.path === "string" && input.path !== "" ? input.path : null;
+  if (path === null) {
+    return { pr: input.pr, path: null, line: null, side: "RIGHT", body, commitOid: null };
+  }
+  if (typeof input.line !== "number") {
+    throw new Error(
+      "Give the line as `line`, or leave out `path` for a comment on the PR as a whole.",
+    );
+  }
+  if (!read.has(path)) {
+    throw new Error(`Read ${path} with read_hunk or read_file before you comment on it.`);
+  }
+  const side: CommentSide = input.side === "LEFT" ? "LEFT" : "RIGHT";
+  const target = commentTarget(report, input.pr, path, input.line, side);
+  if (!target.ok) throw new Error(target.reason);
+  return { pr: input.pr, path, line: input.line, side, body, commitOid: target.commitOid };
 }
 
 function onPath(report: ChangeReport, pr: number): boolean {

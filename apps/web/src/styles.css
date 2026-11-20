@@ -1242,6 +1242,74 @@ code,
     display: grid;
     gap: 6px;
   }
+  /* The review box at the top of a PR's pane, after Linear's review composer. */
+  .review-box {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--raised);
+  }
+  .review-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .review-summary {
+    width: 100%;
+    min-height: 64px;
+    resize: vertical;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: 13.5px;
+    outline: none;
+  }
+  .review-summary:focus {
+    border-color: var(--accent-line);
+    background: var(--bg);
+  }
+  .review-summary:disabled {
+    cursor: not-allowed;
+  }
+  .review-comments {
+    display: grid;
+    gap: 6px;
+  }
+  .review-comment {
+    display: grid;
+    gap: 4px;
+    padding: 6px 8px;
+    border-left: 2px solid var(--accent-line);
+    background: var(--bg);
+    border-radius: 0 6px 6px 0;
+  }
+  .review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .review-actions > [role="alert"],
+  .review-actions > .review-note {
+    flex-basis: 100%;
+  }
+  /* A comment Ask drafted, under its answer. */
+  .ask-draft {
+    display: grid;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+  }
   .ask-form {
     display: grid;
     gap: 8px;

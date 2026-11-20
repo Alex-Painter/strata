@@ -12,8 +12,11 @@ import type {
   ChangeReport,
   ChangeRevisions,
   ChatMessage,
+  ChatRead,
+  CommentSide,
   ContextSource,
   RepoRef,
+  ReviewEvent,
   Stack,
 } from "@strata/core";
 import type { AuthoredPrs } from "./github/authored.js";
@@ -36,6 +39,8 @@ export const DEFAULT_MODELS: Readonly<Record<LlmTask, string>> = {
   "whole-summary": "claude-sonnet-5-5",
   "change-why": "claude-haiku-5-5",
   chat: "claude-sonnet-5-5",
+  /** The extra Ask round when an answer says it read code but made no tool call. */
+  "chat-read-check": "claude-sonnet-5-5",
 };
 
 export interface EngineConfig {
@@ -150,7 +155,24 @@ export interface ChatRequest {
   changeId?: string;
 }
 
-export type ChatChunk = { type: "text"; text: string } | { type: "status"; text: string };
+export type ChatChunk =
+  | { type: "text"; text: string }
+  | { type: "status"; text: string }
+  /** A tool read behind the answer. */
+  | { type: "read"; read: ChatRead }
+  /** A comment Ask drafted. The engine checked its line; it is not on GitHub. */
+  | { type: "draft"; draft: CommentDraft };
+
+/** A comment Ask drafted for a PR's pending review. */
+export interface CommentDraft {
+  pr: number;
+  path: string | null;
+  line: number | null;
+  side: CommentSide;
+  body: string;
+  /** The head the line refers to; null for a comment on the PR as a whole. */
+  commitOid: string | null;
+}
 
 export interface Engine {
   /** Every stack among the PRs updated in the last 90 days, bottom PR first. */
@@ -174,6 +196,11 @@ export interface Engine {
    * it when a person asked for this approval.
    */
   approvePr(read: LivePrRead, commitOid: string): Promise<{ url: string; commitOid: string }>;
+  /**
+   * Submits a review of `commitOid` as the token's user: a summary, an event,
+   * and line comments. Only call it when a person pressed a review button.
+   */
+  submitReview(read: LivePrRead, review: ReviewSubmission): Promise<{ url: string }>;
   resolveChange(input: ChangeInput, options?: ProgressOptions): Promise<ResolvedChange>;
   analyzeChange(input: ChangeInput, options?: AnalyzeOptions): Promise<ChangeReport>;
   /** Null when the file does not exist at that revision. */
@@ -181,6 +208,14 @@ export interface Engine {
   resolveAnchors(report: ChangeReport, anchors: Anchor[]): Promise<ResolvedAnchor[]>;
   /** Streams the assistant's reply. Throws if no Anthropic key is configured. */
   chat(request: ChatRequest): AsyncIterable<ChatChunk>;
+}
+
+export interface ReviewSubmission {
+  event: ReviewEvent;
+  body: string;
+  commitOid: string;
+  /** Line comments; comments on the PR as a whole go in `body`. */
+  threads: Array<{ path: string; line: number; side: CommentSide; body: string }>;
 }
 
 export type CreateEngine = (config: EngineConfig) => Engine;

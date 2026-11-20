@@ -30,6 +30,7 @@ import { latestRun, runInfo } from "../runs.js";
 import { StackCache } from "../stack-cache.js";
 import type { AppDeps, AppEnv } from "../types.js";
 import { approvalRoutes } from "./approvals.js";
+import { reviewRoutes } from "./reviews.js";
 
 const CreateChange = z.object({
   input: z.string().min(1).max(500),
@@ -195,6 +196,7 @@ export function changeRoutes(deps: AppDeps) {
   });
 
   app.route("/", approvalRoutes(deps, stackCache));
+  app.route("/", reviewRoutes(deps));
 
   app.onError((error, c) => {
     if (

@@ -10,6 +10,7 @@ import {
   type Anchor,
   type ChangeReport,
   type ChatMessage,
+  type ChatRead,
   type ChatStreamEvent,
   type ChatThread,
   type PostChatMessageRequest,
@@ -27,9 +28,11 @@ import {
   changes,
   chatMessages,
   chatThreads,
+  prComments,
   reports,
 } from "../db/schema.js";
 import type { AppDeps, AppEnv } from "../types.js";
+import { commentOf } from "./reviews.js";
 
 /** Characters of the first question kept as the thread's title. */
 const TITLE_CHARS = 80;
@@ -121,6 +124,7 @@ export function chatRoutes(deps: AppDeps) {
         anchors: JSON.stringify(anchors),
         analysedAt,
         createdAt: now,
+        reads: "[]",
       })
       .run();
     db.update(chatThreads)
@@ -134,6 +138,8 @@ export function chatRoutes(deps: AppDeps) {
       const send = (event: ChatStreamEvent) =>
         stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
       let answer = "";
+      const reads: ChatRead[] = [];
+      const answerId = newId("msg");
       try {
         for await (const chunk of engine.chat({
           report,
@@ -146,18 +152,40 @@ export function chatRoutes(deps: AppDeps) {
           if (chunk.type === "text") {
             answer += chunk.text;
             await send({ type: "delta", text: chunk.text });
+          } else if (chunk.type === "read") {
+            reads.push(chunk.read);
+          } else if (chunk.type === "draft") {
+            // Kept in Strata only; nothing reaches GitHub until the reviewer sends the review.
+            const draft = {
+              id: newId("cmt"),
+              ownerId: c.get("user").id,
+              changeId: thread.changeId,
+              pr: chunk.draft.pr,
+              path: chunk.draft.path,
+              line: chunk.draft.line,
+              side: chunk.draft.side,
+              body: chunk.draft.body,
+              messageId: answerId,
+              commitOid: chunk.draft.commitOid,
+              state: "pending" as const,
+              url: null,
+              createdAt: new Date(),
+            };
+            db.insert(prComments).values(draft).run();
+            await send({ type: "draft", comment: commentOf(draft) });
           } else {
             await send({ type: "status", text: chunk.text });
           }
         }
         const row = {
-          id: newId("msg"),
+          id: answerId,
           threadId: thread.id,
           role: "assistant" as const,
           text: checkCitations(report, answer).trim(),
           anchors: "[]",
           analysedAt,
           createdAt: new Date(),
+          reads: JSON.stringify(reads),
         };
         db.insert(chatMessages).values(row).run();
         db.update(chatThreads)
@@ -239,6 +267,7 @@ function messageOf(row: ChatMessageRow): ChatMessage {
     anchors: JSON.parse(row.anchors) as Anchor[],
     analysedAt: row.analysedAt,
     createdAt: row.createdAt.toISOString(),
+    reads: JSON.parse(row.reads) as ChatRead[],
   };
 }
 

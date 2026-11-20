@@ -153,6 +153,10 @@ export const prReviews = sqliteTable(
     commitOid: text("commit_oid").notNull(),
     url: text("url").notNull(),
     submittedAt: integer("submitted_at", { mode: "timestamp_ms" }).notNull(),
+    /** APPROVE, REQUEST_CHANGES or COMMENT. */
+    event: text("event", { enum: ["APPROVE", "REQUEST_CHANGES", "COMMENT"] })
+      .notNull()
+      .default("APPROVE"),
   },
   (table) => [index("pr_reviews_pr_idx").on(table.ownerId, table.repo, table.pr)],
 );
@@ -187,8 +191,37 @@ export const chatMessages = sqliteTable(
     /** The report the message was asked against (its analysis.startedAt). */
     analysedAt: text("analysed_at"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    /** ChatRead[] as JSON: the tool reads behind an assistant answer. */
+    reads: text("reads").notNull().default("[]"),
   },
   (table) => [index("chat_messages_thread_id_idx").on(table.threadId)],
+);
+
+/** A comment in a PR's pending review, kept until the reviewer sends the review. */
+export const prComments = sqliteTable(
+  "pr_comments",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id").notNull(),
+    changeId: text("change_id")
+      .notNull()
+      .references(() => changes.id, { onDelete: "cascade" }),
+    pr: integer("pr").notNull(),
+    /** Null for a comment on the PR as a whole. */
+    path: text("path"),
+    line: integer("line"),
+    side: text("side", { enum: ["RIGHT", "LEFT"] }).notNull(),
+    body: text("body").notNull(),
+    /** The Ask answer that drafted it. */
+    messageId: text("message_id"),
+    /** The head the line refers to. */
+    commitOid: text("commit_oid"),
+    state: text("state", { enum: ["pending", "posted"] }).notNull(),
+    /** The review it went out in. */
+    url: text("url"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("pr_comments_change_idx").on(table.changeId, table.pr)],
 );
 
 export type User = typeof users.$inferSelect;
@@ -198,3 +231,4 @@ export type AssignmentRow = typeof assignments.$inferSelect;
 export type PrReviewRow = typeof prReviews.$inferSelect;
 export type ChatThreadRow = typeof chatThreads.$inferSelect;
 export type ChatMessageRow = typeof chatMessages.$inferSelect;
+export type PrCommentRow = typeof prComments.$inferSelect;

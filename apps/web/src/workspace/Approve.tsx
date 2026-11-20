@@ -25,6 +25,8 @@ export interface ApprovalsView {
   /** Why Strata refused the last request, and where it started. */
   sendError: { from: "stack" | number; message: string } | null;
   approve: (prs: PrApproval[], from: "stack" | number) => void;
+  /** Takes the PRs as GitHub shows them after a review sent from the review box. */
+  update?: (next: ApprovalsResponse) => void;
 }
 
 const short = (oid: string | null) => (oid ? oid.slice(0, 7) : "unknown");

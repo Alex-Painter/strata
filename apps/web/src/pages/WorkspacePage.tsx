@@ -172,5 +172,11 @@ function useApprovals(id: string, analysedAt: string | null): ApprovalsView {
         ? { from: send.variables.from, message: send.error.message }
         : null,
     approve: (prs, from) => send.mutate({ prs, from }),
+    update: (next) => {
+      setResults([]);
+      queryClient.setQueryData(key, next);
+      void queryClient.invalidateQueries({ queryKey: ["change", id] });
+      void queryClient.invalidateQueries({ queryKey: ["changes"] });
+    },
   };
 }

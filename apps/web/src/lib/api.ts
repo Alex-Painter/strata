@@ -20,8 +20,11 @@ import type {
   PendingResponse,
   PostChatMessageRequest,
   RepoSettingsResponse,
+  ReviewComment,
   RunInfo,
   StacksResponse,
+  SubmitReviewRequest,
+  SubmitReviewResponse,
   UsageResponse,
 } from "@strata/core/model";
 
@@ -144,6 +147,22 @@ export const api = {
   /** Sends approving reviews to GitHub. Only call it from a person's click. */
   approve: (id: string, body: ApproveRequest) =>
     request<ApproveResponse>(`/api/changes/${encodeURIComponent(id)}/approve`, post(body)),
+  /** The comments of a Change's pending reviews, and the ones already sent. */
+  comments: (changeId: string) =>
+    request<ReviewComment[]>(`/api/changes/${encodeURIComponent(changeId)}/comments`),
+  updateComment: (id: string, body: string) =>
+    request<ReviewComment>(`/api/comments/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ body }),
+    }),
+  deleteComment: (id: string) =>
+    request<void>(`/api/comments/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  /** Sends one PR's review to GitHub. */
+  submitReview: (changeId: string, body: SubmitReviewRequest) =>
+    request<SubmitReviewResponse>(
+      `/api/changes/${encodeURIComponent(changeId)}/review`,
+      post(body),
+    ),
   runAgain: (id: string) =>
     request<RunInfo>(`/api/changes/${encodeURIComponent(id)}/runs`, post({})),
   threads: (changeId: string) =>
