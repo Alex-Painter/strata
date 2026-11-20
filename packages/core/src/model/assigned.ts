@@ -14,7 +14,13 @@ export type AssignedReason =
    * `direct` when you were asked by name; otherwise `teams` names the teams
    * that were asked (empty when the token can't see which).
    */
-  | { kind: "review-requested"; direct: boolean; teams: string[] };
+  | {
+      kind: "review-requested";
+      direct: boolean;
+      teams: string[];
+      /** When GitHub last asked (ISO time); missing when it gave no time. */
+      requestedAt?: string;
+    };
 
 export interface AssignedPr {
   number: number;

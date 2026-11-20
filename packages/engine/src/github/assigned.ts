@@ -29,6 +29,14 @@ query StrataAssigned($q: String!, $cursor: String) {
         reviewRequests(first: 50) {
           nodes { requestedReviewer { __typename ... on User { login } ... on Team { combinedSlug } } }
         }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 10) {
+          nodes {
+            ... on ReviewRequestedEvent {
+              createdAt
+              requestedReviewer { __typename ... on User { login } ... on Team { combinedSlug } }
+            }
+          }
+        }
       }
     }
   }
@@ -49,6 +57,10 @@ export interface AssignedNode {
   repository: { nameWithOwner: string };
   assignees: { nodes: ({ login: string } | null)[] };
   reviewRequests: { nodes: ({ requestedReviewer: Reviewer | null } | null)[] };
+  /** The latest review requests, oldest first. Older Strata fakes may leave it out. */
+  timelineItems?: {
+    nodes: ({ createdAt?: string; requestedReviewer?: Reviewer | null } | null)[];
+  };
 }
 
 export interface ViewerPage {
@@ -114,7 +126,17 @@ function toAssignedPr(
     const teams = direct
       ? []
       : reviewers.flatMap((r) => (r.__typename === "Team" ? [r.combinedSlug] : [])).sort();
-    reasons.push({ kind: "review-requested", direct, teams });
+    const requestedAt = requestedAtOf(node, (r) =>
+      direct
+        ? r.__typename === "User" && same(r.login)
+        : r.__typename === "Team" && (teams.length === 0 || teams.includes(r.combinedSlug)),
+    );
+    reasons.push({
+      kind: "review-requested",
+      direct,
+      teams,
+      ...(requestedAt ? { requestedAt } : {}),
+    });
   }
   if (kinds.has("reviewed")) reasons.push({ kind: "reviewed" });
   return {
@@ -125,4 +147,18 @@ function toAssignedPr(
     updatedAt: node.updatedAt,
     reasons,
   };
+}
+
+/**
+ * When the open request was made: the newest review-request event for a
+ * reviewer that `asks` picks. A request made again after a review is a new
+ * event, so the time restarts. Undefined when GitHub gave no such event.
+ */
+function requestedAtOf(node: AssignedNode, asks: (r: Reviewer) => boolean): string | undefined {
+  let latest: string | undefined;
+  for (const event of node.timelineItems?.nodes ?? []) {
+    if (!event?.createdAt || !event.requestedReviewer || !asks(event.requestedReviewer)) continue;
+    if (!latest || event.createdAt > latest) latest = event.createdAt;
+  }
+  return latest;
 }

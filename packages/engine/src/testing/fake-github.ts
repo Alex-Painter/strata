@@ -68,6 +68,8 @@ export interface FakeRequests {
   reviewedBy?: string[];
   reviewers?: string[];
   teams?: { slug: string; members: string[] }[];
+  /** When the reviewers and teams were asked; defaults to a minute after the PR opened. */
+  requestedAt?: string;
 }
 
 export function fakeGitHub(
@@ -335,6 +337,18 @@ function search(
             requestedReviewer: { __typename: "User" as const, login },
           })),
           ...(asks.teams ?? []).map((team) => ({
+            requestedReviewer: { __typename: "Team" as const, combinedSlug: team.slug },
+          })),
+        ],
+      },
+      timelineItems: {
+        nodes: [
+          ...(asks.reviewers ?? []).map((login) => ({
+            createdAt: asks.requestedAt ?? ghTime(pr.number + 1),
+            requestedReviewer: { __typename: "User" as const, login },
+          })),
+          ...(asks.teams ?? []).map((team) => ({
+            createdAt: asks.requestedAt ?? ghTime(pr.number + 1),
             requestedReviewer: { __typename: "Team" as const, combinedSlug: team.slug },
           })),
         ],

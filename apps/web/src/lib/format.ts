@@ -69,6 +69,17 @@ const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", 
 
 export const formatDate = (iso: string) => DATE.format(new Date(iso));
 
+const DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** "20 Nov 2026, 11:18", in the viewer's time zone. */
+export const formatDateTime = (iso: string) => DATE_TIME.format(new Date(iso));
+
 /** "3h ago", "2d ago", or the date once it's more than a month old. */
 export function ago(iso: string, now = Date.now()): string {
   const minutes = Math.round((now - Date.parse(iso)) / 60_000);

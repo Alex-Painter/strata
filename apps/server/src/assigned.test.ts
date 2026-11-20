@@ -116,7 +116,13 @@ describe("the assignment search", () => {
     ]);
     const changes = await list();
     expect(changes[0]?.yours[1]?.reasons).toEqual([
-      { kind: "review-requested", direct: false, teams: ["acme/backend"] },
+      {
+        kind: "review-requested",
+        direct: false,
+        teams: ["acme/backend"],
+        // When the team was asked, kept for the Requested column.
+        requestedAt: expect.stringMatching(/^2026-10-01T00:\d\d:00Z$/),
+      },
     ]);
     // One run per Change, not per PR.
     expect(runCount()).toBe(3);

@@ -1,13 +1,14 @@
-import type {
-  AssignedStatus,
-  AuthoredPr,
-  AuthoredResponse,
-  ChangeSummary,
-  MeResponse,
-  PathPr,
-  RunStatus,
-  StackSummary,
-  StacksResponse,
+import {
+  type AssignedStatus,
+  type AuthoredPr,
+  type AuthoredResponse,
+  type ChangeSummary,
+  type MeResponse,
+  type PathPr,
+  type RunStatus,
+  type StackSummary,
+  type StacksResponse,
+  waitsOnYou,
 } from "@strata/core/model";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
@@ -16,7 +17,7 @@ import { AppShell, Breadcrumb, HomeNav } from "../components/AppShell";
 import { Icon } from "../components/Icon";
 import { Info } from "../components/Info";
 import { api, isPending, pollStacks } from "../lib/api";
-import { ago, countPrs, yoursLabel } from "../lib/format";
+import { ago, countPrs, formatDateTime, yoursLabel } from "../lib/format";
 import { prUrl } from "../lib/github";
 import { matchesSearch } from "../lib/search";
 import { type ReviewStatus, type ReviewStatusKind, reviewStatus } from "../lib/status";
@@ -471,7 +472,31 @@ function changeRow(change: ChangeSummary): Row {
       reviewed: change.yours.some((pr) => pr.reasons.some((r) => r.kind === "reviewed")),
     }),
     strata: change.status ? STATUS[change.status] : null,
+    requested: requestedOf(change),
   };
+}
+
+/**
+ * When your review was requested on the PRs that still wait on you: the
+ * oldest such request, with each PR's time in `detail`. Null when none has a time.
+ */
+export function requestedOf(change: ChangeSummary): Row["requested"] {
+  const times = change.yours
+    .filter((pr) => pr.active && waitsOnYou(pr.reasons))
+    .flatMap((pr) =>
+      pr.reasons.flatMap((r) =>
+        r.kind === "review-requested" && r.requestedAt
+          ? [{ number: pr.number, at: r.requestedAt }]
+          : [],
+      ),
+    )
+    .sort((a, b) => a.number - b.number);
+  if (times.length === 0) return null;
+  const at = times.map((t) => t.at).sort()[0] as string;
+  const detail = times
+    .map((t) => `#${t.number}: review requested ${formatDateTime(t.at)}`)
+    .join("\n");
+  return { at, detail };
 }
 
 interface Row {
@@ -491,6 +516,8 @@ interface Row {
   place: { label: string; detail: string; positions: number[]; total: number } | null;
   status: ReviewStatus | null;
   strata: string | null;
+  /** When your review was requested, for the Requested column. */
+  requested?: { at: string; detail: string } | null;
 }
 
 /** Where `prs` sit on `path`, bottom first, counted from 1. */
@@ -656,22 +683,29 @@ function rowMatches(row: Row, query: string): boolean {
   );
 }
 
-/** Changes or stacks as a table: what, who, when opened, review status, Strata's run, GitHub. */
+/**
+ * Changes or stacks as a table: what, who, when opened, when your review was
+ * requested (only when a row has that), review status, Strata's run, GitHub.
+ */
 function ChangeTable({ rows: all }: { rows: Row[] }) {
   const [, navigate] = useLocation();
   const query = useContext(SearchContext);
   const rows = all.filter((row) => rowMatches(row, query));
+  const withRequested = all.some((row) => row.requested);
   if (rows.length === 0 && all.length > 0) {
     return <div className="empty">Nothing matches your search.</div>;
   }
   return (
     <div className="list overflow-x-auto">
-      <table className="w-full min-w-[840px] table-fixed border-collapse text-left">
+      <table
+        className={`w-full ${withRequested ? "min-w-[936px]" : "min-w-[840px]"} table-fixed border-collapse text-left`}
+      >
         <colgroup>
           <col />
           <col className="w-32" />
           <col className="w-24" />
           <col className="w-24" />
+          {withRequested && <col className="w-24" />}
           <col className="w-40" />
           <col className="w-28" />
           <col className="w-10" />
@@ -682,6 +716,7 @@ function ChangeTable({ rows: all }: { rows: Row[] }) {
             <th className="px-3 py-1.5 font-normal">Author</th>
             <th className="px-3 py-1.5 font-normal">In stack</th>
             <th className="px-3 py-1.5 font-normal">Opened</th>
+            {withRequested && <th className="px-3 py-1.5 font-normal">Requested</th>}
             <th className="px-3 py-1.5 font-normal">Status</th>
             <th className="px-3 py-1.5 font-normal">Strata</th>
             <th className="px-3 py-1.5 font-normal">
@@ -754,6 +789,11 @@ function ChangeTable({ rows: all }: { rows: Row[] }) {
                 <td className="px-3 py-1.5 text-[13px] text-muted" title={opened}>
                   {opened ? ago(opened) : ""}
                 </td>
+                {withRequested && (
+                  <td className="px-3 py-1.5 text-[13px] text-muted" title={row.requested?.detail}>
+                    {row.requested ? ago(row.requested.at) : ""}
+                  </td>
+                )}
                 <td
                   className={`truncate px-3 py-1.5 text-[13px] ${row.status ? TONE[row.status.kind] : ""}`}
                   title={row.status?.detail}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fakeGitHub, prNode } from "../testing/fake-github.js";
+import { fakeGitHub, ghTime, prNode } from "../testing/fake-github.js";
 import { findAssigned } from "./assigned.js";
 
 const oid = (n: number) => String(n).repeat(40).slice(0, 40);
@@ -41,9 +41,25 @@ describe("findAssigned", () => {
     expect(found.viewer).toBe("alex");
     expect(found.prs.map((pr) => [pr.number, pr.reasons])).toEqual([
       [1, [{ kind: "assignee" }]],
-      [2, [{ kind: "review-requested", direct: true, teams: [] }]],
-      [3, [{ kind: "review-requested", direct: false, teams: ["acme/backend", "acme/infra"] }]],
-      [4, [{ kind: "assignee" }, { kind: "review-requested", direct: true, teams: [] }]],
+      [2, [{ kind: "review-requested", direct: true, teams: [], requestedAt: ghTime(3) }]],
+      [
+        3,
+        [
+          {
+            kind: "review-requested",
+            direct: false,
+            teams: ["acme/backend", "acme/infra"],
+            requestedAt: ghTime(4),
+          },
+        ],
+      ],
+      [
+        4,
+        [
+          { kind: "assignee" },
+          { kind: "review-requested", direct: true, teams: [], requestedAt: ghTime(5) },
+        ],
+      ],
       [8, [{ kind: "reviewed" }]],
     ]);
     expect(found.prs[0]).toMatchObject({ title: "PR 1", headOid: oid(1) });
@@ -60,5 +76,56 @@ describe("findAssigned", () => {
   it("returns no PRs when nothing is asked of you", async () => {
     const github = fakeGitHub("acme/app", [prNode(1, oid(1))], { viewer: "alex" });
     expect(await findAssigned(github, "acme/app")).toEqual({ viewer: "alex", prs: [] });
+  });
+
+  it("dates a request by the newest event aimed at you, not at others", async () => {
+    const github = fakeGitHub("acme/app", [prNode(2, oid(2))], { viewer: "alex" });
+    github.requests = { 2: { reviewers: ["alex"] } };
+    const graphql = github.graphql.bind(github);
+    github.graphql = (async (query: string, variables: Record<string, unknown>) => {
+      const page = (await graphql(query, variables)) as {
+        search?: { nodes: { timelineItems?: unknown }[] };
+      };
+      for (const node of page.search?.nodes ?? []) {
+        node.timelineItems = {
+          nodes: [
+            { createdAt: ghTime(10), requestedReviewer: { __typename: "User", login: "Alex" } },
+            // Asked again after a review: the clock restarts.
+            { createdAt: ghTime(50), requestedReviewer: { __typename: "User", login: "alex" } },
+            { createdAt: ghTime(90), requestedReviewer: { __typename: "User", login: "sam" } },
+            {
+              createdAt: ghTime(95),
+              requestedReviewer: { __typename: "Team", combinedSlug: "acme/x" },
+            },
+            {},
+            null,
+          ],
+        };
+      }
+      return page;
+    }) as typeof github.graphql;
+
+    const found = await findAssigned(github, "acme/app");
+
+    expect(found.prs[0]?.reasons).toEqual([
+      { kind: "review-requested", direct: true, teams: [], requestedAt: ghTime(50) },
+    ]);
+  });
+
+  it("leaves the time out when GitHub gives no request event", async () => {
+    const github = fakeGitHub("acme/app", [prNode(2, oid(2))], { viewer: "alex" });
+    github.requests = { 2: { reviewers: ["alex"] } };
+    const graphql = github.graphql.bind(github);
+    github.graphql = (async (query: string, variables: Record<string, unknown>) => {
+      const page = (await graphql(query, variables)) as {
+        search?: { nodes: { timelineItems?: unknown }[] };
+      };
+      for (const node of page.search?.nodes ?? []) delete node.timelineItems;
+      return page;
+    }) as typeof github.graphql;
+
+    const found = await findAssigned(github, "acme/app");
+
+    expect(found.prs[0]?.reasons).toEqual([{ kind: "review-requested", direct: true, teams: [] }]);
   });
 });

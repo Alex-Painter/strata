@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ChangesPage, ranges } from "./ChangesPage";
+import { ChangesPage, ranges, requestedOf } from "./ChangesPage";
 
 const change = (id: string, fields: Partial<ChangeSummary>): ChangeSummary => ({
   id,
@@ -44,7 +44,14 @@ const list: ChangeSummary[] = [
     yours: [
       {
         number: 3,
-        reasons: [{ kind: "review-requested", direct: false, teams: ["acme/backend"] }],
+        reasons: [
+          {
+            kind: "review-requested",
+            direct: false,
+            teams: ["acme/backend"],
+            requestedAt: "2026-10-01T09:30:00Z",
+          },
+        ],
         active: true,
         seenAt,
       },
@@ -169,6 +176,11 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
     "2/2",
   );
   expect(waiting.textContent).toContain("acme/app#9: no luck");
+  // When your review was requested, next to when the PRs were opened.
+  expect([...waiting.querySelectorAll("th")].map((th) => th.textContent)).toContain("Requested");
+  const requested = waiting.querySelector('td[title^="#3: review requested"]');
+  expect(requested?.textContent).toMatch(/ago$|\d{4}$/);
+  expect(requested?.getAttribute("title")).toMatch(/^#3: review requested 1 Oct 2026, \d\d:\d\d$/);
 
   // Changes you reviewed before are on the Reviewed page, not here.
   expect(section("assigned-h")).toBeNull();
@@ -208,6 +220,8 @@ it("splits Changes by what they ask of you, lists the repo's other stacks, and s
   expect(section("yours-h").querySelector("tbody tr:last-child a")?.getAttribute("href")).toBe(
     "https://github.com/acme/app/pull/60",
   );
+  // No review requests here, so no Requested column.
+  expect(section("yours-h").textContent).not.toContain("Requested");
   const others = rows("others-acme-app");
   expect(others.map(([href]) => href)).toEqual(["/repos/acme/app#stack-30"]);
   expect(others[0]?.[1]).toContain("Not analysed");
@@ -309,4 +323,36 @@ it("writes positions in the stack as runs", () => {
   expect(ranges([2, 3, 4, 5, 6, 7, 8, 9])).toBe("2–9");
   expect(ranges([1, 3, 4, 6])).toBe("1, 3–4, 6");
   expect(ranges([5])).toBe("5");
+});
+
+it("shows the oldest request that still waits on you, with each PR's time", () => {
+  const asked = (requestedAt?: string) => ({
+    kind: "review-requested" as const,
+    direct: true,
+    teams: [],
+    ...(requestedAt ? { requestedAt } : {}),
+  });
+  const result = requestedOf(
+    change("9", {
+      yours: [
+        { number: 9, reasons: [asked("2026-10-03T10:00:00Z")], active: true, seenAt },
+        { number: 7, reasons: [asked("2026-10-02T10:00:00Z")], active: true, seenAt },
+        // Merged or no longer asked: not counted.
+        { number: 5, reasons: [asked("2026-09-01T10:00:00Z")], active: false, seenAt },
+        // Reviewed, and asked only through a team since: it does not wait on you.
+        {
+          number: 4,
+          reasons: [{ kind: "reviewed" }, { ...asked("2026-09-02T10:00:00Z"), direct: false }],
+          active: true,
+          seenAt,
+        },
+        { number: 8, reasons: [asked()], active: true, seenAt },
+      ],
+    }),
+  );
+  expect(result?.at).toBe("2026-10-02T10:00:00Z");
+  expect(result?.detail.split("\n").map((line) => line.split(":")[0])).toEqual(["#7", "#9"]);
+  expect(
+    requestedOf(change("6", { yours: [{ number: 6, reasons: [asked()], active: true, seenAt }] })),
+  ).toBeNull();
 });

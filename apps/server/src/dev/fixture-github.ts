@@ -285,6 +285,9 @@ const newest = Math.max(...demo.github.prs.map((pr) => Date.parse(pr.updatedAt))
 const shift = Date.now() - 3_600_000 - newest;
 demo.github.prs = demo.github.prs.map((pr) => shiftTimes(pr, shift));
 demo.github.verification = shiftTimes(demo.github.verification, shift);
+// The team was asked for #10's review 30 minutes ago, after the PRs opened.
+const asked = demo.github.requests[10];
+if (asked) asked.requestedAt = new Date(Date.now() - 30 * 60_000).toISOString();
 
 // Two small pictures for #9's screenshots.
 const picture = (label: string) =>
